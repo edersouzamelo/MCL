@@ -1,0 +1,31 @@
+{
+  "title": "MCL Piloto Classe II v0.1.0 - Prototipo demonstrativo do Modelo de Continuidade Logistica",
+  "upload_type": "software",
+  "publication_date": "2026-07-02",
+  "creators": [
+    {
+      "name": "Souza Melo, Edervaldo Jose de",
+      "orcid": "0009-0003-6835-135X"
+    }
+  ],
+  "description": "Prototipo web demonstrativo destinado a materializar a continuidade informacional entre necessidade, cobertura, aquisicao, credito, estoque, unidade logistica, remessa e entrega em um cenario sintetico de suprimento Classe II.",
+  "keywords": [
+    "Logistica 4.0",
+    "interoperabilidade",
+    "continuidade informacional",
+    "cadeia de suprimento",
+    "logistica militar",
+    "Classe II",
+    "rastreabilidade",
+    "QR Code",
+    "sistemas federados",
+    "apoio a decisao"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://doi.org/10.5281/zenodo.21053127",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article"
+    }
+  ]
+}

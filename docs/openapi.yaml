@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: MCL Piloto Classe II API
+  version: 0.1.0
+paths:
+  /api/qr/resolve:
+    post:
+      summary: Resolve QR MCL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: Unidade encontrada
+        "400":
+          description: Formato inválido
+  /api/events:
+    post:
+      summary: Registra evento logístico
+      responses:
+        "200":
+          description: Evento registrado ou idempotente
+        "401":
+          description: Autenticação obrigatória
+  /api/import:
+    post:
+      summary: Valida importação CSV/JSON
+      responses:
+        "200":
+          description: Resultado da validação

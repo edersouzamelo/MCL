@@ -1,0 +1,16 @@
+{
+  "name": "MCL | Piloto Classe II",
+  "short_name": "MCL Piloto",
+  "description": "Prototipo demonstrativo com dados sinteticos para continuidade logistica Classe II.",
+  "start_url": "/painel",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#047857",
+  "icons": [
+    {
+      "src": "/icons/mcl-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

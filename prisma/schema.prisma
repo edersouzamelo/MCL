@@ -1,0 +1,363 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RoleName {
+  COMMAND_VIEWER
+  LOGISTICS_MANAGER
+  WAREHOUSE_OPERATOR
+  AUDITOR
+  ADMIN
+  READ_ONLY
+}
+
+enum DataNature {
+  validado
+  informado
+  calculado
+  estimado
+  divergente
+  pendente
+}
+
+enum LogisticsUnitState {
+  IDENTIFICADO
+  AGUARDANDO_INSPECAO
+  DISPONIVEL
+  ARMAZENADO
+  RESERVADO
+  SEPARADO
+  EM_TRANSITO
+  ENTREGUE
+}
+
+model User {
+  id        String      @id
+  name      String?
+  email     String?     @unique
+  image     String?
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  scopes    UserScope[]
+}
+
+model UserScope {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  supplyClass    String
+  role           RoleName
+  validFrom      DateTime
+  validUntil     DateTime?
+  active         Boolean      @default(true)
+  user           User         @relation(fields: [userId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Organization {
+  id        String      @id
+  code      String      @unique
+  name      String
+  type      String
+  parentId  String?
+  synthetic Boolean     @default(true)
+  active    Boolean     @default(true)
+  scopes    UserScope[]
+}
+
+model SupplyItem {
+  id             String        @id
+  persistentCode String        @unique
+  name           String
+  description    String
+  supplyClass    String
+  category       String
+  baseUnit       String
+  active         Boolean       @default(true)
+  synthetic      Boolean       @default(true)
+  variants       ItemVariant[]
+}
+
+model ItemVariant {
+  id        String       @id
+  itemId    String
+  sku       String       @unique
+  label     String
+  size      String
+  unit      String
+  active    Boolean      @default(true)
+  item      SupplyItem   @relation(fields: [itemId], references: [id])
+  needs     Need[]
+  lots      Lot[]
+}
+
+model Need {
+  id                String      @id
+  persistentCode    String      @unique
+  organizationId    String
+  itemVariantId     String
+  quantityRequested Int
+  quantityApproved  Int
+  priority          String
+  requiredAt        DateTime
+  purpose           String
+  status            String
+  sourceSystem      String
+  sourceRecordId    String
+  authorityLevel    String
+  confidence        Float
+  schemaVersion     String
+  dataNature        DataNature
+  occurredAt        DateTime
+  recordedAt        DateTime
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  variant           ItemVariant @relation(fields: [itemVariantId], references: [id])
+}
+
+model Credit {
+  id              String     @id
+  persistentCode  String     @unique
+  amount          Decimal
+  availableAmount Decimal
+  planningCode    String
+  expenseNature   String
+  expiresAt       DateTime
+  status          String
+  sourceSystem    String
+  sourceRecordId  String
+  confidence      Float
+  schemaVersion   String
+  dataNature      DataNature
+  occurredAt      DateTime
+  recordedAt      DateTime
+}
+
+model AcquisitionInstrument {
+  id                    String   @id
+  persistentCode         String   @unique
+  type                  String
+  reference             String
+  supplierNameSynthetic String
+  validFrom             DateTime
+  validUntil            DateTime
+  capacity              Int
+  status                String
+  sourceSystem          String
+  sourceRecordId        String
+}
+
+model Commitment {
+  id                      String   @id
+  persistentCode           String   @unique
+  creditId                String
+  acquisitionInstrumentId String
+  amount                  Decimal
+  issuedAt                DateTime
+  status                  String
+  sourceSystem            String
+  sourceRecordId          String
+  confidence              Float
+}
+
+model NeedCoverage {
+  id           String @id
+  needId       String
+  coverageType String
+  quantity     Int
+  creditId     String?
+  commitmentId String?
+  status       String
+}
+
+model Lot {
+  id                         String      @id
+  persistentCode              String      @unique
+  itemVariantId               String
+  quantity                    Int
+  manufacturedAt              DateTime?
+  receivedAt                  DateTime?
+  supplierReferenceSynthetic  String
+  status                      String
+  variant                     ItemVariant @relation(fields: [itemVariantId], references: [id])
+}
+
+model Location {
+  id             String  @id
+  code           String  @unique
+  name           String
+  organizationId String
+  type           String
+  synthetic      Boolean @default(true)
+}
+
+model LogisticsUnit {
+  id                String             @id
+  persistentCode    String             @unique
+  lotId             String
+  itemVariantId     String
+  quantity          Int
+  unit              String
+  qrToken           String             @unique
+  currentState      LogisticsUnitState
+  currentLocationId String
+  condition         String
+  confidence        Float
+  sourceEventId     String?
+  sourceSystem      String
+  sourceRecordId    String
+  schemaVersion     String
+  dataNature        DataNature
+  occurredAt        DateTime
+  recordedAt        DateTime
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Shipment {
+  id                         String    @id
+  persistentCode             String    @unique
+  originOrganizationId       String
+  destinationOrganizationId  String
+  plannedDepartureAt         DateTime
+  actualDepartureAt          DateTime?
+  expectedDeliveryAt         DateTime
+  actualDeliveryAt           DateTime?
+  status                     String
+  transportReferenceSynthetic String
+  confidence                 Float
+}
+
+model ShipmentUnit {
+  shipmentId      String
+  logisticsUnitId String
+  quantity        Int
+
+  @@id([shipmentId, logisticsUnitId])
+}
+
+model DocumentReference {
+  id                  String   @id
+  title               String
+  documentType        String
+  repository          String
+  externalReference   String
+  classificationLabel String
+  synthetic           Boolean  @default(true)
+  checksum            String?
+  createdAt           DateTime @default(now())
+}
+
+model ObjectLink {
+  id             String   @id
+  fromType       String
+  fromId         String
+  relationType   String
+  toType         String
+  toId           String
+  sourceSystem   String
+  sourceRecordId String
+  createdAt      DateTime @default(now())
+
+  @@index([fromType, fromId])
+  @@index([toType, toId])
+}
+
+model LogisticsEvent {
+  id                 String     @id
+  persistentCode      String     @unique
+  eventType           String
+  occurredAt          DateTime
+  recordedAt          DateTime
+  objectType          String
+  objectId            String
+  quantity            Int
+  unit                String
+  locationId          String?
+  condition           String?
+  sourceSystem        String
+  sourceRecordId      String
+  actorId             String
+  idempotencyKey      String     @unique
+  schemaVersion       String
+  authorityLevel      String
+  confidence          Float
+  dataNature          DataNature
+  payload             Json
+  correctionOfEventId String?
+  createdAt           DateTime   @default(now())
+
+  @@index([objectType, objectId])
+}
+
+model EventRelation {
+  eventId           String
+  relatedObjectType String
+  relatedObjectId   String
+  relationType      String
+
+  @@id([eventId, relatedObjectType, relatedObjectId, relationType])
+}
+
+model Divergence {
+  id                 String   @id
+  persistentCode      String   @unique
+  title              String
+  severity           String
+  status             String
+  objectType         String
+  objectId           String
+  expected           String
+  observed           String
+  sourceSystem       String
+  sourceRecordId     String
+  confidence         Float
+  detectedAt         DateTime
+  correctedByEventId String?
+}
+
+model ConnectorHealth {
+  id                 String   @id
+  name               String
+  sourceSystem       String
+  status             String
+  lastRunAt          DateTime
+  lastSuccessAt      DateTime?
+  latencyMs          Int
+  recordsImported    Int
+  quarantinedRecords Int
+  message            String
+}
+
+model QuarantineRecord {
+  id             String   @id
+  sourceSystem   String
+  sourceRecordId String
+  reason         String
+  payload        Json
+  createdAt      DateTime @default(now())
+}
+
+model AuditLog {
+  id             String   @id
+  occurredAt     DateTime
+  actorId        String
+  action         String
+  resourceType   String
+  resourceId     String
+  organizationId String?
+  requestId      String
+  sourceIpHash   String?
+  userAgent      String
+  outcome        String
+  reason         String
+  metadata       Json
+}

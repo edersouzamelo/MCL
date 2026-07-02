@@ -1,0 +1,16 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "MCL Piloto Classe II",
+  "version": "0.1.0",
+  "dateCreated": "2026-07-02",
+  "programmingLanguage": ["TypeScript", "SQL"],
+  "runtimePlatform": "Node.js",
+  "author": {
+    "@type": "Person",
+    "givenName": "Edervaldo José de",
+    "familyName": "Souza Melo",
+    "@id": "https://orcid.org/0009-0003-6835-135X"
+  },
+  "description": "Prototipo demonstrativo do Modelo de Continuidade Logistica para suprimento Classe II com dados sinteticos."
+}

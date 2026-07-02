@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mcl-piloto-postgres
+    environment:
+      POSTGRES_USER: mcl
+      POSTGRES_PASSWORD: mcl_demo_password
+      POSTGRES_DB: mcl_piloto
+    ports:
+      - "5432:5432"
+    volumes:
+      - mcl_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcl -d mcl_piloto"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mcl_postgres_data:

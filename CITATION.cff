@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: "MCL Piloto Classe II v0.1.0 - Protótipo demonstrativo do Modelo de Continuidade Logística"
+message: "Cite este software conforme os metadados do autor."
+type: software
+version: 0.1.0
+date-released: 2026-07-02
+authors:
+  - family-names: "Souza Melo"
+    given-names: "Edervaldo José de"
+    orcid: "https://orcid.org/0009-0003-6835-135X"
+keywords:
+  - Logística 4.0
+  - interoperabilidade
+  - continuidade informacional
+  - cadeia de suprimento
+  - Classe II
+  - rastreabilidade
