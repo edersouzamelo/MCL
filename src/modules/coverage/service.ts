@@ -132,8 +132,37 @@ type CoverageServiceOptions = {
   fetchImpl?: typeof fetch;
 };
 
+type DbNumericValue = number | string | { toString(): string } | null | undefined;
+type DbItemCatalogMappingVersion = Pick<ItemCatalogMapping, "id" | "status">;
+
+interface DbAcquisitionInstrumentRecord {
+  [key: string]: unknown;
+  id: string;
+  itemCode?: string | null;
+  sourceSystem?: string | null;
+  quantity?: DbNumericValue;
+  unitValue?: DbNumericValue;
+  totalValue?: DbNumericValue;
+  capacity?: number | null;
+  validFrom: Date | string;
+  validUntil: Date | string;
+  status: string;
+}
+
+interface DbNeedCoverageQuantity {
+  quantity: number;
+}
+
 function stableId(prefix: string, value: string) {
   return `${prefix}-${createHash("sha1").update(value).digest("hex").slice(0, 18)}`;
+}
+
+function numberFromDb(value: DbNumericValue): number | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  return Number(value);
 }
 
 function defaultDateRange() {
@@ -690,9 +719,9 @@ export async function confirmCatalogMapping(
       data: { status: "SUPERSEDED" },
     });
 
-    const previousVersions = await prisma.itemCatalogMapping.findMany({
+    const previousVersions = (await prisma.itemCatalogMapping.findMany({
       where: { mclItemId: item.id, mclVariantId: variant?.id },
-    });
+    })) as DbItemCatalogMappingVersion[];
 
     const now = new Date();
     const mapping = await prisma.itemCatalogMapping.create({
@@ -713,7 +742,7 @@ export async function confirmCatalogMapping(
         status: "ACTIVE",
         confidence: input.confidence ?? Math.max(0.55, candidate.similarityScore),
         mappingVersion: previousVersions.length + 1,
-        replacesMappingId: previousVersions.find((v) => v.status === "ACTIVE")?.id,
+        replacesMappingId: previousVersions.find((version: DbItemCatalogMappingVersion) => version.status === "ACTIVE")?.id,
         sourceCandidateId: candidate.id,
       },
     });
@@ -1588,18 +1617,18 @@ export async function consultArpUnits(state: DemoState, rawInput: ArpUnitsInput,
         },
       });
 
-      const relatedInstruments = await prisma.acquisitionInstrument.findMany({
+      const relatedInstruments = (await prisma.acquisitionInstrument.findMany({
         where: {
           sourceSystem: COMPRAS_GOV_SOURCE_SYSTEM,
           itemCode: instrument.itemCode,
         },
-      });
+      })) as DbAcquisitionInstrumentRecord[];
 
-      const mappedInstruments = relatedInstruments.map((i) => ({
-        ...i,
-        quantity: i.quantity ? Number(i.quantity) : 0,
-        unitValue: i.unitValue ? Number(i.unitValue) : undefined,
-        totalValue: i.totalValue ? Number(i.totalValue) : undefined,
+      const mappedInstruments = relatedInstruments.map((relatedInstrument: DbAcquisitionInstrumentRecord) => ({
+        ...relatedInstrument,
+        quantity: numberFromDb(relatedInstrument.quantity) ?? 0,
+        unitValue: numberFromDb(relatedInstrument.unitValue),
+        totalValue: numberFromDb(relatedInstrument.totalValue),
       }));
 
       const mapping = await activeCatalogMappingForNeed(state, input.needId);
@@ -1952,10 +1981,10 @@ export async function getOrCreateMaterialAnalysis(needId: string, actorId: strin
       throw new Error("Necessidade nao localizada.");
     }
 
-    const needCoverages = await prisma.needCoverage.findMany({
+    const needCoverages = (await prisma.needCoverage.findMany({
       where: { needId, coverageType: "ESTOQUE" },
-    });
-    const stockCovered = needCoverages.reduce((sum, c) => sum + c.quantity, 0);
+    })) as DbNeedCoverageQuantity[];
+    const stockCovered = needCoverages.reduce((sum: number, coverage: DbNeedCoverageQuantity) => sum + coverage.quantity, 0);
     const deficit = Math.max(0, need.quantityRequested - stockCovered);
 
     analysis = await prisma.materialCoverageAnalysis.create({
