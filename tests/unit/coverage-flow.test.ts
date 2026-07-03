@@ -458,5 +458,50 @@ describe("consulta de cobertura orientada pela necessidade", () => {
     const resultSearchText = needSearchText(demo, "need-calca-120", "copo plastico");
     expect(resultSearchText).toBe("copo plastico");
   });
+
+  it("retorna candidatos, atas e unidades simulados sob falha de API fora do ambiente de teste", async () => {
+    const demo = state();
+    await prepareMapping(demo);
+    const fetchImpl = vi.fn().mockRejectedValue(new Error("Timeout/SSL Error")) as unknown as typeof fetch;
+
+    const originalEnv = process.env.NODE_ENV;
+    (process.env as any).NODE_ENV = "development";
+
+    try {
+      const candidatesResult = await searchCatmatCandidates(
+        demo,
+        { needId: "need-coturno-200", terms: "copo" },
+        { actorId: "user-demo-admin", config: config(), fetchImpl },
+      );
+      expect(candidatesResult.candidates).toHaveLength(3);
+      expect(candidatesResult.candidates[0].externalItemCode).toBe("328003");
+
+      const arpResult = await searchArpsForConfirmedCatmat(
+        demo,
+        { needId: "need-coturno-200" },
+        { actorId: "user-demo-admin", config: config(), fetchImpl },
+      );
+      expect(arpResult.entries).toHaveLength(2);
+      expect(arpResult.entries[0].instrument.sourceSystem).toBe("MCL_SIMULADO");
+
+      const unitsResult = await consultArpUnits(
+        demo,
+        {
+          needId: "need-coturno-200",
+          acquisitionInstrumentId: arpResult.entries[0].instrument.id,
+          numeroAta: "00010/2026",
+          unidadeGerenciadora: "201057",
+          numeroItem: "00001",
+        },
+        { actorId: "user-demo-admin", config: config(), fetchImpl },
+      );
+      expect(unitsResult.records).toHaveLength(2);
+      expect(unitsResult.synthesis.balanceStatus).toBe("CONSULTABLE");
+      expect(Number(unitsResult.records[0].saldoAdesoes)).toBe(350);
+      expect(Number(unitsResult.records[1].saldoAdesoes)).toBe(150);
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
 });
 
