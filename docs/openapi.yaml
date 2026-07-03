@@ -34,3 +34,48 @@ paths:
       responses:
         "200":
           description: Resultado da validação
+  /api/connectors/compras-gov/sync:
+    post:
+      summary: Sincroniza ARP Item do Compras.gov.br
+      description: Requer ADMIN ou LOGISTICS_MANAGER. Consulta API publica oficial, registra staging, metricas e auditoria.
+      responses:
+        "200":
+          description: Execucao do conector
+        "401":
+          description: Autenticacao obrigatoria
+        "403":
+          description: Permissao insuficiente
+        "409":
+          description: Sincronizacao concorrente ou falha controlada
+  /api/aquisicoes/links:
+    post:
+      summary: Vincula necessidade a instrumento publico
+      description: Cria ObjectLink manual NEED --PODE_SER_ATENDIDA_POR--> ACQUISITION_INSTRUMENT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - needId
+                - acquisitionInstrumentId
+                - justification
+              properties:
+                needId:
+                  type: string
+                acquisitionInstrumentId:
+                  type: string
+                justification:
+                  type: string
+                confidence:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+      responses:
+        "200":
+          description: Vinculo criado ou idempotente
+        "400":
+          description: Entrada invalida
+        "401":
+          description: Autenticacao obrigatoria

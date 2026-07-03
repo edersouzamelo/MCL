@@ -7,6 +7,7 @@ import {
   FileInput,
   Gauge,
   History,
+  Landmark,
   QrCode,
 } from "lucide-react";
 import { DemoBanner } from "@/components/DemoBanner";
@@ -15,6 +16,7 @@ import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 const nav = [
   { href: "/painel", label: "Painel", icon: Gauge },
   { href: "/necessidades", label: "Necessidades", icon: ClipboardList },
+  { href: "/aquisicoes", label: "Aquisicoes", icon: Landmark },
   { href: "/scanner", label: "Scanner", icon: QrCode },
   { href: "/conectores", label: "Conectores", icon: Activity },
   { href: "/divergencias", label: "Divergencias", icon: AlertTriangle },

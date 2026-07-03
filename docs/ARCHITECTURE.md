@@ -12,7 +12,9 @@ flowchart LR
   DOM -. futuro .-> PG["PostgreSQL via Prisma"]
   APP --> AUD["Auditoria append-only"]
   UI --> QR["QR/passaporte"]
-  APP --> CONN["Conectores simulados"]
+  APP --> CONN["Conectores"]
+  CONN --> GOV["Compras.gov.br API publica"]
+  CONN --> STG["ExternalRecord staging"]
 ```
 
 ## Camadas
@@ -22,4 +24,5 @@ flowchart LR
 - Domínio: entidades, eventos, projeções, divergências.
 - Infraestrutura: Auth.js, Prisma, PostgreSQL, scripts, CI.
 - Projeções: estado consolidado, métricas, linha do tempo.
+- Conector Compras.gov.br: cliente HTTP isolado, timeout, retry, cache, validacao Zod, staging e normalizacao canonica minima.
 - Cognitiva futura: contratos somente leitura em `src/modules/cognitive/contracts.ts`.

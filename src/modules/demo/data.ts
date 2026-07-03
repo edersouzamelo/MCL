@@ -3,11 +3,13 @@ import type {
   AuditLog,
   Commitment,
   ConnectorHealth,
+  ConnectorRun,
   Credit,
   DemoState,
   Divergence,
   DocumentReference,
   EventRelation,
+  ExternalRecord,
   ItemVariant,
   Location,
   LogisticsEvent,
@@ -310,6 +312,8 @@ export const acquisitionInstruments: AcquisitionInstrument[] = [
     status: "VIGENTE",
     sourceSystem: "SIM-AQUISICAO",
     sourceRecordId: "AQ-SYN-0001",
+    sourceOrigin: "SINTETICO",
+    confidence: 0.86,
   },
 ];
 
@@ -784,6 +788,25 @@ export const divergences: Divergence[] = [
 
 export const connectors: ConnectorHealth[] = [
   {
+    id: "compras-gov",
+    name: "COMPRAS.GOV - API PUBLICA OFICIAL",
+    sourceSystem: "COMPRAS_GOV",
+    status: "ATRASADO",
+    lastRunAt: createdAt,
+    latencyMs: 0,
+    recordsImported: 0,
+    quarantinedRecords: 0,
+    message: "Conector oficial somente leitura aguardando primeira sincronizacao.",
+    endpoint: "/modulo-arp/2_consultarARPItem",
+    recordsRead: 0,
+    acceptedRecords: 0,
+    updatedRecords: 0,
+    duplicateRecords: 0,
+    rejectedRecords: 0,
+    durationMs: 0,
+    mappingVersion: "compras-gov.arp-item.v1",
+  },
+  {
     id: "connector-needs",
     name: "Simulador de necessidades",
     sourceSystem: "SIM-NECESSIDADES",
@@ -871,6 +894,9 @@ export const auditLogs: AuditLog[] = [
   },
 ];
 
+export const externalRecords: ExternalRecord[] = [];
+export const connectorRuns: ConnectorRun[] = [];
+
 export const multicriteriaWeights: MulticriteriaWeights[] = [
   {
     id: "weights-demo-v1",
@@ -904,6 +930,8 @@ export function createDemoState(): DemoState {
     shipmentUnits,
     documents,
     objectLinks,
+    externalRecords,
+    connectorRuns,
     events,
     eventRelations,
     divergences,

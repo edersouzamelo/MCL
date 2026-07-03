@@ -18,8 +18,8 @@ O MCL não substitui ERP, sistema patrimonial, SIAFI, SIGELOG ou qualquer sistem
 
 - Next.js App Router, TypeScript estrito, Tailwind CSS e PWA simples.
 - Autenticação demonstrativa via Auth.js/NextAuth e OAuth GitHub/Google configurável.
-- Dados 100% sintéticos para fardamento Classe II.
-- Dashboard, necessidades, passaporte digital, QR Code, scanner com fallback manual, registro de eventos, linha do tempo, conectores simulados, divergências, importação CSV/JSON e auditoria.
+- Dados sintéticos para fardamento Classe II e primeiro conector público somente leitura para Compras.gov.br.
+- Dashboard, necessidades, aquisições, passaporte digital, QR Code, scanner com fallback manual, registro de eventos, linha do tempo, conectores, divergências, importação CSV/JSON e auditoria.
 - Schema Prisma/PostgreSQL, Docker Compose local e seed determinístico.
 - Testes unitários e fluxo Playwright.
 - Script `pnpm release:artifact` para ZIP v0.1.0, manifesto e checksum.
@@ -64,6 +64,30 @@ pnpm db:seed
 ```
 
 O app roda imediatamente pelo store demonstrativo em memória. O PostgreSQL está preparado para migração/seed quando `DATABASE_URL` e `DIRECT_URL` estiverem configuradas.
+
+Auditoria do banco: `docs/DATABASE_AUDIT.md`.
+
+## Conector Compras.gov.br
+
+O piloto inclui o conector `COMPRAS.GOV - API PUBLICA OFICIAL`, somente leitura, usando `https://dadosabertos.compras.gov.br/modulo-arp/2_consultarARPItem`.
+
+Variáveis opcionais:
+
+```env
+COMPRAS_GOV_API_BASE_URL=https://dadosabertos.compras.gov.br
+COMPRAS_GOV_SYNC_ENABLED=true
+COMPRAS_GOV_PAGE_SIZE=10
+COMPRAS_GOV_REQUEST_TIMEOUT_MS=12000
+COMPRAS_GOV_CACHE_TTL_SECONDS=300
+COMPRAS_GOV_UNIT_CODE=
+COMPRAS_GOV_CATMAT_CODE=
+COMPRAS_GOV_MODALITY_CODE=
+COMPRAS_GOV_DATE_START=
+COMPRAS_GOV_DATE_END=
+COMPRAS_GOV_KEYWORD=
+```
+
+Fluxo: abrir `/conectores`, acionar **Sincronizar agora**, consultar `/aquisicoes` e vincular manualmente uma necessidade a um instrumento público. Documentação: `docs/connectors/COMPRAS_GOV.md`.
 
 ## OAuth
 

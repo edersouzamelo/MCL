@@ -14,6 +14,8 @@ async function main() {
   const client = prisma as unknown as Record<string, SeedModel>;
   const deleteOrder = [
     "auditLog",
+    "connectorRun",
+    "externalRecord",
     "quarantineRecord",
     "connectorHealth",
     "divergence",
@@ -59,6 +61,12 @@ async function main() {
   await client.shipmentUnit.createMany({ data: state.shipmentUnits });
   await client.documentReference.createMany({ data: state.documents });
   await client.objectLink.createMany({ data: state.objectLinks });
+  if (state.externalRecords.length) {
+    await client.externalRecord.createMany({ data: state.externalRecords });
+  }
+  if (state.connectorRuns.length) {
+    await client.connectorRun.createMany({ data: state.connectorRuns });
+  }
   await client.logisticsEvent.createMany({ data: state.events });
   await client.eventRelation.createMany({ data: state.eventRelations });
   await client.divergence.createMany({ data: state.divergences });

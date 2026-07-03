@@ -49,7 +49,9 @@ export type LogisticsUnitState =
   | "EM_TRANSITO"
   | "ENTREGUE";
 
-export type ConnectorStatus = "SAUDAVEL" | "ATRASADO" | "FALHA";
+export type ConnectorStatus = "SAUDAVEL" | "ATRASADO" | "FALHA" | "SINCRONIZANDO" | "DESABILITADO";
+export type SourceOrigin = "PUBLICO" | "SINTETICO" | "MANUAL" | "CALCULADO";
+export type ExternalProcessingStatus = "PENDING" | "ACCEPTED" | "UPDATED" | "DUPLICATE" | "REJECTED" | "QUARANTINED";
 
 export interface SourceMetadata {
   sourceSystem: string;
@@ -101,6 +103,10 @@ export interface SupplyItem {
   baseUnit: string;
   active: boolean;
   synthetic: boolean;
+  sourceSystem?: string;
+  sourceRecordId?: string;
+  sourceOrigin?: SourceOrigin;
+  sourceUpdatedAt?: string;
 }
 
 export interface ItemVariant {
@@ -146,6 +152,20 @@ export interface AcquisitionInstrument extends Omit<SourceMetadata, "occurredAt"
   type: string;
   reference: string;
   supplierNameSynthetic: string;
+  supplierName?: string;
+  supplierDocument?: string;
+  organizationName?: string;
+  organizationCode?: string;
+  itemDescription?: string;
+  itemCode?: string;
+  quantity?: number;
+  unitValue?: number;
+  totalValue?: number;
+  sourceOrigin?: SourceOrigin;
+  sourceUrl?: string;
+  externalReference?: string;
+  lastSourceUpdateAt?: string;
+  confidence?: number;
   validFrom: string;
   validUntil: string;
   capacity: number;
@@ -250,6 +270,10 @@ export interface ObjectLink {
   toId: string;
   sourceSystem: string;
   sourceRecordId: string;
+  actorId?: string;
+  justification?: string;
+  confidence?: number;
+  sourceOrigin?: SourceOrigin;
   createdAt: string;
 }
 
@@ -306,6 +330,15 @@ export interface ConnectorHealth {
   recordsImported: number;
   quarantinedRecords: number;
   message: string;
+  endpoint?: string;
+  recordsRead?: number;
+  acceptedRecords?: number;
+  updatedRecords?: number;
+  duplicateRecords?: number;
+  rejectedRecords?: number;
+  durationMs?: number;
+  mappingVersion?: string;
+  lastRunId?: string;
 }
 
 export interface QuarantineRecord {
@@ -331,6 +364,41 @@ export interface AuditLog {
   outcome: "SUCESSO" | "NEGADO" | "ERRO";
   reason: string;
   metadata: Record<string, unknown>;
+}
+
+export interface ExternalRecord {
+  id: string;
+  connectorId: string;
+  externalType: string;
+  externalId: string;
+  sourceUrl: string;
+  fetchedAt: string;
+  sourceUpdatedAt?: string;
+  schemaVersion: string;
+  payload: Record<string, unknown>;
+  payloadHash: string;
+  processingStatus: ExternalProcessingStatus;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectorRun {
+  id: string;
+  connectorId: string;
+  status: "RUNNING" | "SUCCESS" | "FAILED" | "SKIPPED";
+  startedAt: string;
+  finishedAt?: string;
+  endpoint: string;
+  recordsRead: number;
+  acceptedRecords: number;
+  updatedRecords: number;
+  duplicateRecords: number;
+  rejectedRecords: number;
+  quarantinedRecords: number;
+  durationMs: number;
+  mappingVersion: string;
+  message: string;
 }
 
 export interface MulticriteriaWeights {
@@ -363,6 +431,8 @@ export interface DemoState {
   shipmentUnits: ShipmentUnit[];
   documents: DocumentReference[];
   objectLinks: ObjectLink[];
+  externalRecords: ExternalRecord[];
+  connectorRuns: ConnectorRun[];
   events: LogisticsEvent[];
   eventRelations: EventRelation[];
   divergences: Divergence[];

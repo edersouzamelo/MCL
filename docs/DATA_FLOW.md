@@ -16,3 +16,27 @@ sequenceDiagram
 ```
 
 Cada dado consolidado conserva fonte, identificador, ocorrência, registro, confiança, versão de esquema e natureza.
+
+## Fluxo Compras.gov.br
+
+```mermaid
+sequenceDiagram
+  participant GOV as Compras.gov.br
+  participant C as Conector MCL
+  participant STG as ExternalRecord
+  participant Q as Quarentena
+  participant CAN as Canonico MCL
+  participant UI as Interface
+  C->>GOV: GET /modulo-arp/2_consultarARPItem
+  GOV-->>C: resultado, totalRegistros, totalPaginas
+  C->>C: timeout, retry, cache, Zod, hash
+  alt registro valido
+    C->>STG: payload bruto + proveniencia
+    C->>CAN: SupplyItem, ItemVariant, Organization, AcquisitionInstrument, DocumentReference
+  else registro invalido
+    C->>Q: motivo + payload
+  end
+  CAN->>UI: /aquisicoes e cobertura contratual
+```
+
+O indicador de cobertura contratual usa apenas vinculos manuais `PODE_SER_ATENDIDA_POR` e nao e misturado com cobertura fisica sintetica.

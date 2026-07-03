@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/AppShell";
 import { DashboardCharts } from "@/components/DashboardCharts";
-import { Badge, Card, InlineLink, MetricCard, PageHeader } from "@/components/ui";
+import { Badge, Card, InlineLink, MetricCard, PageHeader, formatDateTime } from "@/components/ui";
 import { scoreNeed } from "@/modules/analytics/multicriteria";
 import { dashboardMetrics, itemForVariant, organizationName } from "@/modules/demo/selectors";
 import { getDemoState } from "@/server/demo-store";
@@ -45,6 +45,25 @@ export default function DashboardPage() {
       <div className="mt-6">
         <DashboardCharts unitsByState={metrics.unitsByState} coverage={coverageData} />
       </div>
+
+      <section className="mt-6">
+        <Card>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Cobertura contratual</h2>
+              <p className="mt-1 text-sm text-zinc-600">Indicador separado: usa apenas vinculos manuais com instrumentos publicos do Compras.gov.br.</p>
+            </div>
+            <Badge tone="info">{metrics.contractualCoverage.sourceSystem}</Badge>
+          </div>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Com possivel instrumento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.needsWithPossibleInstrument}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Sem instrumento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.needsWithoutInstrument}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Instrumentos vigentes</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.currentPublicInstruments}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Proximos do vencimento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.expiringPublicInstruments}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Ultima sincronizacao</dt><dd className="font-semibold">{metrics.contractualCoverage.lastComprasGovSyncAt ? formatDateTime(metrics.contractualCoverage.lastComprasGovSyncAt) : "sem execucao"}</dd></div>
+          </dl>
+        </Card>
+      </section>
 
       <section className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
         <Card>

@@ -90,6 +90,25 @@ export function dashboardMetrics(state: DemoState) {
     return acc;
   }, {});
   const connectorIssues = state.connectors.filter((connector) => connector.status !== "SAUDAVEL").length;
+  const manualAcquisitionLinks = state.objectLinks.filter(
+    (link) =>
+      link.fromType === "NEED" &&
+      link.toType === "ACQUISITION_INSTRUMENT" &&
+      link.relationType === "PODE_SER_ATENDIDA_POR",
+  );
+  const linkedNeedIds = new Set(manualAcquisitionLinks.map((link) => link.fromId));
+  const now = Date.now();
+  const inThirtyDays = now + 30 * 24 * 60 * 60 * 1000;
+  const publicInstruments = state.acquisitionInstruments.filter((instrument) => instrument.sourceSystem === "COMPRAS_GOV");
+  const currentPublicInstruments = publicInstruments.filter((instrument) => {
+    const validFrom = new Date(instrument.validFrom).getTime();
+    const validUntil = new Date(instrument.validUntil).getTime();
+    return validFrom <= now && validUntil >= now && instrument.status !== "EXCLUIDO_NA_FONTE";
+  });
+  const expiringPublicInstruments = currentPublicInstruments.filter(
+    (instrument) => new Date(instrument.validUntil).getTime() <= inThirtyDays,
+  );
+  const comprasGovConnector = state.connectors.find((connector) => connector.id === "compras-gov");
 
   return {
     needs,
@@ -99,5 +118,13 @@ export function dashboardMetrics(state: DemoState) {
     openDivergences: state.divergences.filter((divergence) => divergence.status !== "CORRIGIDA").length,
     connectorIssues,
     quarantineCount: state.quarantine.length,
+    contractualCoverage: {
+      needsWithPossibleInstrument: linkedNeedIds.size,
+      needsWithoutInstrument: state.needs.length - linkedNeedIds.size,
+      currentPublicInstruments: currentPublicInstruments.length,
+      expiringPublicInstruments: expiringPublicInstruments.length,
+      lastComprasGovSyncAt: comprasGovConnector?.lastSuccessAt ?? comprasGovConnector?.lastRunAt,
+      sourceSystem: "COMPRAS_GOV",
+    },
   };
 }

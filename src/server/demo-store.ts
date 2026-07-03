@@ -29,7 +29,13 @@ export function findUnitByQrToken(token: string) {
 }
 
 export function appendAuditLog(entry: Omit<AuditLog, "id" | "occurredAt" | "requestId" | "userAgent"> & Partial<Pick<AuditLog, "requestId" | "userAgent">>) {
-  const state = getDemoState();
+  return appendAuditLogToState(getDemoState(), entry);
+}
+
+export function appendAuditLogToState(
+  state: DemoState,
+  entry: Omit<AuditLog, "id" | "occurredAt" | "requestId" | "userAgent"> & Partial<Pick<AuditLog, "requestId" | "userAgent">>,
+) {
   const log: AuditLog = {
     id: randomUUID(),
     occurredAt: new Date().toISOString(),

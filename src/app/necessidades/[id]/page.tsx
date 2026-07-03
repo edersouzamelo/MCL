@@ -19,6 +19,19 @@ export default async function NeedDetailPage({ params }: { params: Promise<{ id:
   const timeline = needTimeline(state, need);
   const linkedLotIds = state.objectLinks.filter((link) => link.fromType === "NEED" && link.fromId === need.id && link.toType === "LOT").map((link) => link.toId);
   const units = state.logisticsUnits.filter((unit) => linkedLotIds.includes(unit.lotId));
+  const acquisitionLinks = state.objectLinks.filter(
+    (link) =>
+      link.fromType === "NEED" &&
+      link.fromId === need.id &&
+      link.toType === "ACQUISITION_INSTRUMENT" &&
+      link.relationType === "PODE_SER_ATENDIDA_POR",
+  );
+  const possibleInstruments = acquisitionLinks
+    .map((link) => ({
+      link,
+      instrument: state.acquisitionInstruments.find((instrument) => instrument.id === link.toId),
+    }))
+    .filter((entry) => entry.instrument);
 
   return (
     <AppShell>
@@ -52,6 +65,20 @@ export default async function NeedDetailPage({ params }: { params: Promise<{ id:
               </li>
             ))}
           </ul>
+          <h3 className="mt-5 font-semibold">Possiveis instrumentos publicos</h3>
+          {possibleInstruments.length ? (
+            <ul className="mt-2 space-y-2 text-sm">
+              {possibleInstruments.map(({ link, instrument }) => (
+                <li key={link.id} className="rounded bg-zinc-50 p-3">
+                  <InlineLink href="/aquisicoes">{instrument?.reference}</InlineLink>
+                  <p className="text-xs text-zinc-600">{link.justification}</p>
+                  <p className="text-xs text-zinc-500">Confianca manual: {Math.round((link.confidence ?? 0) * 100)}%</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-zinc-600">Nenhum vinculo manual com instrumento publico.</p>
+          )}
         </Card>
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Trajetoria auditavel</h2>

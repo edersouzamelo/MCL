@@ -26,6 +26,29 @@ enum DataNature {
   pendente
 }
 
+enum SourceOrigin {
+  PUBLICO
+  SINTETICO
+  MANUAL
+  CALCULADO
+}
+
+enum ExternalProcessingStatus {
+  PENDING
+  ACCEPTED
+  UPDATED
+  DUPLICATE
+  REJECTED
+  QUARANTINED
+}
+
+enum ConnectorRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
 enum LogisticsUnitState {
   IDENTIFICADO
   AGUARDANDO_INSPECAO
@@ -82,6 +105,10 @@ model SupplyItem {
   baseUnit       String
   active         Boolean       @default(true)
   synthetic      Boolean       @default(true)
+  sourceSystem   String?
+  sourceRecordId String?
+  sourceOrigin   SourceOrigin?
+  sourceUpdatedAt DateTime?
   variants       ItemVariant[]
 }
 
@@ -145,10 +172,24 @@ model AcquisitionInstrument {
   persistentCode         String   @unique
   type                  String
   reference             String
-  supplierNameSynthetic String
+  supplierNameSynthetic String?
+  supplierName          String?
+  supplierDocument      String?
+  organizationName      String?
+  organizationCode      String?
+  itemDescription       String?
+  itemCode              String?
+  quantity              Decimal?
+  unitValue             Decimal?
+  totalValue            Decimal?
+  sourceOrigin          SourceOrigin?
+  sourceUrl             String?
+  externalReference     String?
+  lastSourceUpdateAt    DateTime?
+  confidence            Float?
   validFrom             DateTime
   validUntil            DateTime
-  capacity              Int
+  capacity              Int      @default(0)
   status                String
   sourceSystem          String
   sourceRecordId        String
@@ -265,6 +306,10 @@ model ObjectLink {
   toId           String
   sourceSystem   String
   sourceRecordId String
+  actorId        String?
+  justification  String?
+  confidence     Float?
+  sourceOrigin   SourceOrigin?
   createdAt      DateTime @default(now())
 
   @@index([fromType, fromId])
@@ -335,6 +380,15 @@ model ConnectorHealth {
   recordsImported    Int
   quarantinedRecords Int
   message            String
+  endpoint           String?
+  recordsRead        Int?
+  acceptedRecords    Int?
+  updatedRecords     Int?
+  duplicateRecords   Int?
+  rejectedRecords    Int?
+  durationMs         Int?
+  mappingVersion     String?
+  lastRunId          String?
 }
 
 model QuarantineRecord {
@@ -344,6 +398,47 @@ model QuarantineRecord {
   reason         String
   payload        Json
   createdAt      DateTime @default(now())
+}
+
+model ExternalRecord {
+  id               String                   @id
+  connectorId      String
+  externalType     String
+  externalId       String
+  sourceUrl        String
+  fetchedAt        DateTime
+  sourceUpdatedAt  DateTime?
+  schemaVersion    String
+  payload          Json
+  payloadHash      String
+  processingStatus ExternalProcessingStatus
+  errorMessage     String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@unique([connectorId, externalType, externalId])
+  @@index([connectorId, processingStatus])
+  @@index([payloadHash])
+}
+
+model ConnectorRun {
+  id                 String             @id
+  connectorId        String
+  status             ConnectorRunStatus
+  startedAt          DateTime
+  finishedAt         DateTime?
+  endpoint           String
+  recordsRead        Int
+  acceptedRecords    Int
+  updatedRecords     Int
+  duplicateRecords   Int
+  rejectedRecords    Int
+  quarantinedRecords Int
+  durationMs         Int
+  mappingVersion     String
+  message            String
+
+  @@index([connectorId, startedAt])
 }
 
 model AuditLog {
