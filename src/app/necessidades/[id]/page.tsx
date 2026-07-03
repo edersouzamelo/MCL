@@ -38,6 +38,7 @@ export default async function NeedDetailPage({ params }: { params: Promise<{ id:
       <PageHeader
         title={need.persistentCode}
         description={`${organizationName(state, need.organizationId)} - ${item?.name} ${variant?.size}.`}
+        action={<InlineLink href={`/necessidades/${need.id}/buscar-cobertura`}>Buscar cobertura de aquisicao</InlineLink>}
       />
       <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
         <Card>

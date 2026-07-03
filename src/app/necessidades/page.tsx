@@ -27,7 +27,10 @@ export default function NeedsPage() {
                   <h2 className="mt-1 text-lg font-semibold">{item?.name} - {variant?.label}</h2>
                   <p className="mt-1 text-sm text-zinc-600">{organizationName(state, need.organizationId)} solicitou {need.quantityRequested} {variant?.unit}.</p>
                 </div>
-                <Badge tone={need.priority === "ALTA" ? "warn" : "neutral"}>{need.priority}</Badge>
+                <div className="flex flex-col items-start gap-2 md:items-end">
+                  <Badge tone={need.priority === "ALTA" ? "warn" : "neutral"}>{need.priority}</Badge>
+                  <InlineLink href={`/necessidades/${need.id}/buscar-cobertura`}>Buscar cobertura</InlineLink>
+                </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <p className="rounded bg-zinc-50 p-3 text-sm">Cobertura: <strong>{projection.coveragePercent}%</strong></p>

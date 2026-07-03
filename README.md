@@ -18,7 +18,7 @@ O MCL não substitui ERP, sistema patrimonial, SIAFI, SIGELOG ou qualquer sistem
 
 - Next.js App Router, TypeScript estrito, Tailwind CSS e PWA simples.
 - Autenticação demonstrativa via Auth.js/NextAuth e OAuth GitHub/Google configurável.
-- Dados sintéticos para fardamento Classe II e primeiro conector público somente leitura para Compras.gov.br.
+- Dados sintéticos para fardamento Classe II e primeiro conector público somente leitura para Compras.gov.br, com pesquisa CATMAT orientada pela necessidade.
 - Dashboard, necessidades, aquisições, passaporte digital, QR Code, scanner com fallback manual, registro de eventos, linha do tempo, conectores, divergências, importação CSV/JSON e auditoria.
 - Schema Prisma/PostgreSQL, Docker Compose local e seed determinístico.
 - Testes unitários e fluxo Playwright.
@@ -63,13 +63,17 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-O app roda imediatamente pelo store demonstrativo em memória. O PostgreSQL está preparado para migração/seed quando `DATABASE_URL` e `DIRECT_URL` estiverem configuradas.
+O app roda imediatamente pelo store demonstrativo em memória. O PostgreSQL está preparado para migração/seed quando `DATABASE_URL` estiver configurada em `prisma.config.ts`.
 
 Auditoria do banco: `docs/DATABASE_AUDIT.md`.
 
 ## Conector Compras.gov.br
 
-O piloto inclui o conector `COMPRAS.GOV - API PUBLICA OFICIAL`, somente leitura, usando `https://dadosabertos.compras.gov.br/modulo-arp/2_consultarARPItem`.
+O piloto inclui o conector `COMPRAS.GOV - API PUBLICA OFICIAL`, somente leitura, usando CATMAT e ARP:
+
+- `/modulo-material/4_consultarItemMaterial`
+- `/modulo-arp/2_consultarARPItem`
+- `/modulo-arp/3_consultarUnidadesItem`
 
 Variáveis opcionais:
 
@@ -87,7 +91,9 @@ COMPRAS_GOV_DATE_END=
 COMPRAS_GOV_KEYWORD=
 ```
 
-Fluxo: abrir `/conectores`, acionar **Sincronizar agora**, consultar `/aquisicoes` e vincular manualmente uma necessidade a um instrumento público. Documentação: `docs/connectors/COMPRAS_GOV.md`.
+Fluxo principal: abrir `/necessidades/need-coturno-200/buscar-cobertura`, pesquisar CATMAT, confirmar manualmente o código, consultar atas, consultar unidades/saldos e registrar possível cobertura. A sincronização genérica sem CATMAT ou UASG é bloqueada para evitar importação sem contexto.
+
+Documentação: `docs/COVERAGE_FLOW.md` e `docs/connectors/COMPRAS_GOV.md`.
 
 ## OAuth
 

@@ -1,7 +1,7 @@
 import { Activity, AlertCircle, CheckCircle2, Clock3 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ComprasGovSyncButton } from "@/components/ComprasGovSyncButton";
-import { Badge, Card, PageHeader, formatDateTime } from "@/components/ui";
+import { Badge, Card, InlineLink, PageHeader, formatDateTime } from "@/components/ui";
 import { getDemoState } from "@/server/demo-store";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,7 @@ export default function ConnectorsPage() {
       <PageHeader
         title="Saude dos conectores"
         description="Conector oficial somente leitura do Compras.gov.br e conectores demonstrativos do piloto."
+        action={<InlineLink href="/necessidades">Iniciar por necessidade</InlineLink>}
       />
       {comprasGov ? (
         <Card className="mb-4 border-l-4 border-l-emerald-600">
@@ -35,6 +36,7 @@ export default function ConnectorsPage() {
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-zinc-600">{comprasGov.message}</p>
+              <p className="mt-1 text-sm text-zinc-600">O fluxo operacional parte da necessidade, confirma CATMAT e so entao consulta atas relacionadas.</p>
             </div>
             <ComprasGovSyncButton />
           </div>

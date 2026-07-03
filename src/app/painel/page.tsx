@@ -65,6 +65,26 @@ export default function DashboardPage() {
         </Card>
       </section>
 
+      <section className="mt-6">
+        <Card>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Cobertura de aquisicao</h2>
+              <p className="mt-1 text-sm text-zinc-600">Jornada por necessidade: CATMAT confirmado, atas relacionadas e validade da ultima consulta.</p>
+            </div>
+            <Badge tone="info">{metrics.acquisitionCoverage.sourceSystem}</Badge>
+          </div>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-6">
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Com CATMAT</dt><dd className="text-2xl font-semibold">{metrics.acquisitionCoverage.needsWithCatmat}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Sem CATMAT</dt><dd className="text-2xl font-semibold">{metrics.acquisitionCoverage.needsWithoutCatmat}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Com ata potencial</dt><dd className="text-2xl font-semibold">{metrics.acquisitionCoverage.needsWithPotentialAta}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Sem resultado</dt><dd className="text-2xl font-semibold">{metrics.acquisitionCoverage.needsWithoutResult}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Desatualizadas</dt><dd className="text-2xl font-semibold">{metrics.acquisitionCoverage.staleResults}</dd></div>
+            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Ultima consulta</dt><dd className="font-semibold">{metrics.acquisitionCoverage.lastQueryAt ? formatDateTime(metrics.acquisitionCoverage.lastQueryAt) : "sem consulta"}</dd></div>
+          </dl>
+        </Card>
+      </section>
+
       <section className="mt-6 grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
         <Card>
           <h2 className="mb-3 text-lg font-semibold">Necessidades acompanhadas</h2>

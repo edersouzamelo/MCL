@@ -14,6 +14,10 @@ async function main() {
   const client = prisma as unknown as Record<string, SeedModel>;
   const deleteOrder = [
     "auditLog",
+    "arpUnitRecord",
+    "itemCatalogMapping",
+    "catalogSearchCandidate",
+    "coverageQuery",
     "connectorRun",
     "externalRecord",
     "quarantineRecord",
@@ -66,6 +70,18 @@ async function main() {
   }
   if (state.connectorRuns.length) {
     await client.connectorRun.createMany({ data: state.connectorRuns });
+  }
+  if (state.coverageQueries.length) {
+    await client.coverageQuery.createMany({ data: state.coverageQueries });
+  }
+  if (state.catalogSearchCandidates.length) {
+    await client.catalogSearchCandidate.createMany({ data: state.catalogSearchCandidates });
+  }
+  if (state.itemCatalogMappings.length) {
+    await client.itemCatalogMapping.createMany({ data: state.itemCatalogMappings });
+  }
+  if (state.arpUnitRecords.length) {
+    await client.arpUnitRecord.createMany({ data: state.arpUnitRecords });
   }
   await client.logisticsEvent.createMany({ data: state.events });
   await client.eventRelation.createMany({ data: state.eventRelations });

@@ -896,6 +896,10 @@ export const auditLogs: AuditLog[] = [
 
 export const externalRecords: ExternalRecord[] = [];
 export const connectorRuns: ConnectorRun[] = [];
+export const coverageQueries: DemoState["coverageQueries"] = [];
+export const catalogSearchCandidates: DemoState["catalogSearchCandidates"] = [];
+export const itemCatalogMappings: DemoState["itemCatalogMappings"] = [];
+export const arpUnitRecords: DemoState["arpUnitRecords"] = [];
 
 export const multicriteriaWeights: MulticriteriaWeights[] = [
   {
@@ -932,6 +936,10 @@ export function createDemoState(): DemoState {
     objectLinks,
     externalRecords,
     connectorRuns,
+    coverageQueries,
+    catalogSearchCandidates,
+    itemCatalogMappings,
+    arpUnitRecords,
     events,
     eventRelations,
     divergences,

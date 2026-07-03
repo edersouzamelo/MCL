@@ -52,5 +52,43 @@ export const comprasGovArpItemSchema = z
   })
   .passthrough();
 
+export const comprasGovCatalogItemSchema = z
+  .object({
+    codigoItem: z.coerce.number().int().positive(),
+    descricaoItem: z.string().min(1),
+    codigoGrupo: z.union([z.string(), z.number()]).optional().transform((value) => (value == null ? undefined : String(value))),
+    codigoClasse: z.union([z.string(), z.number()]).optional().transform((value) => (value == null ? undefined : String(value))),
+    codigoPdm: z.union([z.string(), z.number()]).optional().transform((value) => (value == null ? undefined : String(value))),
+    statusItem: z.coerce.boolean().optional(),
+    dataHoraInclusao: nullableString,
+    dataHoraAtualizacao: nullableString,
+  })
+  .passthrough();
+
+export const comprasGovArpUnitSchema = z
+  .object({
+    numeroAta: z.union([z.string(), z.number()]).transform(String),
+    unidadeGerenciadora: z.union([z.string(), z.number()]).transform(String),
+    numeroItem: z.union([z.string(), z.number()]).transform(String),
+    codigoPdm: z.union([z.string(), z.number()]).optional().transform((value) => (value == null ? undefined : String(value))),
+    descricaoItem: z.string().optional(),
+    fornecedor: nullableString,
+    quantidadeRegistrada: nullableNumber,
+    saldoAdesoes: nullableNumber,
+    saldoRemanejamentoEmpenho: nullableNumber,
+    qtdLimiteAdesao: nullableNumber,
+    qtdLimiteInformadoCompra: nullableNumber,
+    aceitaAdesao: nullableBoolean,
+    dataHoraInclusao: nullableString,
+    dataHoraAtualizacao: nullableString,
+    dataHoraExclusao: nullableString,
+    codigoUnidade: z.union([z.string(), z.number()]).optional().transform((value) => (value == null ? undefined : String(value))),
+    nomeUnidade: nullableString,
+    tipoUnidade: nullableString,
+  })
+  .passthrough();
+
 export type ComprasGovApiResponse = z.infer<typeof comprasGovApiResponseSchema>;
 export type ComprasGovArpItem = z.infer<typeof comprasGovArpItemSchema>;
+export type ComprasGovCatalogItem = z.infer<typeof comprasGovCatalogItemSchema>;
+export type ComprasGovArpUnit = z.infer<typeof comprasGovArpUnitSchema>;

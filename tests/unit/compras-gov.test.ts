@@ -24,7 +24,7 @@ function config(overrides: Partial<ComprasGovConfig> = {}): ComprasGovConfig {
       dateStart: "2026-01-01",
       dateEnd: "2026-12-31",
       unitCode: undefined,
-      catmatCode: undefined,
+      catmatCode: "485523",
       modalityCode: undefined,
       situation: undefined,
       keyword: undefined,
@@ -109,6 +109,7 @@ describe("conector Compras.gov.br", () => {
     expect(demo.externalRecords[0].payloadHash).toHaveLength(64);
     expect(demo.acquisitionInstruments.some((instrument) => instrument.sourceSystem === "COMPRAS_GOV")).toBe(true);
     expect(demo.supplyItems.some((item) => item.persistentCode === "CATMAT-485523")).toBe(true);
+    expect(demo.supplyItems.find((item) => item.persistentCode === "CATMAT-485523")?.supplyClass).toBe("EXTERNAL_UNMAPPED");
   });
 
   it("avanca paginas ate o limite local", async () => {
@@ -224,6 +225,19 @@ describe("conector Compras.gov.br", () => {
 
     expect(run.status).toBe("SUCCESS");
     expect(run.recordsRead).toBe(0);
+  });
+
+  it("bloqueia sincronizacao generica sem CATMAT ou UASG", async () => {
+    const demo = state();
+    const fetchImpl = vi.fn().mockResolvedValue(
+      responseJson({ resultado: [arpItem()], totalRegistros: 1, totalPaginas: 1, paginasRestantes: 0 }),
+    ) as unknown as typeof fetch;
+
+    const run = await sync(demo, fetchImpl, config({ filters: { ...config().filters, catmatCode: undefined, unitCode: undefined } }));
+
+    expect(run.status).toBe("SKIPPED");
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(run.message).toContain("bloqueada");
   });
 
   it("vincula necessidade a instrumento publico com autorizacao e auditoria de duplicidade", async () => {

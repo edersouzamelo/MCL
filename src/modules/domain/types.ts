@@ -52,6 +52,9 @@ export type LogisticsUnitState =
 export type ConnectorStatus = "SAUDAVEL" | "ATRASADO" | "FALHA" | "SINCRONIZANDO" | "DESABILITADO";
 export type SourceOrigin = "PUBLICO" | "SINTETICO" | "MANUAL" | "CALCULADO";
 export type ExternalProcessingStatus = "PENDING" | "ACCEPTED" | "UPDATED" | "DUPLICATE" | "REJECTED" | "QUARANTINED";
+export type CatalogMappingStatus = "ACTIVE" | "REVOKED" | "SUPERSEDED";
+export type CoverageQueryKind = "CATMAT_SEARCH" | "ARP_SEARCH" | "ARP_UNITS";
+export type CoverageQueryStatus = "SUCCESS" | "FAILED" | "NO_RESULTS" | "SKIPPED";
 
 export interface SourceMetadata {
   sourceSystem: string;
@@ -401,6 +404,90 @@ export interface ConnectorRun {
   message: string;
 }
 
+export interface CoverageQuery {
+  id: string;
+  needId: string;
+  kind: CoverageQueryKind;
+  endpoint: string;
+  params: Record<string, unknown>;
+  status: CoverageQueryStatus;
+  recordsRead: number;
+  sourceUrl?: string;
+  errorMessage?: string;
+  actorId?: string;
+  externalCatalog?: string;
+  externalItemCode?: string;
+  startedAt: string;
+  finishedAt: string;
+  staleAt?: string;
+}
+
+export interface CatalogSearchCandidate {
+  id: string;
+  queryId: string;
+  needId: string;
+  externalCatalog: string;
+  externalItemCode: string;
+  externalDescription: string;
+  groupCode?: string;
+  classCode?: string;
+  pdmCode?: string;
+  statusItem?: boolean;
+  sourceSystem: string;
+  sourceUrl: string;
+  sourceUpdatedAt?: string;
+  fetchedAt: string;
+  similarityScore: number;
+  similarityExplanation: string;
+  payload: Record<string, unknown>;
+}
+
+export interface ItemCatalogMapping {
+  id: string;
+  mclItemId: string;
+  mclVariantId?: string;
+  needId?: string;
+  externalCatalog: string;
+  externalItemCode: string;
+  externalDescription: string;
+  groupCode?: string;
+  classCode?: string;
+  pdmCode?: string;
+  confirmedBy: string;
+  confirmedAt: string;
+  revokedBy?: string;
+  revokedAt?: string;
+  justification: string;
+  status: CatalogMappingStatus;
+  confidence: number;
+  mappingVersion: number;
+  replacesMappingId?: string;
+  sourceCandidateId?: string;
+}
+
+export interface ArpUnitRecord {
+  id: string;
+  needId: string;
+  acquisitionInstrumentId: string;
+  numeroAta: string;
+  unidadeGerenciadora: string;
+  numeroItem: string;
+  codigoUnidade?: string;
+  nomeUnidade?: string;
+  tipoUnidade?: string;
+  fornecedor?: string;
+  quantidadeRegistrada?: number;
+  saldoAdesoes?: number;
+  saldoRemanejamentoEmpenho?: number;
+  qtdLimiteAdesao?: number;
+  qtdLimiteInformadoCompra?: number;
+  aceitaAdesao?: boolean;
+  sourceUrl: string;
+  sourceUpdatedAt?: string;
+  fetchedAt: string;
+  payload: Record<string, unknown>;
+}
+
 export interface MulticriteriaWeights {
   id: string;
   version: string;
@@ -433,6 +520,10 @@ export interface DemoState {
   objectLinks: ObjectLink[];
   externalRecords: ExternalRecord[];
   connectorRuns: ConnectorRun[];
+  coverageQueries: CoverageQuery[];
+  catalogSearchCandidates: CatalogSearchCandidate[];
+  itemCatalogMappings: ItemCatalogMapping[];
+  arpUnitRecords: ArpUnitRecord[];
   events: LogisticsEvent[];
   eventRelations: EventRelation[];
   divergences: Divergence[];

@@ -25,7 +25,7 @@ export function ComprasGovSyncButton() {
   const [message, setMessage] = useState<string>();
 
   async function syncNow() {
-    const confirmed = window.confirm("Sincronizar agora dados publicos do Compras.gov.br?");
+    const confirmed = window.confirm("Executar exploracao tecnica do conector? O fluxo principal deve partir de uma necessidade com CATMAT confirmado.");
     if (!confirmed) {
       return;
     }
@@ -42,7 +42,9 @@ export function ComprasGovSyncButton() {
       const run = result.run;
       setMessage(
         run
-          ? `${run.recordsRead} lidos, ${run.acceptedRecords} aceitos, ${run.updatedRecords} atualizados, ${run.duplicateRecords} duplicados, ${run.quarantinedRecords} em quarentena.`
+          ? run.status === "SKIPPED"
+            ? run.message
+            : `${run.recordsRead} lidos, ${run.acceptedRecords} aceitos, ${run.updatedRecords} atualizados, ${run.duplicateRecords} duplicados, ${run.quarantinedRecords} em quarentena.`
           : "Sincronizacao concluida.",
       );
       router.refresh();
@@ -60,7 +62,7 @@ export function ComprasGovSyncButton() {
         className="inline-flex items-center gap-2 rounded bg-emerald-700 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
       >
         <RefreshCw aria-hidden className={pending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-        {pending ? "Sincronizando" : "Sincronizar agora"}
+        {pending ? "Verificando" : "Exploracao tecnica"}
       </button>
       {message ? <p className="text-sm text-zinc-600" aria-live="polite">{message}</p> : null}
     </div>

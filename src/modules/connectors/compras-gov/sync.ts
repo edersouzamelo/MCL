@@ -94,6 +94,10 @@ function requestParams(config: ComprasGovConfig, page: number) {
   };
 }
 
+function hasRelevantSyncFilter(config: ComprasGovConfig) {
+  return Boolean(config.filters.catmatCode || config.filters.unitCode);
+}
+
 function applyKeywordFilter(raw: unknown[], keyword?: string) {
   if (!keyword) {
     return raw;
@@ -180,6 +184,29 @@ async function executeComprasGovSync(state: DemoState, options: SyncOptions): Pr
   if (!config.syncEnabled) {
     finishRun(run, "SKIPPED", "Sincronizacao desabilitada por COMPRAS_GOV_SYNC_ENABLED=false.", startedMs);
     updateHealth(connector, run, metrics, "DESABILITADO", run.message);
+    return run;
+  }
+
+  if (!hasRelevantSyncFilter(config)) {
+    finishRun(
+      run,
+      "SKIPPED",
+      "Sincronizacao generica bloqueada: informe CATMAT confirmado ou UASG para evitar importacao sem contexto.",
+      startedMs,
+    );
+    updateHealth(connector, run, metrics, "DESABILITADO", run.message);
+    appendAuditLogToState(state, {
+      actorId: options.actorId,
+      action: "COMPRAS_GOV_SYNC_BLOQUEADA",
+      resourceType: "CONNECTOR_RUN",
+      resourceId: run.id,
+      organizationId: options.organizationId,
+      requestId: options.requestId,
+      userAgent: options.userAgent,
+      outcome: "NEGADO",
+      reason: run.message,
+      metadata: { endpoint: run.endpoint, mappingVersion: run.mappingVersion },
+    });
     return run;
   }
 

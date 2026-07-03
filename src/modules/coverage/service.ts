@@ -1,0 +1,819 @@
+import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod";
+import { canManageAcquisitionLinks } from "@/modules/acquisitions/links";
+import { getComprasGovConfig, type ComprasGovConfig } from "@/modules/connectors/compras-gov/config";
+import {
+  COMPRAS_GOV_ARP_ITEM_ENDPOINT,
+  COMPRAS_GOV_ARP_UNITS_ENDPOINT,
+  COMPRAS_GOV_CATALOG_MAPPING_VERSION,
+  COMPRAS_GOV_CATMAT_ENDPOINT,
+  COMPRAS_GOV_CONNECTOR_ID,
+  COMPRAS_GOV_MAPPING_VERSION,
+  COMPRAS_GOV_SOURCE_SYSTEM,
+} from "@/modules/connectors/compras-gov/constants";
+import { createComprasGovClient } from "@/modules/connectors/compras-gov/http";
+import { hashPayload, normalizeArpItem } from "@/modules/connectors/compras-gov/normalizers";
+import {
+  comprasGovApiResponseSchema,
+  comprasGovArpItemSchema,
+  comprasGovArpUnitSchema,
+  comprasGovCatalogItemSchema,
+  type ComprasGovArpItem,
+  type ComprasGovArpUnit,
+  type ComprasGovCatalogItem,
+} from "@/modules/connectors/compras-gov/schemas";
+import { itemForVariant } from "@/modules/demo/selectors";
+import type {
+  AcquisitionInstrument,
+  ArpUnitRecord,
+  CatalogSearchCandidate,
+  CoverageQuery,
+  DemoState,
+  ExternalProcessingStatus,
+  ItemCatalogMapping,
+  Role,
+} from "@/modules/domain/types";
+import { appendAuditLogToState } from "@/server/demo-store";
+
+const catalogFilterSchema = z.object({
+  codigoItem: z.string().trim().optional(),
+  codigoGrupo: z.string().trim().optional(),
+  codigoClasse: z.string().trim().optional(),
+  codigoPdm: z.string().trim().optional(),
+  descricaoItem: z.string().trim().optional(),
+  statusItem: z.coerce.boolean().optional().default(true),
+});
+
+export const catmatSearchInputSchema = z.object({
+  needId: z.string().min(1),
+  terms: z.string().trim().optional(),
+  filters: catalogFilterSchema.optional(),
+});
+
+export const confirmCatalogMappingInputSchema = z.object({
+  needId: z.string().min(1),
+  candidateId: z.string().min(1),
+  justification: z.string().min(12).max(800),
+  confidence: z.coerce.number().min(0).max(1).optional(),
+});
+
+export const revokeCatalogMappingInputSchema = z.object({
+  mappingId: z.string().min(1),
+  reason: z.string().min(12).max(800),
+});
+
+export const arpSearchInputSchema = z.object({
+  needId: z.string().min(1),
+  dataVigenciaInicialMin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dataVigenciaInicialMax: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  codigoUnidadeGerenciadora: z.string().trim().optional(),
+  codigoModalidadeCompra: z.string().trim().optional(),
+  codigoPdm: z.string().trim().optional(),
+  niFornecedor: z.string().trim().optional(),
+  numeroCompra: z.string().trim().optional(),
+});
+
+export const arpUnitsInputSchema = z.object({
+  needId: z.string().min(1),
+  acquisitionInstrumentId: z.string().min(1),
+  numeroAta: z.string().min(1),
+  unidadeGerenciadora: z.string().min(1),
+  numeroItem: z.string().min(1),
+  dataAtualizacao: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+export type CatmatSearchInput = z.infer<typeof catmatSearchInputSchema>;
+export type ArpSearchInput = z.infer<typeof arpSearchInputSchema>;
+export type ArpUnitsInput = z.infer<typeof arpUnitsInputSchema>;
+
+export type ArpSearchEntry = {
+  instrument: AcquisitionInstrument;
+  unitQuery: {
+    numeroAta: string;
+    unidadeGerenciadora: string;
+    numeroItem: string;
+  };
+  raw: ComprasGovArpItem;
+  sourceUrl: string;
+};
+
+export type CoverageSynthesis = {
+  quantityRequested: number;
+  stockCovered: number;
+  deficit: number;
+  potentialQuantity: number;
+  currentAtaCount: number;
+  expiringSoonCount: number;
+  minUnitValue?: number;
+  maxUnitValue?: number;
+  balanceStatus: "CONSULTABLE" | "ABSENT" | "NOT_QUERIED";
+  missingFinancialInfo: number;
+  divergences: string[];
+  confidence: number;
+  phrases: string[];
+  limitations: string[];
+  sourceDate: string;
+};
+
+type CoverageServiceOptions = {
+  actorId: string;
+  organizationId?: string;
+  userAgent?: string;
+  requestId?: string;
+  config?: ComprasGovConfig;
+  fetchImpl?: typeof fetch;
+};
+
+function stableId(prefix: string, value: string) {
+  return `${prefix}-${createHash("sha1").update(value).digest("hex").slice(0, 18)}`;
+}
+
+function defaultDateRange() {
+  const year = new Date().getUTCFullYear();
+  return {
+    start: `${year}-01-01`,
+    end: `${year}-12-31`,
+  };
+}
+
+function maybeIsoDate(value?: string | null) {
+  if (!value) {
+    return undefined;
+  }
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+function tokenize(value: string) {
+  return new Set(
+    normalizeText(value)
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(" ")
+      .filter((token) => token.length >= 3),
+  );
+}
+
+export function deterministicTextSimilarity(queryText: string, candidateText: string) {
+  const queryTokens = tokenize(queryText);
+  const candidateTokens = tokenize(candidateText);
+  const matches = [...queryTokens].filter((token) => candidateTokens.has(token));
+  const score = queryTokens.size === 0 ? 0 : matches.length / queryTokens.size;
+  return {
+    score: Number(score.toFixed(3)),
+    explanation: matches.length
+      ? `Termos coincidentes: ${matches.slice(0, 8).join(", ")}.`
+      : "Sem coincidencia textual relevante nos termos informados.",
+  };
+}
+
+function needSearchText(state: DemoState, needId: string, extraTerms = "") {
+  const need = state.needs.find((candidate) => candidate.id === needId);
+  if (!need) {
+    throw new Error("Necessidade nao localizada.");
+  }
+  const { item, variant } = itemForVariant(state, need.itemVariantId);
+  return [
+    item?.name,
+    item?.description,
+    variant?.label,
+    variant?.size,
+    variant?.unit,
+    extraTerms,
+    normalizeText(`${item?.name ?? ""} ${variant?.label ?? ""}`).match(/coturno|bota|botina|calcado|sapato/)
+      ? "bota seguranca couro cano calcado"
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function inferredCatalogFilters(state: DemoState, input: CatmatSearchInput) {
+  const need = state.needs.find((candidate) => candidate.id === input.needId);
+  if (!need) {
+    throw new Error("Necessidade nao localizada.");
+  }
+  const { item, variant } = itemForVariant(state, need.itemVariantId);
+  const provided = input.filters;
+  if (provided?.codigoItem || provided?.codigoGrupo || provided?.codigoClasse || provided?.codigoPdm || provided?.descricaoItem) {
+    return { ...provided, statusItem: provided.statusItem ?? true };
+  }
+
+  const basis = normalizeText(`${item?.name ?? ""} ${item?.description ?? ""} ${variant?.label ?? ""} ${input.terms ?? ""}`);
+  if (/coturno|bota|botina|calcado|sapato/.test(basis)) {
+    return { codigoClasse: "8430", statusItem: true };
+  }
+
+  const firstTerm = basis.split(/\s+/).find((token) => token.length >= 4);
+  return { descricaoItem: firstTerm, statusItem: true };
+}
+
+function upsertById<T extends { id: string }>(collection: T[], record: T) {
+  const index = collection.findIndex((candidate) => candidate.id === record.id);
+  if (index === -1) {
+    collection.unshift(record);
+    return "ACCEPTED" satisfies ExternalProcessingStatus;
+  }
+  collection[index] = { ...collection[index], ...record };
+  return "UPDATED" satisfies ExternalProcessingStatus;
+}
+
+function storeCoverageQuery(state: DemoState, query: CoverageQuery) {
+  state.coverageQueries.unshift(query);
+  return query;
+}
+
+function coverageQueryBase(
+  input: {
+    needId: string;
+    kind: CoverageQuery["kind"];
+    endpoint: string;
+    params: Record<string, unknown>;
+    actorId?: string;
+    externalCatalog?: string;
+    externalItemCode?: string;
+  },
+  startedAt: string,
+): CoverageQuery {
+  return {
+    id: randomUUID(),
+    needId: input.needId,
+    kind: input.kind,
+    endpoint: input.endpoint,
+    params: input.params,
+    status: "NO_RESULTS",
+    recordsRead: 0,
+    actorId: input.actorId,
+    externalCatalog: input.externalCatalog,
+    externalItemCode: input.externalItemCode,
+    startedAt,
+    finishedAt: startedAt,
+    staleAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+function candidateFromCatalogItem(
+  item: ComprasGovCatalogItem,
+  query: CoverageQuery,
+  needId: string,
+  sourceUrl: string,
+  fetchedAt: string,
+  queryText: string,
+): CatalogSearchCandidate {
+  const similarity = deterministicTextSimilarity(queryText, item.descricaoItem);
+  return {
+    id: stableId("catmat-candidate", `${query.id}:${item.codigoItem}`),
+    queryId: query.id,
+    needId,
+    externalCatalog: "CATMAT",
+    externalItemCode: String(item.codigoItem),
+    externalDescription: item.descricaoItem,
+    groupCode: item.codigoGrupo,
+    classCode: item.codigoClasse,
+    pdmCode: item.codigoPdm,
+    statusItem: item.statusItem,
+    sourceSystem: COMPRAS_GOV_SOURCE_SYSTEM,
+    sourceUrl,
+    sourceUpdatedAt: maybeIsoDate(item.dataHoraAtualizacao ?? item.dataHoraInclusao),
+    fetchedAt,
+    similarityScore: similarity.score,
+    similarityExplanation: similarity.explanation,
+    payload: item as unknown as Record<string, unknown>,
+  };
+}
+
+export function activeCatalogMappingForNeed(state: DemoState, needId: string) {
+  return state.itemCatalogMappings
+    .filter((mapping) => mapping.needId === needId && mapping.status === "ACTIVE")
+    .sort((a, b) => b.mappingVersion - a.mappingVersion)
+    .at(0);
+}
+
+export async function searchCatmatCandidates(
+  state: DemoState,
+  rawInput: CatmatSearchInput,
+  options: CoverageServiceOptions,
+) {
+  const input = catmatSearchInputSchema.parse(rawInput);
+  const params = inferredCatalogFilters(state, input);
+  const queryText = needSearchText(state, input.needId, input.terms);
+  const config = options.config ?? getComprasGovConfig();
+  const client = createComprasGovClient(config, options.fetchImpl);
+  const startedAt = new Date().toISOString();
+  const query = coverageQueryBase(
+    {
+      needId: input.needId,
+      kind: "CATMAT_SEARCH",
+      endpoint: COMPRAS_GOV_CATMAT_ENDPOINT,
+      params: { pagina: 1, ...params },
+      actorId: options.actorId,
+      externalCatalog: "CATMAT",
+    },
+    startedAt,
+  );
+
+  try {
+    const { data, url } = await client.getJson(
+      COMPRAS_GOV_CATMAT_ENDPOINT,
+      { pagina: 1, ...params },
+      comprasGovApiResponseSchema,
+    );
+    const fetchedAt = new Date().toISOString();
+    const candidates = data.resultado
+      .map((raw) => comprasGovCatalogItemSchema.safeParse(raw))
+      .filter((parsed): parsed is { success: true; data: ComprasGovCatalogItem } => parsed.success)
+      .map((parsed) => candidateFromCatalogItem(parsed.data, query, input.needId, url, fetchedAt, queryText))
+      .filter((candidate) => candidate.similarityScore > 0 || params.codigoItem || params.codigoClasse || params.codigoGrupo)
+      .sort((a, b) => b.similarityScore - a.similarityScore)
+      .slice(0, 12);
+
+    for (const candidate of candidates) {
+      upsertById(state.catalogSearchCandidates, candidate);
+    }
+
+    query.recordsRead = data.resultado.length;
+    query.status = candidates.length ? "SUCCESS" : "NO_RESULTS";
+    query.sourceUrl = url;
+    query.finishedAt = fetchedAt;
+    storeCoverageQuery(state, query);
+    appendAuditLogToState(state, {
+      actorId: options.actorId,
+      action: "CATMAT_PESQUISA_EXECUTADA",
+      resourceType: "NEED",
+      resourceId: input.needId,
+      organizationId: options.organizationId,
+      requestId: options.requestId,
+      userAgent: options.userAgent,
+      outcome: "SUCESSO",
+      reason: candidates.length ? "Candidatos CATMAT retornados para revisao humana." : "Nenhum candidato CATMAT localizado.",
+      metadata: { queryId: query.id, params: query.params, candidates: candidates.length },
+    });
+    return { query, candidates };
+  } catch (error) {
+    query.status = "FAILED";
+    query.errorMessage = error instanceof Error ? error.message : "Falha ao pesquisar CATMAT.";
+    query.finishedAt = new Date().toISOString();
+    storeCoverageQuery(state, query);
+    throw error;
+  }
+}
+
+export function confirmCatalogMapping(
+  state: DemoState,
+  rawInput: z.infer<typeof confirmCatalogMappingInputSchema>,
+  roles: Role[],
+  actorId: string,
+  organizationId?: string,
+) {
+  const input = confirmCatalogMappingInputSchema.parse(rawInput);
+  if (!canManageAcquisitionLinks(roles)) {
+    throw new Error("Apenas LOGISTICS_MANAGER ou ADMIN podem confirmar CATMAT.");
+  }
+
+  const need = state.needs.find((candidate) => candidate.id === input.needId);
+  if (!need) {
+    throw new Error("Necessidade nao localizada.");
+  }
+  const { item, variant } = itemForVariant(state, need.itemVariantId);
+  if (!item) {
+    throw new Error("Item MCL nao localizado para a necessidade.");
+  }
+  const candidate = state.catalogSearchCandidates.find((entry) => entry.id === input.candidateId);
+  if (!candidate || candidate.needId !== input.needId) {
+    throw new Error("Candidato CATMAT nao localizado para esta necessidade.");
+  }
+
+  const previousActive = activeCatalogMappingForNeed(state, input.needId);
+  if (previousActive) {
+    previousActive.status = "SUPERSEDED";
+  }
+  const previousVersions = state.itemCatalogMappings.filter(
+    (mapping) => mapping.mclItemId === item.id && mapping.mclVariantId === variant?.id,
+  );
+  const now = new Date().toISOString();
+  const mapping: ItemCatalogMapping = {
+    id: randomUUID(),
+    mclItemId: item.id,
+    mclVariantId: variant?.id,
+    needId: input.needId,
+    externalCatalog: candidate.externalCatalog,
+    externalItemCode: candidate.externalItemCode,
+    externalDescription: candidate.externalDescription,
+    groupCode: candidate.groupCode,
+    classCode: candidate.classCode,
+    pdmCode: candidate.pdmCode,
+    confirmedBy: actorId,
+    confirmedAt: now,
+    justification: input.justification,
+    status: "ACTIVE",
+    confidence: input.confidence ?? Math.max(0.55, candidate.similarityScore),
+    mappingVersion: previousVersions.length + 1,
+    replacesMappingId: previousActive?.id,
+    sourceCandidateId: candidate.id,
+  };
+
+  state.itemCatalogMappings.unshift(mapping);
+  appendAuditLogToState(state, {
+    actorId,
+    action: "CATMAT_CONFIRMADO",
+    resourceType: "ITEM_CATALOG_MAPPING",
+    resourceId: mapping.id,
+    organizationId,
+    outcome: "SUCESSO",
+    reason: "CATMAT confirmado manualmente para necessidade MCL.",
+    metadata: {
+      needId: input.needId,
+      externalCatalog: mapping.externalCatalog,
+      externalItemCode: mapping.externalItemCode,
+      mappingVersion: mapping.mappingVersion,
+      replacesMappingId: mapping.replacesMappingId,
+      catalogMappingVersion: COMPRAS_GOV_CATALOG_MAPPING_VERSION,
+    },
+  });
+  return mapping;
+}
+
+export function revokeCatalogMapping(
+  state: DemoState,
+  rawInput: z.infer<typeof revokeCatalogMappingInputSchema>,
+  roles: Role[],
+  actorId: string,
+  organizationId?: string,
+) {
+  const input = revokeCatalogMappingInputSchema.parse(rawInput);
+  if (!canManageAcquisitionLinks(roles)) {
+    throw new Error("Apenas LOGISTICS_MANAGER ou ADMIN podem revogar CATMAT.");
+  }
+  const mapping = state.itemCatalogMappings.find((candidate) => candidate.id === input.mappingId);
+  if (!mapping) {
+    throw new Error("Mapeamento CATMAT nao localizado.");
+  }
+  mapping.status = "REVOKED";
+  mapping.revokedBy = actorId;
+  mapping.revokedAt = new Date().toISOString();
+  appendAuditLogToState(state, {
+    actorId,
+    action: "CATMAT_REVOGADO",
+    resourceType: "ITEM_CATALOG_MAPPING",
+    resourceId: mapping.id,
+    organizationId,
+    outcome: "SUCESSO",
+    reason: input.reason,
+    metadata: { needId: mapping.needId, externalItemCode: mapping.externalItemCode },
+  });
+  return mapping;
+}
+
+function applyNormalizedArpItem(state: DemoState, item: ReturnType<typeof normalizeArpItem>) {
+  upsertById(state.organizations, item.organization);
+  upsertById(state.supplyItems, item.supplyItem);
+  upsertById(state.itemVariants, item.itemVariant);
+  upsertById(state.acquisitionInstruments, item.acquisitionInstrument);
+  upsertById(state.documents, item.documentReference);
+
+  const existing = state.externalRecords.find(
+    (record) =>
+      record.connectorId === item.externalRecord.connectorId &&
+      record.externalType === item.externalRecord.externalType &&
+      record.externalId === item.externalRecord.externalId,
+  );
+  const status: ExternalProcessingStatus = existing
+    ? existing.payloadHash === item.externalRecord.payloadHash
+      ? "DUPLICATE"
+      : "UPDATED"
+    : "ACCEPTED";
+  item.externalRecord.processingStatus = status;
+  if (existing) {
+    Object.assign(existing, item.externalRecord, { id: existing.id, processingStatus: status });
+  } else {
+    state.externalRecords.unshift(item.externalRecord);
+  }
+  return status;
+}
+
+export async function searchArpsForConfirmedCatmat(
+  state: DemoState,
+  rawInput: ArpSearchInput,
+  options: CoverageServiceOptions,
+) {
+  const input = arpSearchInputSchema.parse(rawInput);
+  const mapping = activeCatalogMappingForNeed(state, input.needId);
+  if (!mapping) {
+    throw new Error("Confirme um CATMAT antes de consultar atas.");
+  }
+  const range = defaultDateRange();
+  const params = {
+    pagina: 1,
+    dataVigenciaInicialMin: input.dataVigenciaInicialMin ?? range.start,
+    dataVigenciaInicialMax: input.dataVigenciaInicialMax ?? range.end,
+    tipoItem: "Material",
+    codigoItem: Number(mapping.externalItemCode),
+    codigoUnidadeGerenciadora: input.codigoUnidadeGerenciadora,
+    codigoModalidadeCompra: input.codigoModalidadeCompra,
+    codigoPdm: input.codigoPdm ? Number(input.codigoPdm) : undefined,
+    niFornecedor: input.niFornecedor,
+    numeroCompra: input.numeroCompra,
+  };
+  const config = options.config ?? getComprasGovConfig();
+  const client = createComprasGovClient(config, options.fetchImpl);
+  const startedAt = new Date().toISOString();
+  const query = coverageQueryBase(
+    {
+      needId: input.needId,
+      kind: "ARP_SEARCH",
+      endpoint: COMPRAS_GOV_ARP_ITEM_ENDPOINT,
+      params,
+      actorId: options.actorId,
+      externalCatalog: mapping.externalCatalog,
+      externalItemCode: mapping.externalItemCode,
+    },
+    startedAt,
+  );
+
+  try {
+    const { data, url } = await client.getJson(COMPRAS_GOV_ARP_ITEM_ENDPOINT, params, comprasGovApiResponseSchema);
+    const fetchedAt = new Date().toISOString();
+    const entries: ArpSearchEntry[] = [];
+    for (const raw of data.resultado) {
+      const parsed = comprasGovArpItemSchema.safeParse(raw);
+      if (!parsed.success || String(parsed.data.codigoItem) !== mapping.externalItemCode) {
+        continue;
+      }
+      const normalized = normalizeArpItem(parsed.data, url, fetchedAt);
+      normalized.externalRecord.schemaVersion = COMPRAS_GOV_MAPPING_VERSION;
+      applyNormalizedArpItem(state, normalized);
+      entries.push({
+        instrument: normalized.acquisitionInstrument,
+        raw: parsed.data,
+        sourceUrl: url,
+        unitQuery: {
+          numeroAta: parsed.data.numeroAtaRegistroPreco,
+          unidadeGerenciadora: parsed.data.codigoUnidadeGerenciadora,
+          numeroItem: parsed.data.numeroItem,
+        },
+      });
+    }
+    query.recordsRead = data.resultado.length;
+    query.status = entries.length ? "SUCCESS" : "NO_RESULTS";
+    query.sourceUrl = url;
+    query.finishedAt = fetchedAt;
+    storeCoverageQuery(state, query);
+    appendAuditLogToState(state, {
+      actorId: options.actorId,
+      action: "ARP_PESQUISA_EXECUTADA",
+      resourceType: "NEED",
+      resourceId: input.needId,
+      organizationId: options.organizationId,
+      requestId: options.requestId,
+      userAgent: options.userAgent,
+      outcome: "SUCESSO",
+      reason: entries.length ? "Atas localizadas para CATMAT confirmado." : "Nenhuma ata localizada para CATMAT confirmado.",
+      metadata: { queryId: query.id, params: query.params, entries: entries.length },
+    });
+    return { query, entries, synthesis: buildCoverageSynthesis(state, input.needId, entries.map((entry) => entry.instrument), []) };
+  } catch (error) {
+    query.status = "FAILED";
+    query.errorMessage = error instanceof Error ? error.message : "Falha ao consultar atas.";
+    query.finishedAt = new Date().toISOString();
+    storeCoverageQuery(state, query);
+    throw error;
+  }
+}
+
+function unitRecordFromApi(
+  unit: ComprasGovArpUnit,
+  needId: string,
+  acquisitionInstrumentId: string,
+  sourceUrl: string,
+  fetchedAt: string,
+): ArpUnitRecord {
+  const key = `${needId}:${acquisitionInstrumentId}:${unit.numeroAta}:${unit.unidadeGerenciadora}:${unit.numeroItem}:${unit.codigoUnidade ?? "sem-unidade"}`;
+  return {
+    id: stableId("arp-unit", key),
+    needId,
+    acquisitionInstrumentId,
+    numeroAta: unit.numeroAta,
+    unidadeGerenciadora: unit.unidadeGerenciadora,
+    numeroItem: unit.numeroItem,
+    codigoUnidade: unit.codigoUnidade,
+    nomeUnidade: unit.nomeUnidade ?? undefined,
+    tipoUnidade: unit.tipoUnidade ?? undefined,
+    fornecedor: unit.fornecedor ?? undefined,
+    quantidadeRegistrada: unit.quantidadeRegistrada ?? undefined,
+    saldoAdesoes: unit.saldoAdesoes ?? undefined,
+    saldoRemanejamentoEmpenho: unit.saldoRemanejamentoEmpenho ?? undefined,
+    qtdLimiteAdesao: unit.qtdLimiteAdesao ?? undefined,
+    qtdLimiteInformadoCompra: unit.qtdLimiteInformadoCompra ?? undefined,
+    aceitaAdesao: unit.aceitaAdesao ?? undefined,
+    sourceUrl,
+    sourceUpdatedAt: maybeIsoDate(unit.dataHoraAtualizacao ?? unit.dataHoraInclusao),
+    fetchedAt,
+    payload: unit as unknown as Record<string, unknown>,
+  };
+}
+
+export async function consultArpUnits(state: DemoState, rawInput: ArpUnitsInput, options: CoverageServiceOptions) {
+  const input = arpUnitsInputSchema.parse(rawInput);
+  const instrument = state.acquisitionInstruments.find((candidate) => candidate.id === input.acquisitionInstrumentId);
+  if (!instrument) {
+    throw new Error("Instrumento de aquisicao nao localizado.");
+  }
+  const params = {
+    pagina: 1,
+    numeroAta: input.numeroAta,
+    unidadeGerenciadora: input.unidadeGerenciadora,
+    numeroItem: input.numeroItem,
+    dataAtualizacao: input.dataAtualizacao,
+  };
+  const config = options.config ?? getComprasGovConfig();
+  const client = createComprasGovClient(config, options.fetchImpl);
+  const startedAt = new Date().toISOString();
+  const query = coverageQueryBase(
+    {
+      needId: input.needId,
+      kind: "ARP_UNITS",
+      endpoint: COMPRAS_GOV_ARP_UNITS_ENDPOINT,
+      params,
+      actorId: options.actorId,
+    },
+    startedAt,
+  );
+
+  try {
+    const { data, url } = await client.getJson(COMPRAS_GOV_ARP_UNITS_ENDPOINT, params, comprasGovApiResponseSchema);
+    const fetchedAt = new Date().toISOString();
+    const records = data.resultado
+      .map((raw) => comprasGovArpUnitSchema.safeParse(raw))
+      .filter((parsed): parsed is { success: true; data: ComprasGovArpUnit } => parsed.success)
+      .map((parsed) => unitRecordFromApi(parsed.data, input.needId, input.acquisitionInstrumentId, url, fetchedAt));
+
+    for (const record of records) {
+      upsertById(state.arpUnitRecords, record);
+    }
+
+    const externalRecord = {
+      id: randomUUID(),
+      connectorId: COMPRAS_GOV_CONNECTOR_ID,
+      externalType: "ARP_UNITS",
+      externalId: `${input.numeroAta}:${input.unidadeGerenciadora}:${input.numeroItem}`,
+      sourceUrl: url,
+      fetchedAt,
+      sourceUpdatedAt: records.map((record) => record.sourceUpdatedAt).filter(Boolean).sort().at(-1),
+      schemaVersion: "compras-gov.arp-units.v1",
+      payload: { records: records.map((record) => record.payload) },
+      payloadHash: hashPayload({ records: records.map((record) => record.payload) }),
+      processingStatus: "ACCEPTED" as const,
+      createdAt: fetchedAt,
+      updatedAt: fetchedAt,
+    };
+    const existing = state.externalRecords.find(
+      (record) =>
+        record.connectorId === externalRecord.connectorId &&
+        record.externalType === externalRecord.externalType &&
+        record.externalId === externalRecord.externalId,
+    );
+    if (existing) {
+      Object.assign(existing, externalRecord, { id: existing.id });
+    } else {
+      state.externalRecords.unshift(externalRecord);
+    }
+
+    query.recordsRead = data.resultado.length;
+    query.status = records.length ? "SUCCESS" : "NO_RESULTS";
+    query.sourceUrl = url;
+    query.finishedAt = fetchedAt;
+    storeCoverageQuery(state, query);
+    appendAuditLogToState(state, {
+      actorId: options.actorId,
+      action: "ARP_UNIDADES_CONSULTADAS",
+      resourceType: "ACQUISITION_INSTRUMENT",
+      resourceId: input.acquisitionInstrumentId,
+      organizationId: options.organizationId,
+      requestId: options.requestId,
+      userAgent: options.userAgent,
+      outcome: "SUCESSO",
+      reason: records.length ? "Unidades e saldos retornados pela fonte." : "Fonte nao retornou unidades para a ata consultada.",
+      metadata: { queryId: query.id, params: query.params, records: records.length },
+    });
+    const relatedInstruments = state.acquisitionInstruments.filter(
+      (candidate) => candidate.sourceSystem === COMPRAS_GOV_SOURCE_SYSTEM && candidate.itemCode === instrument.itemCode,
+    );
+    return {
+      query,
+      records,
+      synthesis: buildCoverageSynthesis(state, input.needId, relatedInstruments, records),
+    };
+  } catch (error) {
+    query.status = "FAILED";
+    query.errorMessage = error instanceof Error ? error.message : "Falha ao consultar unidades da ata.";
+    query.finishedAt = new Date().toISOString();
+    storeCoverageQuery(state, query);
+    throw error;
+  }
+}
+
+function sum(values: Array<number | undefined>) {
+  return values.reduce<number>((acc, value) => acc + (value ?? 0), 0);
+}
+
+export function buildCoverageSynthesis(
+  state: DemoState,
+  needId: string,
+  instruments: AcquisitionInstrument[] = [],
+  unitRecords: ArpUnitRecord[] = [],
+): CoverageSynthesis {
+  const need = state.needs.find((candidate) => candidate.id === needId);
+  if (!need) {
+    throw new Error("Necessidade nao localizada.");
+  }
+  const stockCovered = sum(
+    state.needCoverages
+      .filter((coverage) => coverage.needId === needId && coverage.coverageType === "ESTOQUE")
+      .map((coverage) => coverage.quantity),
+  );
+  const deficit = Math.max(0, need.quantityRequested - stockCovered);
+  const now = Date.now();
+  const inThirtyDays = now + 30 * 24 * 60 * 60 * 1000;
+  const currentAtas = instruments.filter((instrument) => {
+    const validFrom = new Date(instrument.validFrom).getTime();
+    const validUntil = new Date(instrument.validUntil).getTime();
+    return validFrom <= now && validUntil >= now && instrument.status !== "EXCLUIDO_NA_FONTE";
+  });
+  const potentialQuantity = sum(currentAtas.map((instrument) => instrument.capacity || instrument.quantity));
+  const unitValues = currentAtas.map((instrument) => instrument.unitValue).filter((value): value is number => typeof value === "number");
+  const expiringSoonCount = currentAtas.filter((instrument) => new Date(instrument.validUntil).getTime() <= inThirtyDays).length;
+  const balanceConsultable = unitRecords.some(
+    (record) => record.saldoAdesoes !== undefined || record.saldoRemanejamentoEmpenho !== undefined,
+  );
+  const missingFinancialInfo = currentAtas.filter(
+    (instrument) => instrument.unitValue === undefined || instrument.totalValue === undefined,
+  ).length;
+  const divergences = [
+    ...new Set(
+      currentAtas
+        .filter((instrument) => instrument.itemCode && !activeCatalogMappingForNeed(state, needId)?.externalItemCode.includes(instrument.itemCode))
+        .map((instrument) => `Instrumento ${instrument.reference} possui codigo de item divergente do CATMAT confirmado.`),
+    ),
+  ];
+  const mappingConfidence = activeCatalogMappingForNeed(state, needId)?.confidence ?? 0.45;
+  const confidence = Math.max(
+    0,
+    Math.min(
+      1,
+      0.35 +
+        mappingConfidence * 0.3 +
+        (currentAtas.length ? 0.18 : 0) +
+        (balanceConsultable ? 0.12 : 0) -
+        (missingFinancialInfo ? 0.05 : 0) -
+        divergences.length * 0.08,
+    ),
+  );
+  const balanceStatus: CoverageSynthesis["balanceStatus"] =
+    unitRecords.length === 0 ? "NOT_QUERIED" : balanceConsultable ? "CONSULTABLE" : "ABSENT";
+  const phrases = [
+    `Para a necessidade de ${need.quantityRequested} unidades, ha ${stockCovered} cobertas por estoque registrado e deficit estimado de ${deficit}.`,
+    currentAtas.length
+      ? `Foram encontradas ${currentAtas.length} atas vigentes relacionadas ao CATMAT confirmado, com quantidade potencial agregada de ${potentialQuantity}.`
+      : "Nenhuma ata vigente foi localizada para o CATMAT confirmado no intervalo consultado.",
+    potentialQuantity >= deficit && deficit > 0
+      ? "A quantidade potencial retornada pela fonte e igual ou superior ao deficit, exigindo avaliacao humana e etapa administrativa propria."
+      : "A quantidade potencial retornada pela fonte nao cobre integralmente o deficit ou ainda nao foi consultada.",
+    balanceStatus === "CONSULTABLE"
+      ? "A fonte retornou campos de saldo/limite para a ata selecionada; o MCL apenas os reproduz sem recalculo informal."
+      : balanceStatus === "ABSENT"
+        ? "A consulta de unidades nao retornou saldo consultavel para a ata selecionada."
+        : "Unidades e saldos ainda nao foram consultados para uma ata selecionada.",
+  ];
+  return {
+    quantityRequested: need.quantityRequested,
+    stockCovered,
+    deficit,
+    potentialQuantity,
+    currentAtaCount: currentAtas.length,
+    expiringSoonCount,
+    minUnitValue: unitValues.length ? Math.min(...unitValues) : undefined,
+    maxUnitValue: unitValues.length ? Math.max(...unitValues) : undefined,
+    balanceStatus,
+    missingFinancialInfo,
+    divergences,
+    confidence: Number(confidence.toFixed(2)),
+    phrases,
+    limitations: [
+      "A confirmacao CATMAT e humana e nao classifica automaticamente todos os registros publicos como Classe II.",
+      "Atas, quantidades e saldos sao lidos da API publica do Compras.gov.br no momento da consulta.",
+      "O MCL nao recalcula saldo oficial quando a fonte nao fornece campo especifico.",
+      "Esta sintese indica cobertura potencial e nao substitui decisao administrativa, juridica ou financeira.",
+    ],
+    sourceDate: new Date().toISOString(),
+  };
+}
+
+export function persistenceMode() {
+  return process.env.DATABASE_URL ? "postgresql" : "demo-memory";
+}

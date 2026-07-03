@@ -3,9 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 enum RoleName {
@@ -46,6 +44,25 @@ enum ConnectorRunStatus {
   RUNNING
   SUCCESS
   FAILED
+  SKIPPED
+}
+
+enum CatalogMappingStatus {
+  ACTIVE
+  REVOKED
+  SUPERSEDED
+}
+
+enum CoverageQueryKind {
+  CATMAT_SEARCH
+  ARP_SEARCH
+  ARP_UNITS
+}
+
+enum CoverageQueryStatus {
+  SUCCESS
+  FAILED
+  NO_RESULTS
   SKIPPED
 }
 
@@ -96,33 +113,33 @@ model Organization {
 }
 
 model SupplyItem {
-  id             String        @id
-  persistentCode String        @unique
-  name           String
-  description    String
-  supplyClass    String
-  category       String
-  baseUnit       String
-  active         Boolean       @default(true)
-  synthetic      Boolean       @default(true)
-  sourceSystem   String?
-  sourceRecordId String?
-  sourceOrigin   SourceOrigin?
+  id              String        @id
+  persistentCode  String        @unique
+  name            String
+  description     String
+  supplyClass     String
+  category        String
+  baseUnit        String
+  active          Boolean       @default(true)
+  synthetic       Boolean       @default(true)
+  sourceSystem    String?
+  sourceRecordId  String?
+  sourceOrigin    SourceOrigin?
   sourceUpdatedAt DateTime?
-  variants       ItemVariant[]
+  variants        ItemVariant[]
 }
 
 model ItemVariant {
-  id        String       @id
-  itemId    String
-  sku       String       @unique
-  label     String
-  size      String
-  unit      String
-  active    Boolean      @default(true)
-  item      SupplyItem   @relation(fields: [itemId], references: [id])
-  needs     Need[]
-  lots      Lot[]
+  id     String     @id
+  itemId String
+  sku    String     @unique
+  label  String
+  size   String
+  unit   String
+  active Boolean    @default(true)
+  item   SupplyItem @relation(fields: [itemId], references: [id])
+  needs  Need[]
+  lots   Lot[]
 }
 
 model Need {
@@ -168,8 +185,8 @@ model Credit {
 }
 
 model AcquisitionInstrument {
-  id                    String   @id
-  persistentCode         String   @unique
+  id                    String        @id
+  persistentCode        String        @unique
   type                  String
   reference             String
   supplierNameSynthetic String?
@@ -189,7 +206,7 @@ model AcquisitionInstrument {
   confidence            Float?
   validFrom             DateTime
   validUntil            DateTime
-  capacity              Int      @default(0)
+  capacity              Int           @default(0)
   status                String
   sourceSystem          String
   sourceRecordId        String
@@ -197,7 +214,7 @@ model AcquisitionInstrument {
 
 model Commitment {
   id                      String   @id
-  persistentCode           String   @unique
+  persistentCode          String   @unique
   creditId                String
   acquisitionInstrumentId String
   amount                  Decimal
@@ -209,7 +226,7 @@ model Commitment {
 }
 
 model NeedCoverage {
-  id           String @id
+  id           String  @id
   needId       String
   coverageType String
   quantity     Int
@@ -220,14 +237,14 @@ model NeedCoverage {
 
 model Lot {
   id                         String      @id
-  persistentCode              String      @unique
-  itemVariantId               String
-  quantity                    Int
-  manufacturedAt              DateTime?
-  receivedAt                  DateTime?
-  supplierReferenceSynthetic  String
-  status                      String
-  variant                     ItemVariant @relation(fields: [itemVariantId], references: [id])
+  persistentCode             String      @unique
+  itemVariantId              String
+  quantity                   Int
+  manufacturedAt             DateTime?
+  receivedAt                 DateTime?
+  supplierReferenceSynthetic String
+  status                     String
+  variant                    ItemVariant @relation(fields: [itemVariantId], references: [id])
 }
 
 model Location {
@@ -264,17 +281,17 @@ model LogisticsUnit {
 }
 
 model Shipment {
-  id                         String    @id
-  persistentCode             String    @unique
-  originOrganizationId       String
-  destinationOrganizationId  String
-  plannedDepartureAt         DateTime
-  actualDepartureAt          DateTime?
-  expectedDeliveryAt         DateTime
-  actualDeliveryAt           DateTime?
-  status                     String
+  id                          String    @id
+  persistentCode              String    @unique
+  originOrganizationId        String
+  destinationOrganizationId   String
+  plannedDepartureAt          DateTime
+  actualDepartureAt           DateTime?
+  expectedDeliveryAt          DateTime
+  actualDeliveryAt            DateTime?
+  status                      String
   transportReferenceSynthetic String
-  confidence                 Float
+  confidence                  Float
 }
 
 model ShipmentUnit {
@@ -298,7 +315,7 @@ model DocumentReference {
 }
 
 model ObjectLink {
-  id             String   @id
+  id             String        @id
   fromType       String
   fromId         String
   relationType   String
@@ -310,14 +327,14 @@ model ObjectLink {
   justification  String?
   confidence     Float?
   sourceOrigin   SourceOrigin?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime      @default(now())
 
   @@index([fromType, fromId])
   @@index([toType, toId])
 }
 
 model LogisticsEvent {
-  id                 String     @id
+  id                  String     @id
   persistentCode      String     @unique
   eventType           String
   occurredAt          DateTime
@@ -354,7 +371,7 @@ model EventRelation {
 
 model Divergence {
   id                 String   @id
-  persistentCode      String   @unique
+  persistentCode     String   @unique
   title              String
   severity           String
   status             String
@@ -370,7 +387,7 @@ model Divergence {
 }
 
 model ConnectorHealth {
-  id                 String   @id
+  id                 String    @id
   name               String
   sourceSystem       String
   status             String
@@ -439,6 +456,103 @@ model ConnectorRun {
   message            String
 
   @@index([connectorId, startedAt])
+}
+
+model CoverageQuery {
+  id               String              @id
+  needId           String
+  kind             CoverageQueryKind
+  endpoint         String
+  params           Json
+  status           CoverageQueryStatus
+  recordsRead      Int
+  sourceUrl        String?
+  errorMessage     String?
+  actorId          String?
+  externalCatalog  String?
+  externalItemCode String?
+  startedAt        DateTime
+  finishedAt       DateTime
+  staleAt          DateTime?
+
+  @@index([needId, kind, startedAt])
+  @@index([externalCatalog, externalItemCode])
+}
+
+model CatalogSearchCandidate {
+  id                    String    @id
+  queryId               String
+  needId                String
+  externalCatalog       String
+  externalItemCode      String
+  externalDescription   String
+  groupCode             String?
+  classCode             String?
+  pdmCode               String?
+  statusItem            Boolean?
+  sourceSystem          String
+  sourceUrl             String
+  sourceUpdatedAt       DateTime?
+  fetchedAt             DateTime
+  similarityScore       Float
+  similarityExplanation String
+  payload               Json
+
+  @@index([needId, queryId])
+  @@index([externalCatalog, externalItemCode])
+}
+
+model ItemCatalogMapping {
+  id                  String               @id
+  mclItemId           String
+  mclVariantId        String?
+  needId              String?
+  externalCatalog     String
+  externalItemCode    String
+  externalDescription String
+  groupCode           String?
+  classCode           String?
+  pdmCode             String?
+  confirmedBy         String
+  confirmedAt         DateTime
+  revokedBy           String?
+  revokedAt           DateTime?
+  justification       String
+  status              CatalogMappingStatus
+  confidence          Float
+  mappingVersion      Int
+  replacesMappingId   String?
+  sourceCandidateId   String?
+
+  @@index([mclItemId, mclVariantId, status])
+  @@index([needId, status])
+  @@index([externalCatalog, externalItemCode])
+}
+
+model ArpUnitRecord {
+  id                        String    @id
+  needId                    String
+  acquisitionInstrumentId   String
+  numeroAta                 String
+  unidadeGerenciadora       String
+  numeroItem                String
+  codigoUnidade             String?
+  nomeUnidade               String?
+  tipoUnidade               String?
+  fornecedor                String?
+  quantidadeRegistrada      Decimal?
+  saldoAdesoes              Decimal?
+  saldoRemanejamentoEmpenho Decimal?
+  qtdLimiteAdesao           Decimal?
+  qtdLimiteInformadoCompra  Decimal?
+  aceitaAdesao              Boolean?
+  sourceUrl                 String
+  sourceUpdatedAt           DateTime?
+  fetchedAt                 DateTime
+  payload                   Json
+
+  @@unique([needId, acquisitionInstrumentId, codigoUnidade])
+  @@index([numeroAta, unidadeGerenciadora, numeroItem])
 }
 
 model AuditLog {

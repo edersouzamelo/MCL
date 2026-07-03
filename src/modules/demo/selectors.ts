@@ -109,6 +109,26 @@ export function dashboardMetrics(state: DemoState) {
     (instrument) => new Date(instrument.validUntil).getTime() <= inThirtyDays,
   );
   const comprasGovConnector = state.connectors.find((connector) => connector.id === "compras-gov");
+  const activeCatalogMappings = state.itemCatalogMappings.filter((mapping) => mapping.status === "ACTIVE");
+  const needsWithCatmat = new Set(activeCatalogMappings.map((mapping) => mapping.needId).filter(Boolean));
+  const needsWithPotentialAta = new Set(
+    activeCatalogMappings
+      .filter((mapping) =>
+        state.acquisitionInstruments.some(
+          (instrument) => instrument.sourceSystem === "COMPRAS_GOV" && instrument.itemCode === mapping.externalItemCode,
+        ),
+      )
+      .map((mapping) => mapping.needId)
+      .filter(Boolean),
+  );
+  const latestCoverageQuery = [...state.coverageQueries].sort(
+    (a, b) => new Date(b.finishedAt).getTime() - new Date(a.finishedAt).getTime(),
+  )[0];
+  const staleCoverageNeedIds = new Set(
+    state.coverageQueries
+      .filter((query) => query.staleAt && new Date(query.staleAt).getTime() < now)
+      .map((query) => query.needId),
+  );
 
   return {
     needs,
@@ -124,6 +144,15 @@ export function dashboardMetrics(state: DemoState) {
       currentPublicInstruments: currentPublicInstruments.length,
       expiringPublicInstruments: expiringPublicInstruments.length,
       lastComprasGovSyncAt: comprasGovConnector?.lastSuccessAt ?? comprasGovConnector?.lastRunAt,
+      sourceSystem: "COMPRAS_GOV",
+    },
+    acquisitionCoverage: {
+      needsWithCatmat: needsWithCatmat.size,
+      needsWithoutCatmat: state.needs.length - needsWithCatmat.size,
+      needsWithPotentialAta: needsWithPotentialAta.size,
+      needsWithoutResult: activeCatalogMappings.filter((mapping) => !needsWithPotentialAta.has(mapping.needId)).length,
+      staleResults: staleCoverageNeedIds.size,
+      lastQueryAt: latestCoverageQuery?.finishedAt,
       sourceSystem: "COMPRAS_GOV",
     },
   };
