@@ -514,6 +514,30 @@ export async function searchCatmatCandidates(
         },
       });
 
+      if (candidates.length > 0) {
+        await prisma.catalogSearchCandidate.createMany({
+          data: candidates.map((c) => ({
+            id: c.id,
+            queryId: c.queryId,
+            needId: c.needId,
+            externalCatalog: c.externalCatalog,
+            externalItemCode: c.externalItemCode,
+            externalDescription: c.externalDescription,
+            groupCode: c.groupCode,
+            classCode: c.classCode,
+            pdmCode: c.pdmCode,
+            statusItem: c.statusItem,
+            similarityScore: c.similarityScore,
+            similarityExplanation: c.similarityExplanation,
+            sourceSystem: c.sourceSystem,
+            sourceUrl: c.sourceUrl,
+            sourceUpdatedAt: new Date(c.sourceUpdatedAt),
+            fetchedAt: new Date(c.fetchedAt),
+            payload: c.payload as any,
+          })),
+        });
+      }
+
       await prisma.auditLog.create({
         data: {
           id: randomUUID(),

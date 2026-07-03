@@ -167,6 +167,12 @@ export function CoverageJourneyClient({
         confidence: Math.max(0.55, selectedCandidate.similarityScore),
       });
       setMapping(result.mapping);
+      setEntries([]);
+      setSelectedEntry(undefined);
+      setUnitRecords([]);
+      setSynthesis(undefined);
+      setQueryTrace(undefined);
+      setAtaQueryStatus("IDLE");
       setMessage(`CATMAT ${result.mapping.externalItemCode} confirmado na versao ${result.mapping.mappingVersion}.`);
       router.refresh();
     });
