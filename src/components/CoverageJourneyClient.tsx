@@ -397,7 +397,12 @@ export function CoverageJourneyClient({
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold">CATMAT {candidate.externalItemCode}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">CATMAT {candidate.externalItemCode}</p>
+                    {candidate.sourceSystem === "MCL_SIMULADO" && (
+                      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Simulado</span>
+                    )}
+                  </div>
                   <Badge tone={candidate.statusItem ? "good" : "warn"}>{candidate.statusItem ? "ativo" : "inativo"}</Badge>
                 </div>
                 <p className="mt-2 line-clamp-4 text-zinc-700">{candidate.externalDescription}</p>
