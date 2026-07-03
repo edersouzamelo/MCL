@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { POST } from "@/app/api/coverage/atas/search/route";
 import { getServerSession } from "next-auth";
 import { getDemoState, resetDemoState } from "@/server/demo-store";
-import { activeCatalogMappingForNeedSync } from "@/modules/coverage/service";
 
 vi.mock("next-auth", () => ({
   getServerSession: vi.fn(),

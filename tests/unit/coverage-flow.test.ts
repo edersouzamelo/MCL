@@ -465,6 +465,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("Timeout/SSL Error")) as unknown as typeof fetch;
 
     const originalEnv = process.env.NODE_ENV;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.env as any).NODE_ENV = "development";
 
     try {
@@ -500,6 +501,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
       expect(Number(unitsResult.records[0].saldoAdesoes)).toBe(350);
       expect(Number(unitsResult.records[1].saldoAdesoes)).toBe(150);
     } finally {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (process.env as any).NODE_ENV = originalEnv;
     }
   });

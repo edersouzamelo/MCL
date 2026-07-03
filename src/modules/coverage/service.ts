@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { canManageAcquisitionLinks } from "@/modules/acquisitions/links";

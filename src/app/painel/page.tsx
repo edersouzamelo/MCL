@@ -153,6 +153,7 @@ export default async function DashboardPage() {
     const dbMappings = await prisma.itemCatalogMapping.findMany({ where: { status: "ACTIVE" } });
     const dbInstruments = await prisma.acquisitionInstrument.findMany();
 
+    // eslint-disable-next-line react-hooks/purity
     const nowTime = Date.now();
 
     needsAwaitingAnalysis = state.needs.filter(
