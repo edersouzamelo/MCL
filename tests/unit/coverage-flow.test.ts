@@ -500,7 +500,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
       expect(Number(unitsResult.records[0].saldoAdesoes)).toBe(350);
       expect(Number(unitsResult.records[1].saldoAdesoes)).toBe(150);
     } finally {
-      process.env.NODE_ENV = originalEnv;
+      (process.env as any).NODE_ENV = originalEnv;
     }
   });
 });
