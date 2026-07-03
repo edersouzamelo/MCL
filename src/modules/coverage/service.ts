@@ -531,7 +531,7 @@ export async function searchCatmatCandidates(
             similarityExplanation: c.similarityExplanation,
             sourceSystem: c.sourceSystem,
             sourceUrl: c.sourceUrl,
-            sourceUpdatedAt: new Date(c.sourceUpdatedAt),
+            sourceUpdatedAt: c.sourceUpdatedAt ? new Date(c.sourceUpdatedAt) : null,
             fetchedAt: new Date(c.fetchedAt),
             payload: c.payload as any,
           })),
