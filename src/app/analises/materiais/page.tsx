@@ -44,12 +44,14 @@ export default async function MaterialAnalysesPage() {
     const dbCoverages = await prisma.needCoverage.findMany();
     const dbAnalyses = await prisma.materialCoverageAnalysis.findMany();
 
-    items = dbNeeds.map((need) => {
-      const org = dbOrganizations.find((o) => o.id === need.organizationId);
-      const coverages = dbCoverages.filter((c) => c.needId === need.id && c.coverageType === "ESTOQUE");
-      const stockCovered = coverages.reduce((sum, c) => sum + c.quantity, 0);
+    items = dbNeeds.map((need: (typeof dbNeeds)[number]) => {
+      const org = dbOrganizations.find((o: (typeof dbOrganizations)[number]) => o.id === need.organizationId);
+      const coverages = dbCoverages.filter(
+        (coverage: (typeof dbCoverages)[number]) => coverage.needId === need.id && coverage.coverageType === "ESTOQUE",
+      );
+      const stockCovered = coverages.reduce((sum: number, coverage: (typeof coverages)[number]) => sum + coverage.quantity, 0);
       const deficit = Math.max(0, need.quantityRequested - stockCovered);
-      const analysis = dbAnalyses.find((a) => a.needId === need.id);
+      const analysis = dbAnalyses.find((candidate: (typeof dbAnalyses)[number]) => candidate.needId === need.id);
 
       let statusLabel = "Aguardando Analise";
       if (analysis) {
