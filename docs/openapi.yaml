@@ -79,3 +79,48 @@ paths:
           description: Entrada invalida
         "401":
           description: Autenticacao obrigatoria
+  /api/v1/material-analyses:
+    get:
+      summary: Lista todas as analises de cobertura de materiais
+      responses:
+        "200":
+          description: Lista de analises
+        "401":
+          description: Autenticacao obrigatoria
+    post:
+      summary: Cria ou busca uma analise de cobertura
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - needId
+              properties:
+                needId:
+                  type: string
+      responses:
+        "200":
+          description: Analise retornada
+        "400":
+          description: Parametro invalido
+        "401":
+          description: Autenticacao obrigatoria
+  /api/v1/material-analyses/{id}:
+    get:
+      summary: Busca detalhes de uma analise especifica
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Detalhes da analise e candidatos
+        "401":
+          description: Autenticacao obrigatoria
+        "404":
+          description: Analise nao localizada
+

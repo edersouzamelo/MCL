@@ -898,7 +898,26 @@ export const externalRecords: ExternalRecord[] = [];
 export const connectorRuns: ConnectorRun[] = [];
 export const coverageQueries: DemoState["coverageQueries"] = [];
 export const catalogSearchCandidates: DemoState["catalogSearchCandidates"] = [];
-export const itemCatalogMappings: DemoState["itemCatalogMappings"] = [];
+export const itemCatalogMappings: DemoState["itemCatalogMappings"] = [
+  {
+    id: "mapping-calca-120-default",
+    mclItemId: "item-calca",
+    mclVariantId: "variant-calca-42",
+    needId: "need-calca-120",
+    externalCatalog: "CATMAT",
+    externalItemCode: "452757",
+    externalDescription: "BOTA SEGURANÇA, MATERIAL: COURO, MATERIAL SOLA: BORRACHA, COR: PRETA, TAMANHO: 40, TIPO CANO: CURTO",
+    groupCode: "84",
+    classCode: "8430",
+    pdmCode: "1415",
+    confirmedBy: "user-demo-admin",
+    confirmedAt: "2026-07-02T10:00:00.000Z",
+    justification: "Mapeamento pre-confirmado para calca tamanho 42.",
+    status: "ACTIVE",
+    confidence: 0.85,
+    mappingVersion: 1
+  }
+];
 export const arpUnitRecords: DemoState["arpUnitRecords"] = [];
 
 export const multicriteriaWeights: MulticriteriaWeights[] = [

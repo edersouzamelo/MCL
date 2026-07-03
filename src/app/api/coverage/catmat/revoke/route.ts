@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
   try {
     const state = getDemoState();
-    const mapping = revokeCatalogMapping(
+    const mapping = await revokeCatalogMapping(
       state,
       await request.json(),
       (session.user.roles ?? []) as Role[],

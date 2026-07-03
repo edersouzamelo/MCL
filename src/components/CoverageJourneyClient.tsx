@@ -70,14 +70,14 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 function money(value?: number) {
   if (value === undefined) {
-    return "sem valor";
+    return "Nao fornecido pela fonte consultada.";
   }
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 function number(value?: number) {
   if (value === undefined) {
-    return "nao informado";
+    return "Nao fornecido pela fonte consultada.";
   }
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(value);
 }
@@ -104,7 +104,12 @@ export function CoverageJourneyClient({
 }) {
   const router = useRouter();
   const [range] = useState(todayYearRange);
-  const [terms, setTerms] = useState("bota seguranca couro cano");
+  const [terms, setTerms] = useState(() => {
+    // build search terms dynamically from the item and variant props
+    const rawTerms = `${item.name} ${variant.label}`.trim().toLowerCase();
+    // remove special character noise
+    return rawTerms.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  });
   const [dateStart, setDateStart] = useState(range.start);
   const [dateEnd, setDateEnd] = useState(range.end);
   const [candidates, setCandidates] = useState<CatalogSearchCandidate[]>([]);
@@ -118,6 +123,8 @@ export function CoverageJourneyClient({
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState<string>();
+  const [queryTrace, setQueryTrace] = useState<any>();
+  const [ataQueryStatus, setAtaQueryStatus] = useState<"IDLE" | "SEARCHING_ARPS" | "COMPLETED" | "EMPTY" | "TIMEOUT" | "ERROR">("IDLE");
 
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId);
 
@@ -136,11 +143,12 @@ export function CoverageJourneyClient({
 
   async function searchCatmat() {
     await guarded("catmat", async () => {
-      const result = await postJson<{ candidates: CatalogSearchCandidate[] }>("/api/coverage/catmat/search", {
+      const result = await postJson<{ candidates: CatalogSearchCandidate[]; query: any }>("/api/coverage/catmat/search", {
         needId: need.id,
         terms,
       });
       setCandidates(result.candidates);
+      setQueryTrace(result.query);
       setSelectedCandidateId(result.candidates[0]?.id);
       setMessage(`${result.candidates.length} candidatos CATMAT preparados para revisao.`);
     });
@@ -178,26 +186,60 @@ export function CoverageJourneyClient({
       setSelectedEntry(undefined);
       setUnitRecords([]);
       setSynthesis(undefined);
+      setQueryTrace(undefined);
       setMessage("Mapeamento CATMAT revogado.");
       router.refresh();
     });
   }
 
   async function searchAtas() {
+    setAtaQueryStatus("SEARCHING_ARPS");
+    setMessage(`Consultando atas relacionadas ao CATMAT ${mapping?.externalItemCode}...`);
+    setError(undefined);
     await guarded("atas", async () => {
-      const result = await postJson<{ entries: ArpSearchEntry[]; synthesis: CoverageSynthesis }>(
-        "/api/coverage/atas/search",
-        {
-          needId: need.id,
-          dataVigenciaInicialMin: dateStart,
-          dataVigenciaInicialMax: dateEnd,
-        },
-      );
-      setEntries(result.entries);
-      setSelectedEntry(result.entries[0]);
-      setSynthesis(result.synthesis);
-      setUnitRecords([]);
-      setMessage(`${result.entries.length} atas relacionadas ao CATMAT confirmado.`);
+      try {
+        const result = await postJson<any>(
+          "/api/coverage/atas/search",
+          {
+            needId: need.id,
+            dataVigenciaInicialMin: dateStart,
+            dataVigenciaInicialMax: dateEnd,
+          },
+        );
+
+        if (result.ok === false) {
+          if (result.code === "TIMEOUT") {
+            setAtaQueryStatus("TIMEOUT");
+            setError("A consulta de atas excedeu o tempo limite.");
+          } else {
+            setAtaQueryStatus("ERROR");
+            setError(`Não foi possível concluir a consulta de atas. Código: ${result.code || "UNKNOWN"}. Motivo: ${result.message || "Erro desconhecido"}`);
+          }
+          setEntries([]);
+          setSynthesis(undefined);
+          return;
+        }
+
+        setQueryTrace(result.trace);
+        if (result.count > 0 && result.items) {
+          setEntries(result.items);
+          setSelectedEntry(result.items[0]);
+          setSynthesis(result.synthesis);
+          setAtaQueryStatus("COMPLETED");
+          setMessage(`Atas relacionadas ao CATMAT ${mapping?.externalItemCode} encontradas: ${result.count}.`);
+        } else {
+          setEntries([]);
+          setSynthesis(undefined);
+          setAtaQueryStatus("EMPTY");
+          setMessage(`Nenhuma ata relacionada ao CATMAT ${mapping?.externalItemCode} foi encontrada no período consultado.`);
+        }
+        setUnitRecords([]);
+      } catch (err: any) {
+        setAtaQueryStatus("ERROR");
+        setError(`Não foi possível concluir a consulta de atas. Código: FETCH_ERROR. Motivo: ${err.message || "Falha na rede"}`);
+        setEntries([]);
+        setSynthesis(undefined);
+      }
     });
   }
 
@@ -207,12 +249,13 @@ export function CoverageJourneyClient({
       return;
     }
     await guarded("units", async () => {
-      const result = await postJson<{ records: ArpUnitRecord[]; synthesis: CoverageSynthesis }>("/api/coverage/atas/units", {
+      const result = await postJson<{ records: ArpUnitRecord[]; synthesis: CoverageSynthesis; query: any }>("/api/coverage/atas/units", {
         needId: need.id,
         acquisitionInstrumentId: entry.instrument.id,
         ...entry.unitQuery,
       });
       setUnitRecords(result.records);
+      setQueryTrace(result.query);
       setSynthesis(result.synthesis);
       setMessage(`${result.records.length} unidades retornadas pela fonte para a ata selecionada.`);
     });
@@ -228,7 +271,7 @@ export function CoverageJourneyClient({
         needId: need.id,
         acquisitionInstrumentId: selectedEntry.instrument.id,
         confidence: synthesis.confidence,
-        justification: `Cobertura potencial registrada apos CATMAT ${mapping?.externalItemCode} e consulta deterministica de atas.`,
+        justification: `Cobertura potencial registrada após CATMAT ${mapping?.externalItemCode} e consulta deterministica de atas.`,
       });
       setMessage("Cobertura possivel registrada no MCL.");
       router.refresh();
@@ -256,7 +299,7 @@ export function CoverageJourneyClient({
             <div key={numberLabel} className="rounded bg-zinc-50 p-2 text-xs">
               <span className="font-semibold text-zinc-500">{numberLabel}</span>
               <p className="mt-1 font-semibold text-zinc-900">{label}</p>
-              <p className={done ? "text-emerald-700" : "text-zinc-500"}>{done ? "pronto" : "pendente"}</p>
+              <p className={done ? "text-emerald-700 font-semibold" : "text-zinc-500"}>{done ? "pronto" : "pendente"}</p>
             </div>
           ))}
         </div>
@@ -297,11 +340,11 @@ export function CoverageJourneyClient({
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
             <label className="text-sm">
-              <span className="font-semibold text-zinc-700">Termos adicionais</span>
+              <span className="font-semibold text-zinc-700">Termos de busca (editavel)</span>
               <input
                 value={terms}
                 onChange={(event) => setTerms(event.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-800"
               />
             </label>
             <button
@@ -378,7 +421,7 @@ export function CoverageJourneyClient({
               <input
                 value={justification}
                 onChange={(event) => setJustification(event.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-850"
               />
             </label>
             <button
@@ -422,7 +465,23 @@ export function CoverageJourneyClient({
           </button>
         </div>
 
-        {entries.length ? (
+        {ataQueryStatus === "SEARCHING_ARPS" ? (
+          <p className="mt-3 text-sm text-zinc-600 animate-pulse">
+            Consultando atas relacionadas ao CATMAT {mapping?.externalItemCode}...
+          </p>
+        ) : ataQueryStatus === "EMPTY" ? (
+          <p className="mt-3 text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+            Nenhuma ata relacionada ao CATMAT {mapping?.externalItemCode} foi encontrada no período consultado.
+          </p>
+        ) : ataQueryStatus === "TIMEOUT" ? (
+          <p className="mt-3 text-sm text-rose-700 bg-rose-50 p-3 rounded border border-rose-200">
+            A consulta de atas excedeu o tempo limite.
+          </p>
+        ) : ataQueryStatus === "ERROR" ? (
+          <p className="mt-3 text-sm text-rose-700 bg-rose-50 p-3 rounded border border-rose-200">
+            {error || "Não foi possível concluir a consulta de atas."}
+          </p>
+        ) : entries.length ? (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {entries.map((entry) => {
               const selected = selectedEntry?.instrument.id === entry.instrument.id;
@@ -441,12 +500,12 @@ export function CoverageJourneyClient({
                     <Badge tone="info">{entry.instrument.status}</Badge>
                   </div>
                   <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-                    <div><dt>Fornecedor</dt><dd className="font-semibold">{entry.instrument.supplierName ?? "nao informado"}</dd></div>
-                    <div><dt>Vigencia</dt><dd className="font-semibold">{formatDateTime(entry.instrument.validFrom)} ate {formatDateTime(entry.instrument.validUntil)}</dd></div>
-                    <div><dt>Qtd. homologada</dt><dd className="font-semibold">{number(entry.instrument.quantity)}</dd></div>
-                    <div><dt>Max. adesao</dt><dd className="font-semibold">{number(entry.instrument.capacity)}</dd></div>
-                    <div><dt>Valor unitario</dt><dd className="font-semibold">{money(entry.instrument.unitValue)}</dd></div>
-                    <div><dt>Valor total</dt><dd className="font-semibold">{money(entry.instrument.totalValue)}</dd></div>
+                    <div><dt className="text-zinc-500">Fornecedor</dt><dd className="font-semibold text-zinc-800">{entry.instrument.supplierName ?? "nao informado"}</dd></div>
+                    <div><dt className="text-zinc-500">Vigencia</dt><dd className="font-semibold text-zinc-800">{formatDateTime(entry.instrument.validFrom)} ate {formatDateTime(entry.instrument.validUntil)}</dd></div>
+                    <div><dt className="text-zinc-500">Qtd. homologada</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.quantity)}</dd></div>
+                    <div><dt className="text-zinc-500">Max. adesao (limite)</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.capacity)}</dd></div>
+                    <div><dt className="text-zinc-500">Valor unitario</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.unitValue)}</dd></div>
+                    <div><dt className="text-zinc-500">Valor total</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.totalValue)}</dd></div>
                   </dl>
                   <p className="mt-2 text-xs text-zinc-500">PNCP/referencia: {entry.instrument.externalReference ?? "nao informada"}</p>
                 </button>
@@ -458,7 +517,7 @@ export function CoverageJourneyClient({
         )}
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -475,27 +534,27 @@ export function CoverageJourneyClient({
             </button>
           </div>
           {unitRecords.length ? (
-            <div className="mt-4 max-h-[420px] overflow-auto">
+            <div className="mt-4 max-h-[420px] overflow-auto border border-zinc-200 rounded-lg">
               <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
+                <thead className="bg-zinc-50 border-b border-zinc-200 text-xs uppercase text-zinc-500">
                   <tr>
-                    <th className="py-2">Unidade</th>
+                    <th className="py-3 px-3">Unidade</th>
                     <th>Tipo</th>
-                    <th>Qtd.</th>
-                    <th>Saldo adesoes</th>
-                    <th>Saldo remanejamento</th>
-                    <th>Aceita adesao</th>
+                    <th>Qtd. Homologada</th>
+                    <th>Saldo Adesões</th>
+                    <th>Saldo Remanejamento</th>
+                    <th className="px-3">Aceita Adesão</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-zinc-100">
                   {unitRecords.map((record) => (
-                    <tr key={record.id} className="border-b border-zinc-100">
-                      <td className="py-2">{record.codigoUnidade} - {record.nomeUnidade}</td>
-                      <td>{record.tipoUnidade ?? "-"}</td>
-                      <td>{number(record.quantidadeRegistrada)}</td>
-                      <td>{number(record.saldoAdesoes)}</td>
-                      <td>{number(record.saldoRemanejamentoEmpenho)}</td>
-                      <td>{record.aceitaAdesao ? "sim" : "nao informado"}</td>
+                    <tr key={record.id} className="hover:bg-zinc-50/50">
+                      <td className="py-3 px-3 font-medium text-zinc-950">{record.codigoUnidade} - {record.nomeUnidade}</td>
+                      <td className="text-zinc-600">{record.tipoUnidade ?? "-"}</td>
+                      <td className="font-semibold text-zinc-900">{number(record.quantidadeRegistrada)}</td>
+                      <td className="font-semibold text-emerald-700">{number(record.saldoAdesoes)}</td>
+                      <td className="font-semibold text-indigo-700">{number(record.saldoRemanejamentoEmpenho)}</td>
+                      <td className="px-3 text-zinc-600">{record.aceitaAdesao ? "sim" : "nao"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -514,21 +573,22 @@ export function CoverageJourneyClient({
           {synthesis ? (
             <div className="mt-4 space-y-3">
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded bg-zinc-50 p-3"><dt>Deficit</dt><dd className="font-semibold">{number(synthesis.deficit)}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt>Qtd. potencial</dt><dd className="font-semibold">{number(synthesis.potentialQuantity)}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt>Atas vigentes</dt><dd className="font-semibold">{synthesis.currentAtaCount}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt>Confianca</dt><dd className="font-semibold">{Math.round(synthesis.confidence * 100)}%</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt>Menor valor</dt><dd className="font-semibold">{money(synthesis.minUnitValue)}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt>Maior valor</dt><dd className="font-semibold">{money(synthesis.maxUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Deficit</dt><dd className="font-semibold">{number(synthesis.deficit)}</dd></div>
+                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Qtd. potencial</dt><dd className="font-semibold">{number(synthesis.potentialQuantity)}</dd></div>
+                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Atas vigentes</dt><dd className="font-semibold">{synthesis.currentAtaCount}</dd></div>
+                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Confianca</dt><dd className="font-semibold text-indigo-700">{Math.round(synthesis.confidence * 100)}%</dd></div>
+                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Menor valor</dt><dd className="font-semibold">{money(synthesis.minUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Maior valor</dt><dd className="font-semibold">{money(synthesis.maxUnitValue)}</dd></div>
               </dl>
               <div className="space-y-2 text-sm text-zinc-700">
                 {synthesis.phrases.map((phrase) => (
                   <p key={phrase} className="rounded bg-zinc-50 p-3">{phrase}</p>
                 ))}
               </div>
-              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
+                <p className="font-semibold">Observações e Limitações:</p>
                 {synthesis.limitations.map((limitation) => (
-                  <p key={limitation}>{limitation}</p>
+                  <p key={limitation}>• {limitation}</p>
                 ))}
               </div>
               <button
@@ -546,6 +606,51 @@ export function CoverageJourneyClient({
           )}
         </Card>
       </div>
+
+      <Card className="border-t border-zinc-200 mt-6 bg-zinc-50/50">
+        <details className="group">
+          <summary className="flex items-center justify-between cursor-pointer font-semibold text-zinc-700 py-1 select-none">
+            <span>Rastro de Execução (Como o MCL pesquisou)</span>
+            <span className="text-xs text-zinc-500 group-open:hidden border border-zinc-300 rounded px-2 py-0.5">expandir</span>
+            <span className="text-xs text-zinc-500 hidden group-open:inline border border-zinc-300 rounded px-2 py-0.5">recolher</span>
+          </summary>
+          <div className="mt-4 text-xs text-zinc-600 space-y-3 font-mono border-t border-zinc-200/60 pt-4">
+            {queryTrace ? (
+              <div className="grid gap-4 sm:grid-cols-2 bg-zinc-50 p-4 rounded border border-zinc-200">
+                <div className="space-y-1.5">
+                  <p><span className="font-semibold text-zinc-800">Endpoint:</span> {queryTrace.endpoint}</p>
+                  <p><span className="font-semibold text-zinc-800">Tipo/Ação:</span> {queryTrace.kind}</p>
+                  <p><span className="font-semibold text-zinc-800">Status da Resposta:</span> {queryTrace.status}</p>
+                  <p><span className="font-semibold text-zinc-800">Registros Recebidos:</span> {queryTrace.recordsRead}</p>
+                  {queryTrace.sourceUrl && (
+                    <p className="break-all">
+                      <span className="font-semibold text-zinc-800">Origem (URL consultada):</span>{" "}
+                      <a href={queryTrace.sourceUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 underline">
+                        {queryTrace.sourceUrl}
+                      </a>
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <p><span className="font-semibold text-zinc-800">Horário Inicial:</span> {formatDateTime(queryTrace.startedAt)}</p>
+                  <p><span className="font-semibold text-zinc-800">Horário Final:</span> {formatDateTime(queryTrace.finishedAt)}</p>
+                  <div>
+                    <span className="font-semibold text-zinc-800">Parâmetros Enviados:</span>
+                    <pre className="mt-1 bg-zinc-100 p-2 rounded text-[10px] text-zinc-700 overflow-x-auto">
+                      {JSON.stringify(queryTrace.params, null, 2)}
+                    </pre>
+                  </div>
+                  {queryTrace.errorMessage && (
+                    <p className="text-rose-600 font-semibold mt-1">Erro da fonte: {queryTrace.errorMessage}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-zinc-500 italic">Pesquise o CATMAT, consulte atas vigentes ou saldos de unidades para auditar o rastro técnico da API oficial.</p>
+            )}
+          </div>
+        </details>
+      </Card>
     </div>
   );
 }

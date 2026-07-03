@@ -570,3 +570,50 @@ model AuditLog {
   reason         String
   metadata       Json
 }
+
+model MaterialCoverageAnalysis {
+  id                         String    @id
+  needId                     String
+  itemId                     String
+  variantId                  String?
+  status                     String
+  deficitQuantity            Int
+  requestedQuantity          Int
+  availableStockQuantity     Int
+  reservedQuantity           Int
+  deliveredQuantity          Int
+  confirmedCatalogMappingId  String?
+  startedBy                  String
+  startedAt                  DateTime
+  completedAt                DateTime?
+  lastRefreshAt              DateTime?
+  confidence                 Float
+  summaryVersion             Int
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  @@index([needId])
+  @@index([itemId])
+}
+
+model AcquisitionCoverageCandidate {
+  id                       String   @id
+  analysisId               String
+  acquisitionInstrumentId  String
+  externalItemCode         String
+  potentialQuantity        Int
+  committedQuantity        Int?
+  reportedBalance          Int?
+  unitValue                Float?
+  validityStatus           String
+  evidenceLevel            String
+  confidence               Float
+  limitations              String[]
+  selectedByUser           Boolean
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([analysisId])
+  @@index([acquisitionInstrumentId])
+}
+

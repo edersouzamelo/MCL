@@ -14,7 +14,9 @@ import {
 } from "@/modules/coverage/service";
 
 function state(): DemoState {
-  return JSON.parse(JSON.stringify(createDemoState())) as DemoState;
+  const s = JSON.parse(JSON.stringify(createDemoState())) as DemoState;
+  s.itemCatalogMappings = [];
+  return s;
 }
 
 function config(): ComprasGovConfig {
@@ -134,7 +136,7 @@ async function prepareMapping(demo: DemoState) {
     { needId: "need-coturno-200", terms: "bota seguranca couro" },
     { actorId: "user-demo-admin", config: config(), fetchImpl },
   );
-  return confirmCatalogMapping(
+  return await confirmCatalogMapping(
     demo,
     {
       needId: "need-coturno-200",
@@ -216,7 +218,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
     expect(mapping.status).toBe("ACTIVE");
     expect(demo.auditLogs[0].action).toBe("CATMAT_CONFIRMADO");
 
-    const revoked = revokeCatalogMapping(
+    const revoked = await revokeCatalogMapping(
       demo,
       { mappingId: mapping.id, reason: "Revogacao demonstrativa para testar substituicao futura." },
       ["LOGISTICS_MANAGER"],
@@ -233,7 +235,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
     const candidate = { ...demo.catalogSearchCandidates[0], id: "candidate-replacement", externalItemCode: "222176" };
     demo.catalogSearchCandidates.unshift(candidate);
 
-    const second = confirmCatalogMapping(
+    const second = await confirmCatalogMapping(
       demo,
       {
         needId: "need-coturno-200",
@@ -253,7 +255,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
     const demo = state();
     await prepareMapping(demo);
 
-    expect(() =>
+    await expect(
       confirmCatalogMapping(
         demo,
         {
@@ -264,7 +266,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
         ["READ_ONLY"],
         "user-demo-viewer",
       ),
-    ).toThrow("LOGISTICS_MANAGER");
+    ).rejects.toThrow("LOGISTICS_MANAGER");
   });
 
   it("consulta atas apenas para CATMAT confirmado", async () => {
@@ -385,4 +387,63 @@ describe("consulta de cobertura orientada pela necessidade", () => {
     expect(text).not.toContain("contratacao assegurada");
     expect(deterministicTextSimilarity("bota couro", "BOTA DE COURO").score).toBe(1);
   });
+
+  it("calcula o deficit deterministico de acordo com a formula: solicitado - estoque", () => {
+    const demo = state();
+    const need = demo.needs.find((n) => n.id === "need-coturno-200")!;
+    const stockCovered = demo.needCoverages
+      .filter((c) => c.needId === need.id && c.coverageType === "ESTOQUE")
+      .reduce((sum, c) => sum + c.quantity, 0);
+
+    const synthesis = buildCoverageSynthesis(demo, "need-coturno-200", [], []);
+    
+    expect(synthesis.quantityRequested).toBe(200);
+    expect(synthesis.stockCovered).toBe(120);
+    expect(synthesis.deficit).toBe(80);
+    expect(synthesis.deficit).toBe(need.quantityRequested - stockCovered);
+  });
+
+  it("calcula a confianca da sintese deterministica combinando fatores objetivos", () => {
+    const demo = state();
+    const mappingCode = "605160";
+
+    const instruments = [
+      {
+        ...demo.acquisitionInstruments[0],
+        sourceSystem: "COMPRAS_GOV",
+        itemCode: "605160",
+        validFrom: "2026-01-01T00:00:00.000Z",
+        validUntil: "2027-01-01T00:00:00.000Z",
+        capacity: 500,
+        unitValue: 438,
+        totalValue: 219000,
+      },
+    ];
+
+    // Sem unidades (balance NOT_QUERIED)
+    const synthesisNoUnits = buildCoverageSynthesis(demo, "need-coturno-200", instruments, [], mappingCode);
+    const confNoUnits = synthesisNoUnits.confidence;
+
+    // Com unidades e saldo consultavel (balance status: CONSULTABLE)
+    const records = [
+      {
+        id: "rec-1",
+        needId: "need-coturno-200",
+        acquisitionInstrumentId: "instrument-001",
+        numeroAta: "00015/2026",
+        unidadeGerenciadora: "201057",
+        numeroItem: "00020",
+        saldoAdesoes: 100,
+        sourceUrl: "https://url.test",
+        fetchedAt: "2026-07-02T10:00:00.000Z",
+        payload: {},
+      },
+    ];
+    const synthesisWithUnits = buildCoverageSynthesis(demo, "need-coturno-200", instruments, records, mappingCode);
+    const confWithUnits = synthesisWithUnits.confidence;
+
+    expect(confWithUnits).toBeGreaterThan(confNoUnits);
+    expect(confWithUnits).toBeLessThanOrEqual(1.0);
+  });
 });
+

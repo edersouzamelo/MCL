@@ -40,3 +40,8 @@ sequenceDiagram
 ```
 
 O indicador de cobertura contratual usa apenas vinculos manuais `PODE_SER_ATENDIDA_POR` e nao e misturado com cobertura fisica sintetica.
+
+## Fluxo da Análise de Cobertura de Materiais
+Para uma documentação detalhada do fluxo de dados das consultas determinísticas na API do governo federal com persistência no PostgreSQL/Neon, consulte:
+* [Fluxo de Dados da Análise de Materiais](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/docs/material-analysis/DATA_FLOW.md)
+

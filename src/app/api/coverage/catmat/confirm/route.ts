@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
   try {
     const state = getDemoState();
-    const mapping = confirmCatalogMapping(
+    const mapping = await confirmCatalogMapping(
       state,
       await request.json(),
       (session.user.roles ?? []) as Role[],
