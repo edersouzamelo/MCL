@@ -24,6 +24,60 @@ interface MaterialCoverageRow {
   atualizadoEm: string;
 }
 
+type NumericRecordValue = number | string | { toString(): string } | null | undefined;
+
+interface DbAcquisitionInstrumentDashboard {
+  id: string;
+  itemCode?: string | null;
+  quantity?: NumericRecordValue;
+  unitValue?: NumericRecordValue;
+  totalValue?: NumericRecordValue;
+  sourceSystem?: string | null;
+  validFrom: Date | string;
+  validUntil: Date | string;
+  status: string;
+}
+
+interface DbArpUnitRecordDashboard {
+  quantidadeRegistrada?: NumericRecordValue;
+  saldoAdesoes?: NumericRecordValue;
+  saldoRemanejamentoEmpenho?: NumericRecordValue;
+  qtdLimiteAdesao?: NumericRecordValue;
+  qtdLimiteInformadoCompra?: NumericRecordValue;
+}
+
+interface DbMaterialCoverageAnalysisDashboard {
+  id: string;
+  needId: string;
+  status: string;
+  confidence?: number | null;
+  updatedAt: Date | string;
+}
+
+interface DbAcquisitionCoverageCandidateDashboard {
+  analysisId: string;
+  acquisitionInstrumentId: string;
+  reportedBalance?: number | null;
+}
+
+interface DbItemCatalogMappingDashboard {
+  needId?: string | null;
+  externalItemCode: string;
+  status: string;
+}
+
+function numberFromDb(value: NumericRecordValue): number | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  return Number(value);
+}
+
+function isoFromDbDate(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 export default async function DashboardPage() {
   const isPostgres = persistenceMode() === "postgresql";
   let state: DemoState;
@@ -39,10 +93,10 @@ export default async function DashboardPage() {
     const dbDivergences = await prisma.divergence.findMany();
     const dbConnectors = await prisma.connectorHealth.findMany();
     const dbQuarantine = await prisma.quarantineRecord.findMany();
-    const dbInstruments = await prisma.acquisitionInstrument.findMany();
+    const dbInstruments = (await prisma.acquisitionInstrument.findMany()) as DbAcquisitionInstrumentDashboard[];
     const dbMappings = await prisma.itemCatalogMapping.findMany();
     const dbQueries = await prisma.coverageQuery.findMany();
-    const dbUnitRecords = await prisma.arpUnitRecord.findMany();
+    const dbUnitRecords = (await prisma.arpUnitRecord.findMany()) as DbArpUnitRecordDashboard[];
     const dbEvents = await prisma.logisticsEvent.findMany();
     const dbRelations = await prisma.eventRelation.findMany();
     const dbLinks = await prisma.objectLink.findMany();
@@ -70,21 +124,21 @@ export default async function DashboardPage() {
       divergences: dbDivergences as any,
       connectors: dbConnectors as any,
       quarantine: dbQuarantine as any,
-      acquisitionInstruments: dbInstruments.map((i) => ({
-        ...i,
-        quantity: i.quantity ? Number(i.quantity) : 0,
-        unitValue: i.unitValue ? Number(i.unitValue) : undefined,
-        totalValue: i.totalValue ? Number(i.totalValue) : undefined,
+      acquisitionInstruments: dbInstruments.map((instrument: DbAcquisitionInstrumentDashboard) => ({
+        ...instrument,
+        quantity: numberFromDb(instrument.quantity) ?? 0,
+        unitValue: numberFromDb(instrument.unitValue),
+        totalValue: numberFromDb(instrument.totalValue),
       })) as any,
       itemCatalogMappings: dbMappings as any,
       coverageQueries: dbQueries as any,
-      arpUnitRecords: dbUnitRecords.map((r) => ({
-        ...r,
-        quantidadeRegistrada: r.quantidadeRegistrada ? Number(r.quantidadeRegistrada) : undefined,
-        saldoAdesoes: r.saldoAdesoes ? Number(r.saldoAdesoes) : undefined,
-        saldoRemanejamentoEmpenho: r.saldoRemanejamentoEmpenho ? Number(r.saldoRemanejamentoEmpenho) : undefined,
-        qtdLimiteAdesao: r.qtdLimiteAdesao ? Number(r.qtdLimiteAdesao) : undefined,
-        qtdLimiteInformadoCompra: r.qtdLimiteInformadoCompra ? Number(r.qtdLimiteInformadoCompra) : undefined,
+      arpUnitRecords: dbUnitRecords.map((record: DbArpUnitRecordDashboard) => ({
+        ...record,
+        quantidadeRegistrada: numberFromDb(record.quantidadeRegistrada),
+        saldoAdesoes: numberFromDb(record.saldoAdesoes),
+        saldoRemanejamentoEmpenho: numberFromDb(record.saldoRemanejamentoEmpenho),
+        qtdLimiteAdesao: numberFromDb(record.qtdLimiteAdesao),
+        qtdLimiteInformadoCompra: numberFromDb(record.qtdLimiteInformadoCompra),
       })) as any,
       events: dbEvents as any,
       eventRelations: dbRelations as any,
@@ -148,52 +202,70 @@ export default async function DashboardPage() {
   let tableRows: MaterialCoverageRow[] = [];
 
   if (isPostgres) {
-    const dbAnalyses = await prisma.materialCoverageAnalysis.findMany();
-    const dbCandidates = await prisma.acquisitionCoverageCandidate.findMany();
-    const dbMappings = await prisma.itemCatalogMapping.findMany({ where: { status: "ACTIVE" } });
-    const dbInstruments = await prisma.acquisitionInstrument.findMany();
+    const dbAnalyses = (await prisma.materialCoverageAnalysis.findMany()) as DbMaterialCoverageAnalysisDashboard[];
+    const dbCandidates = (await prisma.acquisitionCoverageCandidate.findMany()) as DbAcquisitionCoverageCandidateDashboard[];
+    const dbMappings = (await prisma.itemCatalogMapping.findMany({ where: { status: "ACTIVE" } })) as DbItemCatalogMappingDashboard[];
+    const dbInstruments = (await prisma.acquisitionInstrument.findMany()) as DbAcquisitionInstrumentDashboard[];
 
     // eslint-disable-next-line react-hooks/purity
     const nowTime = Date.now();
 
     needsAwaitingAnalysis = state.needs.filter(
-      (n) => !dbAnalyses.some((a) => a.needId === n.id) || dbAnalyses.some((a) => a.needId === n.id && a.status === "NOT_STARTED")
+      (need: Need) =>
+        !dbAnalyses.some((analysis: DbMaterialCoverageAnalysisDashboard) => analysis.needId === need.id) ||
+        dbAnalyses.some(
+          (analysis: DbMaterialCoverageAnalysisDashboard) => analysis.needId === need.id && analysis.status === "NOT_STARTED",
+        )
     ).length;
 
     materialsWithoutCatmat = state.needs.filter(
-      (n) => !dbMappings.some((m) => m.needId === n.id)
+      (need: Need) => !dbMappings.some((mapping: DbItemCatalogMappingDashboard) => mapping.needId === need.id)
     ).length;
 
     materialsWithCatmat = dbMappings.length;
 
-    materialsWithAtas = dbAnalyses.filter((a) => a.status === "PARTIAL_RESULTS" || a.status === "COMPLETED").length;
-    materialsWithoutResult = dbAnalyses.filter((a) => a.status === "NO_RESULTS").length;
-    queryFailures = dbAnalyses.filter((a) => a.status === "FAILED").length;
-    staleAnalyses = dbAnalyses.filter((a) => a.status === "STALE").length;
+    materialsWithAtas = dbAnalyses.filter(
+      (analysis: DbMaterialCoverageAnalysisDashboard) => analysis.status === "PARTIAL_RESULTS" || analysis.status === "COMPLETED",
+    ).length;
+    materialsWithoutResult = dbAnalyses.filter(
+      (analysis: DbMaterialCoverageAnalysisDashboard) => analysis.status === "NO_RESULTS",
+    ).length;
+    queryFailures = dbAnalyses.filter((analysis: DbMaterialCoverageAnalysisDashboard) => analysis.status === "FAILED").length;
+    staleAnalyses = dbAnalyses.filter((analysis: DbMaterialCoverageAnalysisDashboard) => analysis.status === "STALE").length;
 
     materialsWithBalance = dbCandidates.filter(
-      (c) => c.reportedBalance !== null && c.reportedBalance > 0
+      (candidate: DbAcquisitionCoverageCandidateDashboard) =>
+        candidate.reportedBalance !== null && candidate.reportedBalance !== undefined && candidate.reportedBalance > 0
     ).length;
 
-    tableRows = state.needs.map((need) => {
+    tableRows = state.needs.map((need: Need) => {
       const { item, variant } = itemForVariant(state, need.itemVariantId);
-      const analysis = dbAnalyses.find((a) => a.needId === need.id);
-      const mapping = dbMappings.find((m) => m.needId === need.id);
-      const needCoverages = state.needCoverages.filter((c) => c.needId === need.id && c.coverageType === "ESTOQUE");
-      const stock = needCoverages.reduce((sum, c) => sum + c.quantity, 0);
+      const analysis = dbAnalyses.find((candidate: DbMaterialCoverageAnalysisDashboard) => candidate.needId === need.id);
+      const mapping = dbMappings.find((candidate: DbItemCatalogMappingDashboard) => candidate.needId === need.id);
+      const needCoverages = state.needCoverages.filter((coverage) => coverage.needId === need.id && coverage.coverageType === "ESTOQUE");
+      const stock = needCoverages.reduce((sum: number, coverage) => sum + coverage.quantity, 0);
       const deficit = Math.max(0, need.quantityRequested - stock);
 
-      const relatedCandidates = analysis ? dbCandidates.filter((c) => c.analysisId === analysis.id) : [];
-      const currentAtasCount = relatedCandidates.filter((c) => {
-        const inst = dbInstruments.find((i) => i.id === c.acquisitionInstrumentId);
-        if (!inst) return false;
-        const validFrom = new Date(inst.validFrom).getTime();
-        const validUntil = new Date(inst.validUntil).getTime();
-        return validFrom <= nowTime && validUntil >= nowTime && inst.status !== "EXCLUIDO_NA_FONTE";
+      const relatedCandidates = analysis
+        ? dbCandidates.filter((candidate: DbAcquisitionCoverageCandidateDashboard) => candidate.analysisId === analysis.id)
+        : [];
+      const currentAtasCount = relatedCandidates.filter((candidate: DbAcquisitionCoverageCandidateDashboard) => {
+        const instrument = dbInstruments.find(
+          (dbInstrument: DbAcquisitionInstrumentDashboard) => dbInstrument.id === candidate.acquisitionInstrumentId,
+        );
+        if (!instrument) return false;
+        const validFrom = new Date(instrument.validFrom).getTime();
+        const validUntil = new Date(instrument.validUntil).getTime();
+        return validFrom <= nowTime && validUntil >= nowTime && instrument.status !== "EXCLUIDO_NA_FONTE";
       }).length;
 
-      const totalBalance = relatedCandidates.some((c) => c.reportedBalance !== null)
-        ? relatedCandidates.reduce((acc, c) => acc + (c.reportedBalance ?? 0), 0)
+      const totalBalance = relatedCandidates.some(
+        (candidate: DbAcquisitionCoverageCandidateDashboard) => candidate.reportedBalance !== null && candidate.reportedBalance !== undefined,
+      )
+        ? relatedCandidates.reduce(
+            (acc: number, candidate: DbAcquisitionCoverageCandidateDashboard) => acc + (candidate.reportedBalance ?? 0),
+            0,
+          )
         : null;
 
       return {
@@ -205,7 +277,7 @@ export default async function DashboardPage() {
         atasVigentesCount: currentAtasCount,
         saldoInformado: totalBalance !== null ? String(totalBalance) : "Nao consultado",
         confianca: analysis?.confidence ?? 0.0,
-        atualizadoEm: analysis ? analysis.updatedAt.toISOString() : "Nunca",
+        atualizadoEm: analysis ? isoFromDbDate(analysis.updatedAt) : "Nunca",
       };
     });
   } else {
