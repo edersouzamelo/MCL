@@ -18,6 +18,12 @@ import type {
   CatalogSearchCandidate,
   ItemCatalogMapping,
 } from "@/modules/domain/types";
+import {
+  buildArpSearchPayload,
+  classifyArpSearchResponse,
+  type ArpSearchResponse,
+  type AtaQueryStatus,
+} from "@/modules/coverage/arp-client";
 import type { ArpSearchEntry, CoverageSynthesis } from "@/modules/coverage/service";
 import { Badge, Card, formatDateTime } from "@/components/ui";
 
@@ -53,7 +59,36 @@ type Projection = {
   deliveredPercent: number;
 };
 
+type QueryTrace = {
+  endpoint?: string;
+  kind?: string;
+  status?: string;
+  recordsRead?: number;
+  sourceUrl?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  params?: unknown;
+  errorMessage?: string;
+  requestId?: string;
+  totalRegistros?: number;
+  totalPaginas?: number;
+  paginasRestantes?: number;
+  pagesConsulted?: number;
+  durationMs?: number;
+  timeoutMs?: number;
+  persistenceMode?: string;
+};
+
 type ApiResult<T> = T & { error?: string };
+
+async function readJsonBody<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const text = await response.text();
+    throw new Error(text ? `Resposta nao JSON recebida: ${text.slice(0, 180)}` : "Resposta nao JSON recebida.");
+  }
+  return (await response.json()) as T;
+}
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const response = await fetch(url, {
@@ -61,11 +96,23 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  const result = (await response.json()) as ApiResult<T>;
+  const result = await readJsonBody<ApiResult<T>>(response);
   if (!response.ok || result.error) {
     throw new Error(result.error ?? "Falha na requisicao.");
   }
   return result;
+}
+
+async function postJsonWithStatus<T>(url: string, body: unknown): Promise<{ responseOk: boolean; body: T }> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return {
+    responseOk: response.ok,
+    body: await readJsonBody<T>(response),
+  };
 }
 
 function money(value?: number) {
@@ -94,6 +141,7 @@ export function CoverageJourneyClient({
   organizationName,
   projection,
   initialMapping,
+  initialAnalysisId,
 }: {
   need: JourneyNeed;
   item: JourneyItem;
@@ -101,6 +149,7 @@ export function CoverageJourneyClient({
   organizationName: string;
   projection: Projection;
   initialMapping?: ItemCatalogMapping;
+  initialAnalysisId?: string;
 }) {
   const router = useRouter();
   const [range] = useState(todayYearRange);
@@ -123,8 +172,8 @@ export function CoverageJourneyClient({
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState<string>();
-  const [queryTrace, setQueryTrace] = useState<any>();
-  const [ataQueryStatus, setAtaQueryStatus] = useState<"IDLE" | "SEARCHING_ARPS" | "COMPLETED" | "EMPTY" | "TIMEOUT" | "ERROR">("IDLE");
+  const [queryTrace, setQueryTrace] = useState<QueryTrace>();
+  const [ataQueryStatus, setAtaQueryStatus] = useState<AtaQueryStatus>("IDLE");
 
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId);
 
@@ -199,51 +248,74 @@ export function CoverageJourneyClient({
   }
 
   async function searchAtas() {
+    if (!mapping) {
+      setAtaQueryStatus("ERROR");
+      setError("Confirme um CATMAT antes de consultar atas.");
+      return;
+    }
+
+    const requestId = crypto.randomUUID();
+    const payload = buildArpSearchPayload({
+      needId: need.id,
+      analysisId: initialAnalysisId,
+      mapping,
+      dateStart,
+      dateEnd,
+      requestId,
+    });
+
+    console.info("ARP_BUTTON_CLICKED", {
+      requestId,
+      needId: need.id,
+      analysisId: payload.analysisId,
+      catmatCode: payload.catmatCode,
+      stage: "ARP_SEARCH_REQUESTED",
+      status: "CLICKED",
+    });
+
     setAtaQueryStatus("SEARCHING_ARPS");
-    setMessage(`Consultando atas relacionadas ao CATMAT ${mapping?.externalItemCode}...`);
+    setMessage(`Consultando atas relacionadas ao CATMAT ${mapping.externalItemCode}...`);
     setError(undefined);
+
     await guarded("atas", async () => {
       try {
-        const result = await postJson<any>(
-          "/api/coverage/atas/search",
-          {
-            needId: need.id,
-            dataVigenciaInicialMin: dateStart,
-            dataVigenciaInicialMax: dateEnd,
-          },
-        );
+        console.info("ARP_INTERNAL_REQUEST_SENT", {
+          requestId,
+          needId: need.id,
+          analysisId: payload.analysisId,
+          catmatCode: payload.catmatCode,
+          stage: "ARP_SEARCH_SENT",
+          status: "PENDING",
+        });
 
-        if (result.ok === false) {
-          if (result.code === "TIMEOUT") {
-            setAtaQueryStatus("TIMEOUT");
-            setError("A consulta de atas excedeu o tempo limite.");
-          } else {
-            setAtaQueryStatus("ERROR");
-            setError(`Não foi possível concluir a consulta de atas. Código: ${result.code || "UNKNOWN"}. Motivo: ${result.message || "Erro desconhecido"}`);
-          }
-          setEntries([]);
-          setSynthesis(undefined);
-          return;
-        }
+        const result = await postJsonWithStatus<ArpSearchResponse>("/api/coverage/atas/search", payload);
+        const outcome = classifyArpSearchResponse(result.responseOk, result.body, payload.catmatCode);
 
-        setQueryTrace(result.trace);
-        if (result.count > 0 && result.items) {
-          setEntries(result.items);
-          setSelectedEntry(result.items[0]);
-          setSynthesis(result.synthesis);
-          setAtaQueryStatus("COMPLETED");
-          setMessage(`Atas relacionadas ao CATMAT ${mapping?.externalItemCode} encontradas: ${result.count}.`);
-        } else {
-          setEntries([]);
-          setSynthesis(undefined);
-          setAtaQueryStatus("EMPTY");
-          setMessage(`Nenhuma ata relacionada ao CATMAT ${mapping?.externalItemCode} foi encontrada no período consultado.`);
-        }
+        setQueryTrace(outcome.trace as QueryTrace | undefined);
+        setAtaQueryStatus(outcome.status);
+        setEntries(outcome.entries);
+        setSelectedEntry(outcome.entries[0]);
         setUnitRecords([]);
-      } catch (err: any) {
+        setSynthesis(outcome.synthesis);
+        setError(outcome.error);
+        setMessage(outcome.message);
+
+        console.info("ARP_RENDER_COMPLETED", {
+          requestId,
+          needId: need.id,
+          analysisId: payload.analysisId,
+          catmatCode: payload.catmatCode,
+          stage: result.body.stage,
+          durationMs: (outcome.trace as { durationMs?: number } | undefined)?.durationMs,
+          count: outcome.entries.length,
+          status: outcome.status,
+        });
+      } catch (err) {
         setAtaQueryStatus("ERROR");
-        setError(`Não foi possível concluir a consulta de atas. Código: FETCH_ERROR. Motivo: ${err.message || "Falha na rede"}`);
+        setError(`Nao foi possivel concluir a consulta de atas. Codigo: FETCH_ERROR. Motivo: ${err instanceof Error ? err.message : "Falha na rede"}`);
         setEntries([]);
+        setSelectedEntry(undefined);
+        setUnitRecords([]);
         setSynthesis(undefined);
       }
     });
@@ -633,6 +705,11 @@ export function CoverageJourneyClient({
                   <p><span className="font-semibold text-zinc-800">Tipo/Ação:</span> {queryTrace.kind}</p>
                   <p><span className="font-semibold text-zinc-800">Status da Resposta:</span> {queryTrace.status}</p>
                   <p><span className="font-semibold text-zinc-800">Registros Recebidos:</span> {queryTrace.recordsRead}</p>
+                  {queryTrace.requestId ? <p><span className="font-semibold text-zinc-800">Request ID:</span> {queryTrace.requestId}</p> : null}
+                  {queryTrace.persistenceMode ? <p><span className="font-semibold text-zinc-800">Persistencia:</span> {queryTrace.persistenceMode}</p> : null}
+                  {queryTrace.pagesConsulted ? <p><span className="font-semibold text-zinc-800">Paginas consultadas:</span> {queryTrace.pagesConsulted}</p> : null}
+                  {queryTrace.totalRegistros !== undefined ? <p><span className="font-semibold text-zinc-800">Total da fonte:</span> {queryTrace.totalRegistros}</p> : null}
+                  {queryTrace.timeoutMs ? <p><span className="font-semibold text-zinc-800">Timeout:</span> {queryTrace.timeoutMs} ms</p> : null}
                   {queryTrace.sourceUrl && (
                     <p className="break-all">
                       <span className="font-semibold text-zinc-800">Origem (URL consultada):</span>{" "}
@@ -643,8 +720,8 @@ export function CoverageJourneyClient({
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <p><span className="font-semibold text-zinc-800">Horário Inicial:</span> {formatDateTime(queryTrace.startedAt)}</p>
-                  <p><span className="font-semibold text-zinc-800">Horário Final:</span> {formatDateTime(queryTrace.finishedAt)}</p>
+                  <p><span className="font-semibold text-zinc-800">Horário Inicial:</span> {queryTrace.startedAt ? formatDateTime(queryTrace.startedAt) : "-"}</p>
+                  <p><span className="font-semibold text-zinc-800">Horário Final:</span> {queryTrace.finishedAt ? formatDateTime(queryTrace.finishedAt) : "-"}</p>
                   <div>
                     <span className="font-semibold text-zinc-800">Parâmetros Enviados:</span>
                     <pre className="mt-1 bg-zinc-100 p-2 rounded text-[10px] text-zinc-700 overflow-x-auto">

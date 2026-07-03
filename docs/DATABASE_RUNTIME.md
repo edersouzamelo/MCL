@@ -13,7 +13,13 @@ DIRECT_URL="postgresql://mcl:mcl_demo_password@localhost:5432/mcl_piloto?schema=
 ## Modo de Persistência
 A persistência suporta dois modos dinâmicos por meio da função `persistenceMode()`:
 1. **Modo PostgreSQL (`postgresql`):** Ativado quando a variável `DATABASE_URL` está preenchida. Toda a gravação e leitura de entidades de cobertura de material é persistida em banco de dados real. Em produção, este modo é obrigatório e falhas na conexão impedirão execuções silenciosas em memória.
-2. **Modo Memória (`demo-memory`):** Fallback ativado quando `DATABASE_URL` está nula. Utilizado para rodar testes rápidos ou executar a demonstração sem conexões externas de banco de dados.
+2. **Modo Memória (`demo-memory`):** Fallback demonstrativo usado quando `DATABASE_URL` está nula. Para rotas operacionais de consulta de atas, esse modo deve estar explicitamente autorizado por `MCL_ALLOW_MEMORY_FALLBACK=true`; caso contrario, a API retorna erro claro em vez de fingir persistencia real.
+
+Quando o modo memoria estiver ativo, a interface deve exibir:
+
+```text
+MODO MEMORIA - DADOS NAO PERSISTENTES
+```
 
 ## Migrations do Prisma
 As migrations de banco de dados ficam localizadas no diretório [prisma/migrations](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/prisma/migrations).

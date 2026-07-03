@@ -4,6 +4,8 @@ cd /d "%~dp0"
 set AUTH_SECRET=dev-secret-local
 set DEMO_AUTH_ENABLED=true
 set DEMO_ACCESS_CODE=MCL-DEMO-2026
+set MCL_ALLOW_MEMORY_FALLBACK=true
+set NODE_OPTIONS=--use-system-ca
 if not exist ".next\BUILD_ID" (
   echo Preparando build de producao do MCL...
   "C:\Program Files\nodejs\npm.cmd" run build

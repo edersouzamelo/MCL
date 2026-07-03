@@ -66,6 +66,11 @@ export const revokeCatalogMappingInputSchema = z.object({
 
 export const arpSearchInputSchema = z.object({
   needId: z.string().min(1),
+  analysisId: z.string().trim().optional(),
+  catalogMappingId: z.string().trim().optional(),
+  catmatCode: z.string().trim().optional(),
+  dateStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dateEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dataVigenciaInicialMin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dataVigenciaInicialMax: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   codigoUnidadeGerenciadora: z.string().trim().optional(),
@@ -73,6 +78,7 @@ export const arpSearchInputSchema = z.object({
   codigoPdm: z.string().trim().optional(),
   niFornecedor: z.string().trim().optional(),
   numeroCompra: z.string().trim().optional(),
+  requestId: z.string().trim().optional(),
 });
 
 export const arpUnitsInputSchema = z.object({
@@ -136,6 +142,38 @@ function defaultDateRange() {
     start: `${year}-01-01`,
     end: `${year}-12-31`,
   };
+}
+
+function arpEvent(event: string, fields: Record<string, unknown>) {
+  console.info(event, JSON.stringify(fields));
+}
+
+function arpDateRange(input: ArpSearchInput) {
+  const range = defaultDateRange();
+  return {
+    start: input.dateStart ?? input.dataVigenciaInicialMin ?? range.start,
+    end: input.dateEnd ?? input.dataVigenciaInicialMax ?? range.end,
+  };
+}
+
+function arpSearchConfig(options: CoverageServiceOptions) {
+  const config = options.config ?? getComprasGovConfig();
+  if (options.config) {
+    return config;
+  }
+  return {
+    ...config,
+    requestTimeoutMs: Math.max(config.requestTimeoutMs, 45_000),
+  };
+}
+
+function assertMappingMatchesInput(mapping: { id: string; externalItemCode: string }, input: ArpSearchInput) {
+  if (input.catalogMappingId && input.catalogMappingId !== mapping.id) {
+    throw new Error("O mapeamento informado nao e o CATMAT ativo da necessidade.");
+  }
+  if (input.catmatCode && input.catmatCode !== mapping.externalItemCode) {
+    throw new Error("O CATMAT informado nao corresponde ao mapeamento confirmado.");
+  }
 }
 
 function maybeIsoDate(value?: string | null) {
@@ -909,11 +947,12 @@ export async function searchArpsForConfirmedCatmat(
     if (!mapping) {
       throw new Error("Confirme um CATMAT antes de consultar atas.");
     }
-    const range = defaultDateRange();
+    assertMappingMatchesInput(mapping, input);
+    const range = arpDateRange(input);
     const params = {
       pagina: 1,
-      dataVigenciaInicialMin: input.dataVigenciaInicialMin ?? range.start,
-      dataVigenciaInicialMax: input.dataVigenciaInicialMax ?? range.end,
+      dataVigenciaInicialMin: range.start,
+      dataVigenciaInicialMax: range.end,
       tipoItem: "Material",
       codigoItem: Number(mapping.externalItemCode),
       codigoUnidadeGerenciadora: input.codigoUnidadeGerenciadora,
@@ -922,9 +961,10 @@ export async function searchArpsForConfirmedCatmat(
       niFornecedor: input.niFornecedor,
       numeroCompra: input.numeroCompra,
     };
-    const config = options.config ?? getComprasGovConfig();
+    const config = arpSearchConfig(options);
     const client = createComprasGovClient(config, options.fetchImpl);
     const startedAt = new Date().toISOString();
+    const startedMs = Date.now();
     const query = coverageQueryBase(
       {
         needId: input.needId,
@@ -939,8 +979,41 @@ export async function searchArpsForConfirmedCatmat(
     );
 
     try {
+      arpEvent("ARP_EXTERNAL_REQUEST_SENT", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_EXTERNAL_REQUEST_SENT",
+        durationMs: 0,
+        count: 0,
+        status: "PENDING",
+      });
       const { data, url } = await client.getJson(COMPRAS_GOV_ARP_ITEM_ENDPOINT, params, comprasGovApiResponseSchema);
       const fetchedAt = new Date().toISOString();
+      const durationMs = Date.now() - startedMs;
+      arpEvent("ARP_EXTERNAL_RESPONSE_RECEIVED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_EXTERNAL_RESPONSE_RECEIVED",
+        durationMs,
+        count: data.resultado.length,
+        status: "OK",
+      });
+      if (data.resultado.length === 0) {
+        arpEvent("ARP_EXTERNAL_EMPTY", {
+          requestId: options.requestId ?? input.requestId,
+          needId: input.needId,
+          analysisId: input.analysisId,
+          catmatCode: mapping.externalItemCode,
+          stage: "ARP_EXTERNAL_EMPTY",
+          durationMs,
+          count: 0,
+          status: "NO_RESULTS",
+        });
+      }
       const entries: ArpSearchEntry[] = [];
       for (const raw of data.resultado) {
         const parsed = comprasGovArpItemSchema.safeParse(raw);
@@ -968,6 +1041,16 @@ export async function searchArpsForConfirmedCatmat(
       query.status = entries.length ? "SUCCESS" : "NO_RESULTS";
       query.sourceUrl = url;
       query.finishedAt = fetchedAt;
+      arpEvent("ARP_NORMALIZATION_COMPLETED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_NORMALIZATION_COMPLETED",
+        durationMs,
+        count: entries.length,
+        status: query.status,
+      });
 
       await prisma.coverageQuery.create({
         data: {
@@ -1016,11 +1099,42 @@ export async function searchArpsForConfirmedCatmat(
 
       await saveAnalysisAndCandidatesToDb(input.needId, entries, synthesis, options.actorId);
 
-      return { query, entries, synthesis };
+      arpEvent("ARP_PERSISTENCE_COMPLETED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_PERSISTENCE_COMPLETED",
+        durationMs: Date.now() - startedMs,
+        count: entries.length,
+        status: query.status,
+      });
+
+      return {
+        query,
+        entries,
+        synthesis,
+        totalRegistros: data.totalRegistros,
+        totalPaginas: data.totalPaginas,
+        paginasRestantes: data.paginasRestantes,
+        pagesConsulted: 1,
+        durationMs: Date.now() - startedMs,
+        timeoutMs: config.requestTimeoutMs,
+      };
     } catch (error) {
       query.status = "FAILED";
       query.errorMessage = error instanceof Error ? error.message : "Falha ao consultar atas.";
       query.finishedAt = new Date().toISOString();
+      arpEvent("ARP_EXTERNAL_FAILED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_EXTERNAL_FAILED",
+        durationMs: Date.now() - startedMs,
+        count: 0,
+        status: query.errorMessage,
+      });
 
       await prisma.coverageQuery.create({
         data: {
@@ -1048,11 +1162,12 @@ export async function searchArpsForConfirmedCatmat(
     if (!mapping) {
       throw new Error("Confirme um CATMAT antes de consultar atas.");
     }
-    const range = defaultDateRange();
+    assertMappingMatchesInput(mapping, input);
+    const range = arpDateRange(input);
     const params = {
       pagina: 1,
-      dataVigenciaInicialMin: input.dataVigenciaInicialMin ?? range.start,
-      dataVigenciaInicialMax: input.dataVigenciaInicialMax ?? range.end,
+      dataVigenciaInicialMin: range.start,
+      dataVigenciaInicialMax: range.end,
       tipoItem: "Material",
       codigoItem: Number(mapping.externalItemCode),
       codigoUnidadeGerenciadora: input.codigoUnidadeGerenciadora,
@@ -1061,9 +1176,10 @@ export async function searchArpsForConfirmedCatmat(
       niFornecedor: input.niFornecedor,
       numeroCompra: input.numeroCompra,
     };
-    const config = options.config ?? getComprasGovConfig();
+    const config = arpSearchConfig(options);
     const client = createComprasGovClient(config, options.fetchImpl);
     const startedAt = new Date().toISOString();
+    const startedMs = Date.now();
     const query = coverageQueryBase(
       {
         needId: input.needId,
@@ -1078,21 +1194,41 @@ export async function searchArpsForConfirmedCatmat(
     );
 
     try {
-      let apiResult;
-      try {
-        apiResult = await client.getJson(COMPRAS_GOV_ARP_ITEM_ENDPOINT, params, comprasGovApiResponseSchema);
-      } catch (apiError) {
-        if (process.env.NODE_ENV === "test") {
-          throw apiError;
-        }
-        console.warn("Compras.gov API call failed, falling back to simulated ARPs. Error:", apiError);
-        apiResult = {
-          data: { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 },
-          url: COMPRAS_GOV_ARP_ITEM_ENDPOINT,
-        };
-      }
-      const { data, url } = apiResult;
+      arpEvent("ARP_EXTERNAL_REQUEST_SENT", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_EXTERNAL_REQUEST_SENT",
+        durationMs: 0,
+        count: 0,
+        status: "PENDING",
+      });
+      const { data, url } = await client.getJson(COMPRAS_GOV_ARP_ITEM_ENDPOINT, params, comprasGovApiResponseSchema);
       const fetchedAt = new Date().toISOString();
+      const durationMs = Date.now() - startedMs;
+      arpEvent("ARP_EXTERNAL_RESPONSE_RECEIVED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_EXTERNAL_RESPONSE_RECEIVED",
+        durationMs,
+        count: data.resultado.length,
+        status: "OK",
+      });
+      if (data.resultado.length === 0) {
+        arpEvent("ARP_EXTERNAL_EMPTY", {
+          requestId: options.requestId ?? input.requestId,
+          needId: input.needId,
+          analysisId: input.analysisId,
+          catmatCode: mapping.externalItemCode,
+          stage: "ARP_EXTERNAL_EMPTY",
+          durationMs,
+          count: 0,
+          status: "NO_RESULTS",
+        });
+      }
       const entries: ArpSearchEntry[] = [];
       for (const raw of data.resultado) {
         const parsed = comprasGovArpItemSchema.safeParse(raw);
@@ -1114,7 +1250,7 @@ export async function searchArpsForConfirmedCatmat(
         });
       }
 
-      if (entries.length === 0 && process.env.NODE_ENV !== "test") {
+      if (entries.length === 0 && process.env.MCL_ALLOW_SIMULATED_ARP_FALLBACK === "true") {
         const mockRawAtas = [
           {
             numeroAtaRegistroPreco: `00010/${new Date().getFullYear()}`,
@@ -1205,11 +1341,31 @@ export async function searchArpsForConfirmedCatmat(
         }
       }
 
-      query.recordsRead = entries.length;
+      query.recordsRead = data.resultado.length;
       query.status = entries.length ? "SUCCESS" : "NO_RESULTS";
       query.sourceUrl = url;
       query.finishedAt = fetchedAt;
+      arpEvent("ARP_NORMALIZATION_COMPLETED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_NORMALIZATION_COMPLETED",
+        durationMs,
+        count: entries.length,
+        status: query.status,
+      });
       storeCoverageQuery(state, query);
+      arpEvent("ARP_PERSISTENCE_COMPLETED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_PERSISTENCE_COMPLETED",
+        durationMs: Date.now() - startedMs,
+        count: entries.length,
+        status: query.status,
+      });
       appendAuditLogToState(state, {
         actorId: options.actorId,
         action: "ARP_PESQUISA_EXECUTADA",
@@ -1222,11 +1378,31 @@ export async function searchArpsForConfirmedCatmat(
         reason: entries.length ? "Atas localizadas para CATMAT confirmado." : "Nenhuma ata localizada para CATMAT confirmado.",
         metadata: { queryId: query.id, params: query.params, entries: entries.length },
       });
-      return { query, entries, synthesis: buildCoverageSynthesis(state, input.needId, entries.map((entry) => entry.instrument), []) };
+      return {
+        query,
+        entries,
+        synthesis: buildCoverageSynthesis(state, input.needId, entries.map((entry) => entry.instrument), [], mapping.externalItemCode),
+        totalRegistros: data.totalRegistros,
+        totalPaginas: data.totalPaginas,
+        paginasRestantes: data.paginasRestantes,
+        pagesConsulted: 1,
+        durationMs: Date.now() - startedMs,
+        timeoutMs: config.requestTimeoutMs,
+      };
     } catch (error) {
       query.status = "FAILED";
       query.errorMessage = error instanceof Error ? error.message : "Falha ao consultar atas.";
       query.finishedAt = new Date().toISOString();
+      arpEvent("ARP_EXTERNAL_FAILED", {
+        requestId: options.requestId ?? input.requestId,
+        needId: input.needId,
+        analysisId: input.analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage: "ARP_EXTERNAL_FAILED",
+        durationMs: Date.now() - startedMs,
+        count: 0,
+        status: query.errorMessage,
+      });
       storeCoverageQuery(state, query);
       throw error;
     }

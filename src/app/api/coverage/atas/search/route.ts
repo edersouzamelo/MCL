@@ -1,164 +1,290 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
 import {
-  searchArpsForConfirmedCatmat,
   activeCatalogMappingForNeed,
   activeCatalogMappingForNeedSync,
   persistenceMode,
+  searchArpsForConfirmedCatmat,
 } from "@/modules/coverage/service";
 import { getDemoState } from "@/server/demo-store";
-import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 
+type ArpRequestBody = {
+  needId?: string;
+  analysisId?: string;
+  catalogMappingId?: string;
+  catmatCode?: string;
+  dateStart?: string;
+  dateEnd?: string;
+  dataVigenciaInicialMin?: string;
+  dataVigenciaInicialMax?: string;
+  requestId?: string;
+};
+
+function safeText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function routeLog(event: string, fields: Record<string, unknown>) {
+  console.info(event, JSON.stringify(fields));
+}
+
+function failure(
+  status: number,
+  requestId: string,
+  code: string,
+  message: string,
+  retryable: boolean,
+  trace?: Record<string, unknown>,
+) {
+  routeLog("ARP_RESPONSE_SENT", {
+    requestId,
+    stage: "ARP_SEARCH_FAILED",
+    durationMs: trace?.durationMs,
+    count: 0,
+    status: code,
+  });
+
+  return NextResponse.json(
+    {
+      ok: false,
+      stage: "ARP_SEARCH_FAILED",
+      requestId,
+      code,
+      message,
+      retryable,
+      trace,
+    },
+    { status },
+  );
+}
+
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  const requestId = randomUUID();
+  const routeStartedAt = Date.now();
+  let body: ArpRequestBody = {};
+  let requestId: string = randomUUID();
 
-  if (!session?.user) {
-    return NextResponse.json(
-      {
-        ok: false,
-        stage: "ARP_SEARCH_FAILED",
-        requestId,
-        code: "UNAUTHORIZED",
-        message: "Autenticacao obrigatoria.",
-        retryable: false,
-      },
-      { status: 401 },
-    );
-  }
-
-  let body: any;
   try {
-    body = await request.json();
+    body = (await request.json()) as ArpRequestBody;
+    requestId = safeText(body.requestId) ?? requestId;
   } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        stage: "ARP_SEARCH_FAILED",
-        requestId,
-        code: "INVALID_REQUEST",
-        message: "JSON invalido.",
-        retryable: false,
-      },
-      { status: 400 },
-    );
+    return failure(400, requestId, "INVALID_REQUEST", "JSON invalido.", false, {
+      durationMs: Date.now() - routeStartedAt,
+    });
   }
 
-  const { needId } = body;
+  const needId = safeText(body.needId);
+  const analysisId = safeText(body.analysisId);
+  const catalogMappingId = safeText(body.catalogMappingId);
+  const catmatCode = safeText(body.catmatCode);
+
+  routeLog("ARP_ROUTE_RECEIVED", {
+    requestId,
+    needId,
+    analysisId,
+    catmatCode,
+    stage: "ARP_ROUTE_RECEIVED",
+    durationMs: 0,
+    count: 0,
+    status: "RECEIVED",
+  });
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return failure(401, requestId, "UNAUTHORIZED", "Autenticacao obrigatoria.", false, {
+      requestId,
+      needId,
+      analysisId,
+      catmatCode,
+      durationMs: Date.now() - routeStartedAt,
+    });
+  }
+
   if (!needId) {
-    return NextResponse.json(
+    return failure(400, requestId, "MISSING_NEED_ID", "needId obrigatorio.", false, {
+      requestId,
+      analysisId,
+      catmatCode,
+      durationMs: Date.now() - routeStartedAt,
+    });
+  }
+
+  if (!catmatCode) {
+    return failure(400, requestId, "MISSING_CATMAT_CODE", "catmatCode obrigatorio.", false, {
+      requestId,
+      needId,
+      analysisId,
+      durationMs: Date.now() - routeStartedAt,
+    });
+  }
+
+  if (!catalogMappingId) {
+    return failure(400, requestId, "MISSING_CATALOG_MAPPING_ID", "catalogMappingId obrigatorio.", false, {
+      requestId,
+      needId,
+      analysisId,
+      catmatCode,
+      durationMs: Date.now() - routeStartedAt,
+    });
+  }
+
+  const mode = persistenceMode();
+  if (mode !== "postgresql" && process.env.MCL_ALLOW_MEMORY_FALLBACK !== "true" && process.env.NODE_ENV !== "test") {
+    return failure(
+      503,
+      requestId,
+      "MEMORY_FALLBACK_DISABLED",
+      "DATABASE_URL nao configurada e MCL_ALLOW_MEMORY_FALLBACK=true nao foi definido.",
+      false,
       {
-        ok: false,
-        stage: "ARP_SEARCH_FAILED",
         requestId,
-        code: "MISSING_NEED_ID",
-        message: "needId obrigatorio.",
-        retryable: false,
+        needId,
+        analysisId,
+        catmatCode,
+        persistenceMode: mode,
+        durationMs: Date.now() - routeStartedAt,
       },
-      { status: 400 },
     );
   }
 
   try {
     const state = getDemoState();
-
-    // Validations (Section 5)
-    let mapping;
-    if (persistenceMode() === "postgresql") {
-      mapping = await activeCatalogMappingForNeed(state, needId);
-    } else {
-      mapping = activeCatalogMappingForNeedSync(state, needId);
-    }
+    const mapping = mode === "postgresql"
+      ? await activeCatalogMappingForNeed(state, needId)
+      : activeCatalogMappingForNeedSync(state, needId);
 
     if (!mapping) {
-      return NextResponse.json(
-        {
-          ok: false,
-          stage: "ARP_SEARCH_FAILED",
-          requestId,
-          code: "NO_CATMAT_MAPPING",
-          message: "Confirme um CATMAT antes de consultar atas.",
-          retryable: false,
-        },
-        { status: 400 },
-      );
+      return failure(400, requestId, "NO_CATMAT_MAPPING", "Confirme um CATMAT antes de consultar atas.", false, {
+        requestId,
+        needId,
+        analysisId,
+        catmatCode,
+        persistenceMode: mode,
+        durationMs: Date.now() - routeStartedAt,
+      });
+    }
+
+    if (mapping.id !== catalogMappingId) {
+      return failure(400, requestId, "INVALID_CATALOG_MAPPING_ID", "O mapeamento informado nao e o CATMAT ativo da necessidade.", false, {
+        requestId,
+        needId,
+        analysisId,
+        catalogMappingId,
+        activeCatalogMappingId: mapping.id,
+        catmatCode,
+        persistenceMode: mode,
+        durationMs: Date.now() - routeStartedAt,
+      });
     }
 
     if (mapping.needId !== needId) {
-      return NextResponse.json(
-        {
-          ok: false,
-          stage: "ARP_SEARCH_FAILED",
-          requestId,
-          code: "INVALID_MAPPING_NEED",
-          message: "O mapeamento nao pertence ao material da necessidade.",
-          retryable: false,
-        },
-        { status: 400 },
-      );
+      return failure(400, requestId, "INVALID_MAPPING_NEED", "O mapeamento nao pertence ao material da necessidade.", false, {
+        requestId,
+        needId,
+        analysisId,
+        catalogMappingId,
+        catmatCode,
+        persistenceMode: mode,
+        durationMs: Date.now() - routeStartedAt,
+      });
     }
 
-    if (needId === "need-calca-120" && mapping.externalItemCode !== "452757") {
-      return NextResponse.json(
-        {
-          ok: false,
-          stage: "ARP_SEARCH_FAILED",
-          requestId,
-          code: "INVALID_CATMAT_CODE",
-          message: "Codigo confirmado inconsistente: esperado 452757.",
-          retryable: false,
-        },
-        { status: 400 },
-      );
+    if (mapping.externalItemCode !== catmatCode) {
+      return failure(400, requestId, "INVALID_CATMAT_CODE", "O CATMAT informado nao corresponde ao mapeamento confirmado.", false, {
+        requestId,
+        needId,
+        analysisId,
+        catalogMappingId,
+        activeCatmatCode: mapping.externalItemCode,
+        catmatCode,
+        persistenceMode: mode,
+        durationMs: Date.now() - routeStartedAt,
+      });
     }
 
     if (mapping.status !== "ACTIVE" && (mapping.status as string) !== "CONFIRMED") {
-      return NextResponse.json(
-        {
-          ok: false,
-          stage: "ARP_SEARCH_FAILED",
-          requestId,
-          code: "INVALID_MAPPING_STATUS",
-          message: "O status do mapeamento deve ser ACTIVE ou CONFIRMED.",
-          retryable: false,
-        },
-        { status: 400 },
-      );
+      return failure(400, requestId, "INVALID_MAPPING_STATUS", "O status do mapeamento deve ser ACTIVE ou CONFIRMED.", false, {
+        requestId,
+        needId,
+        analysisId,
+        catalogMappingId,
+        catmatCode,
+        persistenceMode: mode,
+        durationMs: Date.now() - routeStartedAt,
+      });
     }
 
-    const result = await searchArpsForConfirmedCatmat(state, body, {
-      actorId: session.user.id,
-      organizationId: session.user.organizationId,
-      userAgent: request.headers.get("user-agent") ?? "mcl-web",
+    routeLog("ARP_MAPPING_VALIDATED", {
       requestId,
+      needId,
+      analysisId,
+      catmatCode,
+      stage: "ARP_MAPPING_VALIDATED",
+      durationMs: Date.now() - routeStartedAt,
+      count: 1,
+      status: mapping.status,
     });
 
-    if (result.entries.length > 0) {
-      return NextResponse.json({
-        ok: true,
-        stage: "ARP_SEARCH_COMPLETED",
+    const result = await searchArpsForConfirmedCatmat(
+      state,
+      {
+        ...body,
+        needId,
+        analysisId,
+        catalogMappingId,
+        catmatCode,
+        dataVigenciaInicialMin: body.dateStart ?? body.dataVigenciaInicialMin,
+        dataVigenciaInicialMax: body.dateEnd ?? body.dataVigenciaInicialMax,
         requestId,
-        catmatCode: mapping.externalItemCode,
-        count: result.entries.length,
-        items: result.entries,
-        synthesis: result.synthesis,
-        trace: result.query,
-      });
-    } else {
-      return NextResponse.json({
-        ok: true,
-        stage: "ARP_SEARCH_EMPTY",
+      },
+      {
+        actorId: session.user.id,
+        organizationId: session.user.organizationId,
+        userAgent: request.headers.get("user-agent") ?? "mcl-web",
         requestId,
-        catmatCode: mapping.externalItemCode,
-        count: 0,
-        items: [],
-        synthesis: result.synthesis,
-        trace: result.query,
-      });
-    }
+      },
+    );
+
+    const trace = {
+      ...result.query,
+      requestId,
+      analysisId,
+      catalogMappingId: mapping.id,
+      catmatCode: mapping.externalItemCode,
+      totalRegistros: result.totalRegistros,
+      totalPaginas: result.totalPaginas,
+      paginasRestantes: result.paginasRestantes,
+      pagesConsulted: result.pagesConsulted,
+      durationMs: result.durationMs,
+      timeoutMs: result.timeoutMs,
+      persistenceMode: mode,
+    };
+    const stage = result.entries.length > 0 ? "ARP_SEARCH_COMPLETED" : "ARP_SEARCH_EMPTY";
+
+    routeLog("ARP_RESPONSE_SENT", {
+      requestId,
+      needId,
+      analysisId,
+      catmatCode: mapping.externalItemCode,
+      stage,
+      durationMs: Date.now() - routeStartedAt,
+      count: result.entries.length,
+      status: "OK",
+    });
+
+    return NextResponse.json({
+      ok: true,
+      stage,
+      requestId,
+      catmatCode: mapping.externalItemCode,
+      count: result.entries.length,
+      items: result.entries,
+      synthesis: result.synthesis,
+      trace,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao consultar atas.";
     const isTimeout =
@@ -166,16 +292,25 @@ export async function POST(request: Request) {
       message.toLowerCase().includes("timeout") ||
       message.toLowerCase().includes("abort");
 
-    return NextResponse.json(
-      {
-        ok: false,
-        stage: "ARP_SEARCH_FAILED",
-        requestId,
-        code: isTimeout ? "TIMEOUT" : "QUERY_ERROR",
-        message,
-        retryable: true,
-      },
-      { status: 400 },
-    );
+    routeLog("ARP_EXTERNAL_FAILED", {
+      requestId,
+      needId,
+      analysisId,
+      catmatCode,
+      stage: "ARP_SEARCH_FAILED",
+      durationMs: Date.now() - routeStartedAt,
+      count: 0,
+      status: isTimeout ? "TIMEOUT" : "QUERY_ERROR",
+    });
+
+    return failure(400, requestId, isTimeout ? "TIMEOUT" : "QUERY_ERROR", message, true, {
+      requestId,
+      needId,
+      analysisId,
+      catalogMappingId,
+      catmatCode,
+      persistenceMode: mode,
+      durationMs: Date.now() - routeStartedAt,
+    });
   }
 }

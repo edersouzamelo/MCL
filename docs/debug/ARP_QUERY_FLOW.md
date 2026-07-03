@@ -1,71 +1,71 @@
-# Caminho Real do Clique - Consulta de Atas (ARP)
+# ARP Query Flow - Confirmed CATMAT
 
-Este documento mapeia o caminho completo do clique do usuário no botão "Consultar atas" até a atualização da tela.
+This document maps the real path from the `Consultar atas` button to the ARP result rendered on screen.
+
+## Current Flow
 
 ```text
-[Componente React] CoverageJourneyClient.tsx (Botão "Consultar atas")
-  ↓
-[Handler do Clique] searchAtas()
-  ↓
-[Fetch Interno] postJson("/api/coverage/atas/search", payload)
-  ↓
-[Rota Next.js] src/app/api/coverage/atas/search/route.ts (POST)
-  ↓
-[Serviço] searchArpsForConfirmedCatmat(...)
-  ↓
-[Cliente HTTP] createComprasGovClient(...)
-  ↓
-[Endpoint Externo] dadosabertos.compras.gov.br/modulo-arp/2_consultarARPItem
-  ↓
-[Normalizador] normalizeArpItem(...)
-  ↓
-[Persistência] saveNormalizedArpItemToDb(...) e saveAnalysisAndCandidatesToDb(...)
-  ↓
-[JSON de Resposta] Rota retorna resposta estruturada (ok: true/false, stage, etc.)
-  ↓
-[Estado React] CoverageJourneyClient atualiza ataQueryStatus, entries e error
-  ↓
-[Renderização] UI exibe a lista de atas ou mensagem detalhada de status/erro
+Button "Consultar atas"
+-> CoverageJourneyClient.searchAtas()
+-> POST /api/coverage/atas/search
+-> src/app/api/coverage/atas/search/route.ts
+-> searchArpsForConfirmedCatmat(...)
+-> createComprasGovClient(...).getJson(...)
+-> GET https://dadosabertos.compras.gov.br/modulo-arp/2_consultarARPItem
+-> comprasGovArpItemSchema + normalizeArpItem(...)
+-> saveNormalizedArpItemToDb(...) or in-memory state update
+-> saveAnalysisAndCandidatesToDb(...) when PostgreSQL is active
+-> JSON response with ok/stage/requestId/catmatCode/count/items/trace
+-> CoverageJourneyClient updates ataQueryStatus, entries, synthesis, queryTrace
 ```
 
-## Detalhamento das Etapas
+## Steps
 
-### 1. Botão e Handler React
-* **Arquivo:** [CoverageJourneyClient.tsx](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/src/components/CoverageJourneyClient.tsx)
-* **Componente:** Botão com texto `Consultar atas` ou `Consultando`.
-* **Função disparada:** `searchAtas()`
-* **Entrada:** Valores estáticos do componente (`dateStart`, `dateEnd`, `need.id`).
-* **Erros possíveis:** Campos de data em formato inválido ou `need.id` ausente.
+| Step | File | Function | Input | Output | Possible Error | Tested |
+| --- | --- | --- | --- | --- | --- | --- |
+| Button | `src/components/CoverageJourneyClient.tsx` | `<button onClick={searchAtas}>` | Confirmed `mapping`, date range | Click handler execution | Button disabled when no mapping | Code inspection |
+| Handler | `src/components/CoverageJourneyClient.tsx` | `searchAtas()` | `need.id`, dates, confirmed mapping | Internal POST request | Missing/invalid structured payload | Code inspection |
+| Fetch | `src/components/CoverageJourneyClient.tsx` | `postJson(...)` | JSON body | Parsed JSON | Non-JSON or structured error could be flattened | Code inspection |
+| Route | `src/app/api/coverage/atas/search/route.ts` | `POST(request)` | JSON request + session | Standard ARP JSON | Unauthorized, invalid request, missing CATMAT, invalid mapping, timeout | Unit tests pending update |
+| Mapping | `src/modules/coverage/service.ts` | `activeCatalogMappingForNeed*` | `needId` | Active CATMAT mapping | No confirmed mapping | Unit tests existing |
+| Service | `src/modules/coverage/service.ts` | `searchArpsForConfirmedCatmat(...)` | Need, CATMAT mapping, date range | Query trace, entries, synthesis | External API failure, timeout, parser mismatch | Direct service test |
+| HTTP | `src/modules/connectors/compras-gov/http.ts` | `createComprasGovClient().getJson(...)` | Endpoint + params | Zod-validated JSON | HTTP 4xx/5xx, AbortError, `fetch failed` | Direct service test |
+| External API | Compras.gov.br | `/modulo-arp/2_consultarARPItem` | `pagina=1`, date range, `tipoItem=Material`, `codigoItem=452757` | `resultado`, totals | Empty result or upstream error | Direct real query |
+| Normalization | `src/modules/connectors/compras-gov/normalizers.ts` | `normalizeArpItem(...)` | Raw ARP item | Internal instrument records | Invalid raw item shape | Existing unit tests |
+| Persistence | `src/modules/coverage/service.ts` | `saveNormalizedArpItemToDb(...)`, `saveAnalysisAndCandidatesToDb(...)`, `storeCoverageQuery(...)` | Query + normalized entries | DB rows or memory state | DB unavailable, silent memory fallback | Needs stricter handling |
+| Render | `src/components/CoverageJourneyClient.tsx` | `ataQueryStatus` render branch | Response stage | COMPLETED, EMPTY, TIMEOUT, ERROR UI | Loading/idle confusion | Helper tests pending |
 
-### 2. Fetch Interno
-* **Arquivo:** [CoverageJourneyClient.tsx](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/src/components/CoverageJourneyClient.tsx)
-* **Função:** `postJson`
-* **Entrada:** Endpoint `/api/coverage/atas/search`, corpo `{ needId, dataVigenciaInicialMin, dataVigenciaInicialMax }`.
-* **Saída:** JSON com os dados da resposta ou erro lançado.
+## Reproduction Notes
 
-### 3. Rota Next.js
-* **Arquivo:** [route.ts](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/src/app/api/coverage/atas/search/route.ts)
-* **Método:** `POST`
-* **Validações:**
-  * Autenticação de sessão via `getServerSession`.
-  * Verificação de existência e status do mapeamento confirmado (CATMAT 452757 para a calça).
-* **Erros possíveis:** 401 Unauthorized, 400 Bad Request se validação de negócio falhar.
+- Branch inspected: `feature/material-coverage-production-v1`.
+- Repair branch: `codex/repair-arp-query-from-confirmed-catmat`.
+- Confirmed seed mapping for `/necessidades/need-calca-120/buscar-cobertura`:
+  - `needId`: `need-calca-120`
+  - `catalogMappingId`: `mapping-calca-120-default`
+  - `catmatCode`: `452757`
+- Direct service call with Node CA disabled failed quickly with `fetch failed`.
+- Direct service call with `NODE_OPTIONS=--use-system-ca` returned a valid empty response:
+  - endpoint: `https://dadosabertos.compras.gov.br/modulo-arp/2_consultarARPItem`
+  - params: `pagina=1`, `dataVigenciaInicialMin=2026-01-01`, `dataVigenciaInicialMax=2026-12-31`, `tipoItem=Material`, `codigoItem=452757`
+  - duration: about `572ms`
+  - records: `0`
+  - status: `NO_RESULTS`
 
-### 4. Serviço
-* **Arquivo:** [service.ts](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/src/modules/coverage/service.ts)
-* **Função:** `searchArpsForConfirmedCatmat(...)`
-* **Parâmetros:** `state`, dados da requisição, e opções com `actorId` e `requestId`.
+## Confirmed Breakpoints
 
-### 5. Cliente HTTP & Endpoint Externo
-* **Arquivo:** [http.ts](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/src/modules/connectors/compras-gov/http.ts)
-* **Função:** `createComprasGovClient` -> `getJson`
-* **Endpoint externo:** `https://dadosabertos.compras.gov.br/modulo-arp/2_consultarARPItem`
-* **Erros possíveis:** Timeout (AbortError), indisponibilidade do servidor externo (502/503), limite de taxa (429).
+1. The frontend request currently sends only `needId`, `dataVigenciaInicialMin`, and `dataVigenciaInicialMax`. It does not include `analysisId`, `catalogMappingId`, `catmatCode`, or a client `requestId`.
+2. The frontend generic fetch helper can turn a structured route error into a generic `"Falha na requisicao."`, so the ARP UI loses the precise `code`, `stage`, and `message`.
+3. The memory-mode service silently falls back to simulated ARPs outside tests when the external API fails. That hides real endpoint errors and can create a false positive.
+4. Runtime memory mode is not explicitly gated by `MCL_ALLOW_MEMORY_FALLBACK=true`, and the UI does not currently show a memory-mode persistence warning.
 
-### 6. Normalização e Persistência
-* **Arquivo:** [normalizers.ts](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/src/modules/connectors/compras-gov/normalizers.ts) e [service.ts](file:///c:/Users/eders/Desktop/MCL/mcl-piloto-classe-ii/src/modules/coverage/service.ts)
-* **Funções:** `normalizeArpItem(...)`, `saveNormalizedArpItemToDb(...)` e `saveAnalysisAndCandidatesToDb(...)`
-* **Descrição:** Se dados forem retornados, converte para o modelo interno e persiste no PostgreSQL. Se nenhum for encontrado, atualiza o status do banco para `NO_RESULTS`.
+## Expected Fixed Behavior
 
-### 7. Atualização do Estado React e Renderização
-* **Descrição:** O frontend recebe a resposta do fetch. Se a consulta falhar ou expirar, a resposta JSON de erro limpa o loading e exibe a causa. Se for bem sucedida, atualiza `entries` e `synthesis` para renderizar as atas.
+- The button sends `needId`, `analysisId`, `catalogMappingId`, `catmatCode`, `dateStart`, `dateEnd`, and `requestId`.
+- The route validates the confirmed CATMAT and returns one of:
+  - `ARP_SEARCH_COMPLETED`
+  - `ARP_SEARCH_EMPTY`
+  - `ARP_SEARCH_FAILED`
+- Empty external results render as:
+  - `Nenhuma ata relacionada ao CATMAT 452757 foi encontrada no periodo consultado.`
+- Timeouts and upstream failures render as explicit errors.
+- The trace panel shows endpoint, params, time range, pages consulted, records returned, source URL, request id, and persistence mode.

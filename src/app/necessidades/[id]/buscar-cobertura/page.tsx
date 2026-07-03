@@ -14,7 +14,7 @@ export default async function NeedCoverageSearchPage({ params }: { params: Promi
   const { id } = await params;
   const isPostgres = persistenceMode() === "postgresql";
   
-  let need, item, variant, mapping, stockCovered, orgName, projection;
+  let need, item, variant, mapping, stockCovered, orgName, projection, analysisId;
 
   if (isPostgres) {
     const dbNeed = await prisma.need.findUnique({
@@ -51,6 +51,11 @@ export default async function NeedCoverageSearchPage({ params }: { params: Promi
 
     const mappingData = await activeCatalogMappingForNeed({} as any, dbNeed.id);
     mapping = mappingData;
+    const analysis = await prisma.materialCoverageAnalysis.findFirst({
+      where: { needId: dbNeed.id },
+      select: { id: true },
+    });
+    analysisId = analysis?.id ?? `analysis-${dbNeed.id}`;
 
     const coverages = await prisma.needCoverage.findMany({
       where: { needId: dbNeed.id, coverageType: "ESTOQUE" }
@@ -92,6 +97,7 @@ export default async function NeedCoverageSearchPage({ params }: { params: Promi
     const needProjection = projectNeed(demoNeed, state);
     orgName = organizationName(state, demoNeed.organizationId);
     mapping = activeCatalogMappingForNeedSync(state, demoNeed.id);
+    analysisId = `analysis-${demoNeed.id}`;
 
     projection = {
       stockCovered,
@@ -126,6 +132,7 @@ export default async function NeedCoverageSearchPage({ params }: { params: Promi
         organizationName={orgName}
         projection={projection}
         initialMapping={mapping as any}
+        initialAnalysisId={analysisId}
       />
     </AppShell>
   );
