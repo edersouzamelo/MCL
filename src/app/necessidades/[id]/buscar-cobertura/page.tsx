@@ -60,7 +60,7 @@ export default async function NeedCoverageSearchPage({ params }: { params: Promi
     const coverages = await prisma.needCoverage.findMany({
       where: { needId: dbNeed.id, coverageType: "ESTOQUE" }
     });
-    stockCovered = coverages.reduce((sum, c) => sum + c.quantity, 0);
+    stockCovered = coverages.reduce((sum: number, coverage: (typeof coverages)[number]) => sum + coverage.quantity, 0);
 
     projection = {
       stockCovered,
