@@ -414,7 +414,7 @@ export function CoverageJourneyClient({
         ) : (
           <p className="mt-3 text-sm text-zinc-600">Nenhuma pesquisa CATMAT executada nesta sessao.</p>
         )}
-        {selectedCandidate && !mapping ? (
+        {selectedCandidate ? (
           <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
             <label className="text-sm">
               <span className="font-semibold text-zinc-700">Justificativa da confirmacao</span>

@@ -11,6 +11,8 @@ import {
   revokeCatalogMapping,
   searchArpsForConfirmedCatmat,
   searchCatmatCandidates,
+  inferredCatalogFilters,
+  needSearchText,
 } from "@/modules/coverage/service";
 
 function state(): DemoState {
@@ -444,6 +446,17 @@ describe("consulta de cobertura orientada pela necessidade", () => {
 
     expect(confWithUnits).toBeGreaterThan(confNoUnits);
     expect(confWithUnits).toBeLessThanOrEqual(1.0);
+  });
+
+  it("prioriza termos de busca fornecidos pelo usuario na inferredCatalogFilters e needSearchText", () => {
+    const demo = state();
+    const filters = { needId: "need-calca-120", terms: "copo plastico" };
+    // Call functions directly (they are already imported at the top of the test file!)
+    const resultFilters = inferredCatalogFilters(demo, filters);
+    expect(resultFilters.descricaoItem).toBe("copo");
+    
+    const resultSearchText = needSearchText(demo, "need-calca-120", "copo plastico");
+    expect(resultSearchText).toBe("copo plastico");
   });
 });
 
