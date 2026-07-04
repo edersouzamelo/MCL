@@ -8,6 +8,7 @@ export type ArpSearchPayload = {
   analysisId: string;
   catalogMappingId: string;
   catmatCode: string;
+  mappingSnapshot: ItemCatalogMapping;
   dateStart: string;
   dateEnd: string;
   dataVigenciaInicialMin: string;
@@ -69,6 +70,7 @@ export function buildArpSearchPayload({
     analysisId: analysisId ?? `analysis-${needId}`,
     catalogMappingId: mapping.id,
     catmatCode: mapping.externalItemCode,
+    mappingSnapshot: mapping,
     dateStart,
     dateEnd,
     dataVigenciaInicialMin: dateStart,

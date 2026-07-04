@@ -52,9 +52,48 @@ export const catmatSearchInputSchema = z.object({
   filters: catalogFilterSchema.optional(),
 });
 
+const candidateSnapshotSchema = z.object({
+  externalCatalog: z.string().trim().default("CATMAT"),
+  externalItemCode: z.string().trim().min(1),
+  externalDescription: z.string().trim().min(1),
+  groupCode: z.string().trim().optional(),
+  classCode: z.string().trim().optional(),
+  pdmCode: z.string().trim().optional(),
+  statusItem: z.coerce.boolean().optional(),
+  sourceSystem: z.string().trim().optional(),
+  sourceUrl: z.string().trim().optional(),
+  sourceUpdatedAt: z.string().trim().optional(),
+  fetchedAt: z.string().trim().optional(),
+  similarityScore: z.coerce.number().min(0).max(1).optional(),
+  similarityExplanation: z.string().trim().optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+const mappingSnapshotSchema = z.object({
+  id: z.string().trim().min(1),
+  mclItemId: z.string().trim().min(1),
+  mclVariantId: z.string().trim().optional(),
+  needId: z.string().trim().min(1).optional(),
+  externalCatalog: z.string().trim().default("CATMAT"),
+  externalItemCode: z.string().trim().min(1),
+  externalDescription: z.string().trim().optional(),
+  groupCode: z.string().trim().optional(),
+  classCode: z.string().trim().optional(),
+  pdmCode: z.string().trim().optional(),
+  confirmedBy: z.string().trim().optional(),
+  confirmedAt: z.string().trim().optional(),
+  justification: z.string().trim().optional(),
+  status: z.enum(["ACTIVE", "REVOKED", "SUPERSEDED"]).optional(),
+  confidence: z.coerce.number().min(0).max(1).optional(),
+  mappingVersion: z.coerce.number().int().min(1).optional(),
+  replacesMappingId: z.string().trim().optional(),
+  sourceCandidateId: z.string().trim().optional(),
+});
+
 export const confirmCatalogMappingInputSchema = z.object({
   needId: z.string().min(1),
   candidateId: z.string().min(1),
+  candidateSnapshot: candidateSnapshotSchema.optional(),
   justification: z.string().min(12).max(800),
   confidence: z.coerce.number().min(0).max(1).optional(),
 });
@@ -78,6 +117,7 @@ export const arpSearchInputSchema = z.object({
   codigoPdm: z.string().trim().optional(),
   niFornecedor: z.string().trim().optional(),
   numeroCompra: z.string().trim().optional(),
+  mappingSnapshot: mappingSnapshotSchema.optional(),
   requestId: z.string().trim().optional(),
 });
 
@@ -783,7 +823,30 @@ export async function confirmCatalogMapping(
     if (!item) {
       throw new Error("Item MCL nao localizado para a necessidade.");
     }
-    const candidate = state.catalogSearchCandidates.find((entry) => entry.id === input.candidateId);
+    let candidate = state.catalogSearchCandidates.find((entry) => entry.id === input.candidateId);
+    if (!candidate && input.candidateSnapshot) {
+      const fetchedAt = input.candidateSnapshot.fetchedAt ?? new Date().toISOString();
+      candidate = {
+        id: input.candidateId,
+        queryId: "stateless-demo-confirmation",
+        needId: input.needId,
+        externalCatalog: input.candidateSnapshot.externalCatalog,
+        externalItemCode: input.candidateSnapshot.externalItemCode,
+        externalDescription: input.candidateSnapshot.externalDescription,
+        groupCode: input.candidateSnapshot.groupCode,
+        classCode: input.candidateSnapshot.classCode,
+        pdmCode: input.candidateSnapshot.pdmCode,
+        statusItem: input.candidateSnapshot.statusItem,
+        sourceSystem: input.candidateSnapshot.sourceSystem ?? "MCL_DEMO_STATELESS",
+        sourceUrl: input.candidateSnapshot.sourceUrl ?? "local://stateless-demo-candidate",
+        sourceUpdatedAt: input.candidateSnapshot.sourceUpdatedAt,
+        fetchedAt,
+        similarityScore: input.candidateSnapshot.similarityScore ?? input.confidence ?? 0.55,
+        similarityExplanation: input.candidateSnapshot.similarityExplanation ?? "Candidato preservado pelo cliente para fluxo demonstrativo stateless.",
+        payload: input.candidateSnapshot.payload ?? {},
+      };
+      state.catalogSearchCandidates.unshift(candidate as CatalogSearchCandidate);
+    }
     if (!candidate || candidate.needId !== input.needId) {
       throw new Error("Candidato CATMAT nao localizado para esta necessidade.");
     }
@@ -1187,7 +1250,30 @@ export async function searchArpsForConfirmedCatmat(
       throw error;
     }
   } else {
-    const mapping = activeCatalogMappingForNeedSync(state, input.needId);
+    let mapping = activeCatalogMappingForNeedSync(state, input.needId);
+    if (!mapping && input.mappingSnapshot && input.mappingSnapshot.externalItemCode === input.catmatCode) {
+      mapping = {
+        id: input.mappingSnapshot.id,
+        mclItemId: input.mappingSnapshot.mclItemId,
+        mclVariantId: input.mappingSnapshot.mclVariantId,
+        needId: input.mappingSnapshot.needId ?? input.needId,
+        externalCatalog: input.mappingSnapshot.externalCatalog,
+        externalItemCode: input.mappingSnapshot.externalItemCode,
+        externalDescription: input.mappingSnapshot.externalDescription ?? `CATMAT ${input.mappingSnapshot.externalItemCode}`,
+        groupCode: input.mappingSnapshot.groupCode,
+        classCode: input.mappingSnapshot.classCode,
+        pdmCode: input.mappingSnapshot.pdmCode,
+        confirmedBy: input.mappingSnapshot.confirmedBy ?? options.actorId,
+        confirmedAt: input.mappingSnapshot.confirmedAt ?? new Date().toISOString(),
+        justification: input.mappingSnapshot.justification ?? "Mapeamento preservado pelo cliente para fluxo demonstrativo stateless.",
+        status: "ACTIVE",
+        confidence: input.mappingSnapshot.confidence ?? 0.55,
+        mappingVersion: input.mappingSnapshot.mappingVersion ?? 1,
+        replacesMappingId: input.mappingSnapshot.replacesMappingId,
+        sourceCandidateId: input.mappingSnapshot.sourceCandidateId,
+      };
+      state.itemCatalogMappings.unshift(mapping);
+    }
     if (!mapping) {
       throw new Error("Confirme um CATMAT antes de consultar atas.");
     }

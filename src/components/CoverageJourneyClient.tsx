@@ -212,6 +212,7 @@ export function CoverageJourneyClient({
       const result = await postJson<{ mapping: ItemCatalogMapping }>("/api/coverage/catmat/confirm", {
         needId: need.id,
         candidateId: selectedCandidate.id,
+        candidateSnapshot: selectedCandidate,
         justification,
         confidence: Math.max(0.55, selectedCandidate.similarityScore),
       });
