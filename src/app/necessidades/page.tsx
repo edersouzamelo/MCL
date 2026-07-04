@@ -29,7 +29,7 @@ export default function NeedsPage() {
                 </div>
                 <div className="flex flex-col items-start gap-2 md:items-end">
                   <Badge tone={need.priority === "ALTA" ? "warn" : "neutral"}>{need.priority}</Badge>
-                  <InlineLink href={`/necessidades/${need.id}/buscar-cobertura`}>Buscar cobertura</InlineLink>
+                  <InlineLink href={`/necessidades/${need.id}/buscar-cobertura`}>Buscar CATMAT e atas</InlineLink>
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">

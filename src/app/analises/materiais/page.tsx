@@ -163,7 +163,7 @@ export default async function MaterialAnalysesPage() {
                   href={`/necessidades/${item.id}/buscar-cobertura`}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm text-center py-2 px-4 rounded shadow-sm hover:shadow transition-all block w-full md:w-auto"
                 >
-                  ANALISAR COBERTURA
+                  ABRIR CATMAT E ATAS
                 </Link>
               </div>
             </div>

@@ -23,7 +23,7 @@ export default function ConnectorsPage() {
       <PageHeader
         title="Saude dos conectores"
         description="Conector oficial somente leitura do Compras.gov.br e conectores demonstrativos do piloto."
-        action={<InlineLink href="/necessidades">Iniciar por necessidade</InlineLink>}
+        action={<InlineLink href="/analises/materiais">Abrir CATMAT e atas</InlineLink>}
       />
       {comprasGov ? (
         <Card className="mb-4 border-l-4 border-l-emerald-600">
@@ -36,7 +36,13 @@ export default function ConnectorsPage() {
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-zinc-600">{comprasGov.message}</p>
-              <p className="mt-1 text-sm text-zinc-600">O fluxo operacional parte da necessidade, confirma CATMAT e so entao consulta atas relacionadas.</p>
+              <p className="mt-1 text-sm text-zinc-600">
+                Para localizar atas disponiveis, abra o fluxo CATMAT e atas. A sincronizacao tecnica abaixo exige sessao de gestor/admin e
+                nao substitui a busca orientada pela necessidade.
+              </p>
+              <div className="mt-3">
+                <InlineLink href="/analises/materiais">Ir para busca por CATMAT e atas</InlineLink>
+              </div>
             </div>
             <ComprasGovSyncButton />
           </div>

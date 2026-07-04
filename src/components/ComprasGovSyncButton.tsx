@@ -25,7 +25,9 @@ export function ComprasGovSyncButton() {
   const [message, setMessage] = useState<string>();
 
   async function syncNow() {
-    const confirmed = window.confirm("Executar exploracao tecnica do conector? O fluxo principal deve partir de uma necessidade com CATMAT confirmado.");
+    const confirmed = window.confirm(
+      "Executar exploracao tecnica do conector? Para localizar atas por CATMAT, use o fluxo Cobertura > CATMAT e atas.",
+    );
     if (!confirmed) {
       return;
     }
