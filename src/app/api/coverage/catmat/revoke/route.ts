@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import type { Role } from "@/modules/domain/types";
-import { authOptions } from "@/modules/auth/options";
+import { getRouteActor } from "@/modules/auth/route-actor";
 import { revokeCatalogMapping } from "@/modules/coverage/service";
 import { getDemoState } from "@/server/demo-store";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getRouteActor();
+  if (!actor) {
     return NextResponse.json({ error: "Autenticacao obrigatoria." }, { status: 401 });
   }
 
@@ -18,9 +16,9 @@ export async function POST(request: Request) {
     const mapping = await revokeCatalogMapping(
       state,
       await request.json(),
-      (session.user.roles ?? []) as Role[],
-      session.user.id,
-      session.user.organizationId,
+      actor.roles,
+      actor.id,
+      actor.organizationId,
     );
     return NextResponse.json({ mapping });
   } catch (error) {

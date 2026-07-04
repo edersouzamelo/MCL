@@ -1,22 +1,21 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/modules/auth/options";
+import { getRouteActor } from "@/modules/auth/route-actor";
 import { searchCatmatCandidates } from "@/modules/coverage/service";
 import { getDemoState } from "@/server/demo-store";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getRouteActor();
+  if (!actor) {
     return NextResponse.json({ error: "Autenticacao obrigatoria." }, { status: 401 });
   }
 
   try {
     const state = getDemoState();
     const result = await searchCatmatCandidates(state, await request.json(), {
-      actorId: session.user.id,
-      organizationId: session.user.organizationId,
+      actorId: actor.id,
+      organizationId: actor.organizationId,
       userAgent: request.headers.get("user-agent") ?? "mcl-web",
     });
     return NextResponse.json(result);

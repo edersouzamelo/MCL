@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/modules/auth/options";
+import { demoMemoryFallbackAllowed, getRouteActor } from "@/modules/auth/route-actor";
 import {
   activeCatalogMappingForNeed,
   activeCatalogMappingForNeedSync,
@@ -92,8 +91,8 @@ export async function POST(request: Request) {
     status: "RECEIVED",
   });
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getRouteActor();
+  if (!actor) {
     return failure(401, requestId, "UNAUTHORIZED", "Autenticacao obrigatoria.", false, {
       requestId,
       needId,
@@ -132,7 +131,12 @@ export async function POST(request: Request) {
   }
 
   const mode = persistenceMode();
-  if (mode !== "postgresql" && process.env.MCL_ALLOW_MEMORY_FALLBACK !== "true" && process.env.NODE_ENV !== "test") {
+  if (
+    mode !== "postgresql" &&
+    process.env.MCL_ALLOW_MEMORY_FALLBACK !== "true" &&
+    !demoMemoryFallbackAllowed() &&
+    process.env.NODE_ENV !== "test"
+  ) {
     return failure(
       503,
       requestId,
@@ -241,8 +245,8 @@ export async function POST(request: Request) {
         requestId,
       },
       {
-        actorId: session.user.id,
-        organizationId: session.user.organizationId,
+        actorId: actor.id,
+        organizationId: actor.organizationId,
         userAgent: request.headers.get("user-agent") ?? "mcl-web",
         requestId,
       },
