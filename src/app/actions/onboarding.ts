@@ -28,9 +28,15 @@ export async function completeOnboarding(formData: FormData) {
 
   if (mode === "postgresql") {
     try {
-      await prisma.user.update({
+      await prisma.user.upsert({
         where: { id: session.user.id },
-        data: data,
+        update: data,
+        create: {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name,
+          ...data,
+        },
       });
     } catch (error) {
       console.error("Erro no banco de dados (completeOnboarding), usando memória temporária:", error);
