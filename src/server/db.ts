@@ -19,33 +19,6 @@ export const prisma = new Proxy({} as PrismaClient, {
         );
       }
 
-      // Sincroniza o esquema do banco de dados na Vercel no primeiro acesso em produção
-      if (process.env.NODE_ENV === "production" && !globalThis.hasOwnProperty("__db_pushed")) {
-        try {
-          console.log("MCL: Iniciando sincronizacao automatica do esquema com o banco...");
-          execSync("npx prisma db push --accept-data-loss", {
-            env: { ...process.env, DATABASE_URL: dbUrl },
-            stdio: "inherit",
-          });
-          console.log("MCL: Sincronizacao do banco finalizada com sucesso!");
-          
-          try {
-            console.log("MCL: Populando dados iniciais (seeding) no banco de dados...");
-            execSync("npx tsx prisma/seed.ts", {
-              env: { ...process.env, DATABASE_URL: dbUrl },
-              stdio: "inherit",
-            });
-            console.log("MCL: Dados populados com sucesso!");
-          } catch (seedErr) {
-            console.error("MCL: Falha na populacao automatica de dados:", seedErr);
-          }
-
-          (globalThis as any).__db_pushed = true;
-        } catch (err) {
-          console.error("MCL: Falha na sincronizacao automatica do banco:", err);
-        }
-      }
-
       globalForPrisma.prisma = new PrismaClient({
         accelerateUrl: dbUrl,
         log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
