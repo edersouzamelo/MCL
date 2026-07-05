@@ -574,7 +574,7 @@ export async function searchCatmatCandidates(
       }));
     }
 
-    query.recordsRead = data.resultado.length;
+    query.recordsRead = (data.hits || data.resultado || []).length;
     query.status = candidates.length ? "SUCCESS" : "NO_RESULTS";
     query.sourceUrl = url;
     query.finishedAt = fetchedAt;
@@ -1970,8 +1970,7 @@ export function buildCoverageSynthesis(
 }
 
 export function persistenceMode() {
-  // Temporariamente forçando o modo demo-memory para que o app funcione sem o banco de dados Supabase
-  return "demo-memory";
+  return process.env.DATABASE_URL ? "postgresql" : "demo-memory";
 }
 
 export async function getOrCreateMaterialAnalysis(needId: string, actorId: string) {
