@@ -27,8 +27,20 @@ export const prisma = new Proxy({} as PrismaClient, {
             env: { ...process.env, DATABASE_URL: dbUrl },
             stdio: "inherit",
           });
-          (globalThis as any).__db_pushed = true;
           console.log("MCL: Sincronizacao do banco finalizada com sucesso!");
+          
+          try {
+            console.log("MCL: Populando dados iniciais (seeding) no banco de dados...");
+            execSync("npx tsx prisma/seed.ts", {
+              env: { ...process.env, DATABASE_URL: dbUrl },
+              stdio: "inherit",
+            });
+            console.log("MCL: Dados populados com sucesso!");
+          } catch (seedErr) {
+            console.error("MCL: Falha na populacao automatica de dados:", seedErr);
+          }
+
+          (globalThis as any).__db_pushed = true;
         } catch (err) {
           console.error("MCL: Falha na sincronizacao automatica do banco:", err);
         }
