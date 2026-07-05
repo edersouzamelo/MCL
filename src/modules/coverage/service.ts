@@ -1970,7 +1970,7 @@ export function buildCoverageSynthesis(
 }
 
 export function persistenceMode() {
-  return process.env.DATABASE_URL ? "postgresql" : "demo-memory";
+  return "demo-memory";
 }
 
 export async function getOrCreateMaterialAnalysis(needId: string, actorId: string) {
