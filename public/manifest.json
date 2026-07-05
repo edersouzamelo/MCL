@@ -9,9 +9,9 @@
   "icons": [
     {
       "src": "/icons/mcl-logo.png",
-      "sizes": "961x1152",
+      "sizes": "192x192 512x512 961x1152",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ]
 }
