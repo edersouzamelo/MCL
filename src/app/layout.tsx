@@ -32,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="h-full antialiased" suppressHydrationWarning>
-      <body className="min-h-full flex flex-col bg-white text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 transition-colors duration-300">
+      <body className="min-h-full flex flex-col bg-zinc-950 text-white transition-colors duration-300">
         <Providers>{children}</Providers>
       </body>
     </html>
