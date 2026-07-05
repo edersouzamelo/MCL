@@ -1,9 +1,39 @@
 import { createRequire } from "node:module";
 import { createDemoState } from "../src/modules/demo/data";
+import fs from "node:fs";
+import path from "node:path";
+
+// Load .env manually if it exists
+try {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const envFile = fs.readFileSync(envPath, "utf-8");
+    for (const line of envFile.split("\n")) {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1];
+        let val = (match[2] || "").trim();
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.substring(1, val.length - 1);
+        } else if (val.startsWith("'") && val.endsWith("'")) {
+          val = val.substring(1, val.length - 1);
+        }
+        process.env[key] = val;
+      }
+    }
+  }
+} catch (e) {
+  console.warn("Failed to load .env file in seed:", e);
+}
 
 const require = createRequire(import.meta.url);
-const { PrismaClient } = require("@prisma/client") as { PrismaClient: new () => { $disconnect: () => Promise<void> } };
-const prisma = new PrismaClient();
+const { PrismaClient } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const pg = require("pg");
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 const state = createDemoState();
 type SeedModel = {
   deleteMany: () => Promise<unknown>;

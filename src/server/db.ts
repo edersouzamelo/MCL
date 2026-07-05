@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 import { createDemoState } from "@/modules/demo/data";
 
 const globalForPrisma = globalThis as unknown as {
@@ -87,8 +89,11 @@ export const prisma = new Proxy({} as PrismaClient, {
         );
       }
 
+      const pool = new pg.Pool({ connectionString: dbUrl });
+      const adapter = new PrismaPg(pool);
+
       globalForPrisma.prisma = new PrismaClient({
-        accelerateUrl: dbUrl,
+        adapter,
         log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
       } as any);
 
