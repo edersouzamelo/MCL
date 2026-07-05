@@ -472,7 +472,7 @@ export async function searchCatmatCandidates(
     {
       needId: input.needId,
       kind: "CATMAT_SEARCH",
-      endpoint: COMPRAS_GOV_CATMAT_ENDPOINT,
+      endpoint: "https://catmat.com.br/api/v1/search",
       params: queryParams,
       actorId: options.actorId,
       externalCatalog: "CATMAT",
@@ -483,29 +483,41 @@ export async function searchCatmatCandidates(
   try {
     let apiResult;
     try {
-      apiResult = await client.getJson(
-        COMPRAS_GOV_CATMAT_ENDPOINT,
-        queryParams,
-        comprasGovApiResponseSchema,
+      const fetchImpl = options.fetchImpl ?? fetch;
+      const response = await fetchImpl(
+        `https://catmat.com.br/api/v1/search?q=${encodeURIComponent(queryText)}`,
+        { headers: { accept: "application/json" } }
       );
+      if (!response.ok) {
+         throw new Error(`Catmat API responded with ${response.status}`);
+      }
+      apiResult = { data: await response.json(), url: response.url };
     } catch (apiError) {
       if (process.env.NODE_ENV === "test") {
         throw apiError;
       }
-      console.warn("Compras.gov API call failed, falling back to simulated candidates. Error:", apiError);
+      console.warn("Catmat.com.br API call failed, falling back to simulated candidates. Error:", apiError);
       apiResult = {
-        data: { resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 },
-        url: COMPRAS_GOV_CATMAT_ENDPOINT,
+        data: { hits: [], total: 0 },
+        url: "https://catmat.com.br/api/v1/search",
       };
     }
+    
     const { data, url } = apiResult;
     const fetchedAt = new Date().toISOString();
-    let candidates = data.resultado
-      .map((raw) => comprasGovCatalogItemSchema.safeParse(raw))
-      .filter((parsed): parsed is { success: true; data: ComprasGovCatalogItem } => parsed.success)
-      .map((parsed) => candidateFromCatalogItem(parsed.data, query, input.needId, url, fetchedAt, queryText))
-      .filter((candidate) => candidate.similarityScore > 0 || params.codigoItem || params.codigoClasse || params.codigoGrupo)
-      .sort((a, b) => b.similarityScore - a.similarityScore)
+    
+    let candidates = (data.hits || [])
+      .map((raw: any) => ({
+        codigoItem: raw.codigo_item,
+        codigoGrupo: raw.codigo_grupo,
+        codigoClasse: raw.codigo_classe,
+        codigoPdm: raw.codigo_pdm,
+        descricaoItem: raw.descricao_item,
+        statusItem: true
+      }))
+      .map((parsed: any) => candidateFromCatalogItem(parsed, query, input.needId, url, fetchedAt, queryText))
+      .filter((candidate: any) => candidate.similarityScore > 0 || params.codigoItem || params.codigoClasse || params.codigoGrupo)
+      .sort((a: any, b: any) => b.similarityScore - a.similarityScore)
       .slice(0, 12);
 
     if (candidates.length === 0 && input.terms?.trim() && process.env.NODE_ENV !== "test") {
