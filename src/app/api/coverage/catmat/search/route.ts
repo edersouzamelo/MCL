@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRouteActor } from "@/modules/auth/route-actor";
-import { searchCatmatCandidates } from "@/modules/coverage/service";
+import { searchOfficialCatmatCandidates } from "@/modules/coverage/catmat-official-search";
 import { getDemoState } from "@/server/demo-store";
 
 export const runtime = "nodejs";
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
   try {
     const state = getDemoState();
-    const result = await searchCatmatCandidates(state, await request.json(), {
+    const result = await searchOfficialCatmatCandidates(state, await request.json(), {
       actorId: actor.id,
       organizationId: actor.organizationId,
       userAgent: request.headers.get("user-agent") ?? "mcl-web",
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao pesquisar CATMAT." },
+      { error: error instanceof Error ? error.message : "Falha ao pesquisar CATMAT oficial." },
       { status: 400 },
     );
   }
