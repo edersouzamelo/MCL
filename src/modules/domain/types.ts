@@ -1,5 +1,5 @@
 export const DEMO_NOTICE =
-  "AMBIENTE DEMONSTRATIVO - DADOS SINTETICOS - NAO CONSTITUI SISTEMA OFICIAL";
+  "INTEGRADO AO COMPRAS.GOV (DADOS REAIS)";
 
 export const INSTITUTIONAL_IDENTITY_NOTICE =
   "Em eventual implantacao institucional, o provedor demonstrativo devera ser substituido ou integrado a um provedor de identidade autorizado.";
