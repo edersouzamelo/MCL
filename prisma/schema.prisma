@@ -78,14 +78,21 @@ enum LogisticsUnitState {
 }
 
 model User {
-  id        String      @id
-  name      String?
-  email     String?     @unique
-  image     String?
-  active    Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  scopes    UserScope[]
+  id                   String      @id
+  name                 String?
+  email                String?     @unique
+  image                String?
+  active               Boolean     @default(true)
+  rank                 String?
+  address              String?
+  phone                String?
+  whatsapp             String?
+  militaryRole         String?
+  militaryOrganization String?
+  termsAcceptedAt      DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  scopes               UserScope[]
 }
 
 model UserScope {

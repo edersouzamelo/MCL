@@ -72,6 +72,13 @@ export interface User {
   email: string;
   image?: string;
   active: boolean;
+  rank?: string;
+  address?: string;
+  phone?: string;
+  whatsapp?: string;
+  militaryRole?: string;
+  militaryOrganization?: string;
+  termsAcceptedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

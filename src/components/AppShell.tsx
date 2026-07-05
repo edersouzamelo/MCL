@@ -44,7 +44,16 @@ const nav = [
   { href: "/auditoria", label: "Auditoria", icon: History },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+import { redirect } from "next/navigation";
+import { getUserProfile } from "@/app/actions/onboarding";
+
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const profile = await getUserProfile();
+  
+  if (profile && !profile.termsAcceptedAt) {
+    redirect("/primeiro-acesso");
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-zinc-50 transition-colors">
       <ServiceWorkerRegister />

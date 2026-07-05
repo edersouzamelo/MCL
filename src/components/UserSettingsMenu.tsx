@@ -152,6 +152,15 @@ export function UserSettingsMenu() {
           </div>
 
           <div className="p-2 border-t border-zinc-800">
+            {session?.user?.email === "edersouzamelo@gmail.com" && (
+              <a 
+                href="/admin/usuarios"
+                className="w-full flex items-center gap-2 px-3 py-3 text-xs font-bold text-emerald-500 hover:bg-zinc-800/50 rounded-lg transition-colors uppercase tracking-widest mb-1"
+              >
+                <Settings2 className="h-4 w-4" />
+                PAINEL DO ADMINISTRADOR
+              </a>
+            )}
             <button 
               onClick={() => signOut({ callbackUrl: '/' })}
               className="w-full flex items-center gap-2 px-3 py-3 text-xs font-bold text-red-500 hover:bg-zinc-800/50 rounded-lg transition-colors uppercase tracking-widest"

@@ -1,12 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useTheme } from "next-themes";
 
 export type Language = "pt-BR" | "en" | "es";
 export type FontSize = "pequena" | "media" | "grande";
 
-interface SettingsContextType {
+interface SettingsContextData {
   language: Language;
   setLanguage: (lang: Language) => void;
   animationsEnabled: boolean;
@@ -17,15 +16,13 @@ interface SettingsContextType {
   setTheme: (theme: string) => void;
 }
 
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+const SettingsContext = createContext<SettingsContextData>({} as SettingsContextData);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const { theme, setTheme } = useTheme();
-  
-  // Default values
   const [language, setLanguage] = useState<Language>("pt-BR");
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [fontSize, setFontSize] = useState<FontSize>("media");
+  const [theme, setTheme] = useState<string>("light");
   
   // Load from localStorage on mount
   useEffect(() => {
@@ -37,50 +34,65 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     
     const savedFont = localStorage.getItem("mcl-font") as FontSize;
     if (savedFont) setFontSize(savedFont);
+
+    const savedTheme = localStorage.getItem("mcl_theme");
+    if (savedTheme) {
+      setTheme(savedTheme);
+      if (savedTheme === "dark") document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+    }
   }, []);
 
-  // Save to localStorage when changed
-  useEffect(() => {
-    localStorage.setItem("mcl-lang", language);
-  }, [language]);
+  const handleLanguageChange = (lang: Language) => {
+    setLanguage(lang);
+    localStorage.setItem("mcl-lang", lang);
+  };
 
-  useEffect(() => {
-    localStorage.setItem("mcl-anim", String(animationsEnabled));
-  }, [animationsEnabled]);
+  const handleAnimationsChange = (enabled: boolean) => {
+    setAnimationsEnabled(enabled);
+    localStorage.setItem("mcl-anim", String(enabled));
+  };
 
-  useEffect(() => {
-    localStorage.setItem("mcl-font", fontSize);
+  const handleFontSizeChange = (size: FontSize) => {
+    setFontSize(size);
+    localStorage.setItem("mcl-font", size);
     
     // Apply font size to document html to affect REM sizing globally (Tailwind's base)
     const root = document.documentElement;
     root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
-    if (fontSize === "pequena") root.classList.add("text-[14px]");
-    else if (fontSize === "media") root.classList.add("text-[16px]");
-    else if (fontSize === "grande") root.classList.add("text-[18px]");
-  }, [fontSize]);
+    if (size === "pequena") root.classList.add("text-[14px]");
+    else if (size === "media") root.classList.add("text-[16px]");
+    else if (size === "grande") root.classList.add("text-[18px]");
+  };
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+    localStorage.setItem("mcl_theme", newTheme);
+    if (newTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
 
   return (
     <SettingsContext.Provider
       value={{
         language,
-        setLanguage,
+        setLanguage: handleLanguageChange,
         animationsEnabled,
-        setAnimationsEnabled,
+        setAnimationsEnabled: handleAnimationsChange,
         fontSize,
-        setFontSize,
-        theme: theme || "light",
-        setTheme,
+        setFontSize: handleFontSizeChange,
+        theme,
+        setTheme: handleThemeChange,
       }}
     >
-      {children}
+      <div className={`font-${fontSize} ${animationsEnabled ? 'transitions-enabled' : 'transitions-disabled'}`}>{children}</div>
     </SettingsContext.Provider>
   );
 }
 
 export function useSettings() {
-  const context = useContext(SettingsContext);
-  if (context === undefined) {
-    throw new Error("useSettings must be used within a SettingsProvider");
-  }
-  return context;
+  return useContext(SettingsContext);
 }
