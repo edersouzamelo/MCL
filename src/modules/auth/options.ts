@@ -70,6 +70,11 @@ function optionalProviders() {
       GoogleProvider({
         clientId: process.env.AUTH_GOOGLE_ID,
         clientSecret: process.env.AUTH_GOOGLE_SECRET,
+        authorization: {
+          params: {
+            prompt: "consent select_account",
+          },
+        },
       }),
     );
   }
@@ -92,6 +97,9 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         token.roles = ["ADMIN", "LOGISTICS_MANAGER", "WAREHOUSE_OPERATOR", "AUDITOR"];
         token.organizationId = "org-provedor-alfa";
+        if (user.image) {
+          token.picture = user.image;
+        }
       }
       return token;
     },
@@ -100,6 +108,9 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub ?? "user-demo-admin";
         session.user.roles = (token.roles as string[] | undefined) ?? ["READ_ONLY"];
         session.user.organizationId = (token.organizationId as string | undefined) ?? "org-provedor-alfa";
+        if (token.picture) {
+          session.user.image = token.picture as string;
+        }
       }
       return session;
     },
