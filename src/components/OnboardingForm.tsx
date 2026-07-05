@@ -78,7 +78,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             type="text"
             required
             placeholder="Ex: Cel, Maj, Cap, 1º Ten, 1º Sgt"
-            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
           />
         </div>
       </div>
@@ -92,7 +92,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             id="militaryRole"
             name="militaryRole"
             required
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
           >
             <option value="">Selecione uma função...</option>
             {FUNCOES_RAE.map((funcao) => (
@@ -119,7 +119,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               setSelectedOm("");
             }}
             onFocus={() => setShowOmDropdown(true)}
-            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
           />
           <input type="hidden" name="militaryOrganization" value={selectedOm} required />
           
@@ -157,7 +157,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             name="address"
             type="text"
             required
-            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
           />
         </div>
       </div>
@@ -173,7 +173,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               name="phone"
               type="tel"
               required
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
             />
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               name="whatsapp"
               type="tel"
               required
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
             />
           </div>
         </div>
