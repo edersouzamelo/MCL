@@ -89,7 +89,12 @@ export const prisma = new Proxy({} as PrismaClient, {
         );
       }
 
-      const pool = new pg.Pool({ connectionString: dbUrl });
+      const pool = new pg.Pool({
+        connectionString: dbUrl,
+        ssl: dbUrl.includes("pooler") || dbUrl.includes("supabase")
+          ? { rejectUnauthorized: false }
+          : undefined,
+      });
       const adapter = new PrismaPg(pool);
 
       globalForPrisma.prisma = new PrismaClient({
