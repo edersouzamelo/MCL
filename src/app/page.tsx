@@ -12,7 +12,7 @@ export default function Home() {
       <div className="absolute inset-0 top-[36px] z-0 overflow-hidden">
         <div 
           className="absolute inset-[-20px] bg-cover bg-center bg-no-repeat blur-md" 
-          style={{ backgroundImage: 'url(/bg.jpg)' }} 
+          style={{ backgroundImage: 'url(/bg.png)' }} 
         />
         {/* Dark overlay to ensure contrast */}
         <div className="absolute inset-0 bg-black/40" />
