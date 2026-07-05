@@ -46,17 +46,9 @@ export function UserSettingsMenu() {
     <div className="relative" ref={menuRef}>
       {/* Trigger Button */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
-        >
-          <Settings2 className="h-5 w-5" />
-          <span className="text-sm font-semibold uppercase tracking-wider hidden sm:block">{t.settings}</span>
-        </button>
-
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="h-9 w-9 rounded-full overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 hover:border-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="h-10 w-10 rounded-full overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 hover:border-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           {session?.user?.image ? (
             <img src={session.user.image} alt="User avatar" className="h-full w-full object-cover" />

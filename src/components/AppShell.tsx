@@ -21,6 +21,7 @@ import { DemoBanner } from "@/components/DemoBanner";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { PageTransition } from "@/components/PageTransition";
+import { TechnicalFooter } from "@/components/TechnicalFooter";
 
 const metaNav = [
   { href: "/necessidades", label: "Necessidade", icon: ClipboardList },
@@ -52,11 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 transition-colors">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
             <Link href="/painel" className="flex items-center gap-3">
-              <BrandLogo className="h-12 w-12 shrink-0 dark:brightness-110 dark:contrast-125 transition-all" priority />
-              <span>
-                <span className="block text-lg font-semibold text-zinc-900 dark:text-white">MCL | Piloto Classe II</span>
-                <span className="block text-xs text-zinc-500 dark:text-zinc-400">Continuidade informacional logística</span>
-              </span>
+              <BrandLogo className="h-14 w-14 shrink-0 transition-all" priority tone="light" />
             </Link>
             
             <div className="flex flex-col lg:flex-row items-center gap-4">
@@ -101,11 +98,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 relative">
+      <main className="mx-auto w-full max-w-7xl px-4 py-6 relative flex-1">
         <PageTransition>
           {children}
         </PageTransition>
       </main>
+      <TechnicalFooter />
     </div>
   );
 }
