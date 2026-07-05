@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { PrismaClient } from "@prisma/client";
 
+import { execSync } from "child_process";
+
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
@@ -16,6 +18,22 @@ export const prisma = new Proxy({} as PrismaClient, {
           "DATABASE_URL nao configurada. O PrismaClient nao pode ser instanciado no modo de fallback em memoria."
         );
       }
+
+      // Sincroniza o esquema do banco de dados na Vercel no primeiro acesso em produção
+      if (process.env.NODE_ENV === "production" && !globalThis.hasOwnProperty("__db_pushed")) {
+        try {
+          console.log("MCL: Iniciando sincronizacao automatica do esquema com o banco...");
+          execSync("npx prisma db push --accept-data-loss", {
+            env: { ...process.env, DATABASE_URL: dbUrl },
+            stdio: "inherit",
+          });
+          (globalThis as any).__db_pushed = true;
+          console.log("MCL: Sincronizacao do banco finalizada com sucesso!");
+        } catch (err) {
+          console.error("MCL: Falha na sincronizacao automatica do banco:", err);
+        }
+      }
+
       globalForPrisma.prisma = new PrismaClient({
         accelerateUrl: dbUrl,
         log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
