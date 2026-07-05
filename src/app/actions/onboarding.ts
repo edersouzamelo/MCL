@@ -6,6 +6,7 @@ import { prisma } from "@/server/db";
 import { persistenceMode } from "@/modules/coverage/service";
 import { getDemoState } from "@/server/demo-store";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export async function completeOnboarding(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -61,6 +62,7 @@ export async function completeOnboarding(formData: FormData) {
   }
 
   revalidatePath("/");
+  redirect("/inicio");
 }
 
 export async function getUserProfile() {
