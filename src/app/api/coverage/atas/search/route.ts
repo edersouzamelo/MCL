@@ -156,9 +156,13 @@ export async function POST(request: Request) {
 
   try {
     const state = getDemoState();
-    const mapping = mode === "postgresql"
+    let mapping = mode === "postgresql"
       ? await activeCatalogMappingForNeed(state, needId)
       : activeCatalogMappingForNeedSync(state, needId);
+
+    if (!mapping && mode !== "postgresql" && body.mappingSnapshot) {
+      mapping = body.mappingSnapshot;
+    }
 
     if (!mapping) {
       return failure(400, requestId, "NO_CATMAT_MAPPING", "Confirme um CATMAT antes de consultar atas.", false, {
