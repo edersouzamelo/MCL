@@ -7,6 +7,7 @@ import { persistenceMode } from "@/modules/coverage/service";
 import { getDemoState } from "@/server/demo-store";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export async function completeOnboarding(formData: FormData) {
   const session = await getServerSession(authOptions);
@@ -25,8 +26,8 @@ export async function completeOnboarding(formData: FormData) {
     termsAcceptedAt: new Date().toISOString(),
   };
 
+  // Salva no banco se o banco estiver disponível
   const mode = persistenceMode();
-
   if (mode === "postgresql") {
     try {
       await prisma.user.upsert({
@@ -40,36 +41,34 @@ export async function completeOnboarding(formData: FormData) {
         },
       });
     } catch (error) {
-      console.error("Erro no banco de dados (completeOnboarding), usando memória temporária:", error);
-      const state = getDemoState();
-      const userIndex = state.users.findIndex(u => u.id === session.user?.id);
-      if (userIndex >= 0) {
-        state.users[userIndex] = {
-          ...state.users[userIndex],
-          ...data,
-        } as any;
-      } else {
-        state.users.push({
-          id: session.user.id,
-          name: session.user.name || "Operador",
-          email: session.user.email || "",
-          active: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          ...data,
-        } as any);
-      }
-    }
-  } else {
-    const state = getDemoState();
-    const userIndex = state.users.findIndex(u => u.id === session.user?.id);
-    if (userIndex >= 0) {
-      state.users[userIndex] = {
-        ...state.users[userIndex],
-        ...data,
-      };
+      console.error("Erro no banco de dados (completeOnboarding), usando fallback:", error);
     }
   }
+
+  // Sempre atualiza o estado em memória para a sessão atual
+  const state = getDemoState();
+  const userIndex = state.users.findIndex(u => u.id === session.user?.id);
+  if (userIndex >= 0) {
+    state.users[userIndex] = {
+      ...state.users[userIndex],
+      ...data,
+    } as any;
+  } else {
+    state.users.push({
+      id: session.user.id,
+      name: session.user.name || "Operador",
+      email: session.user.email || "",
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...data,
+    } as any);
+  }
+
+  // Persiste o onboarding completo em cookies seguros para evitar loops em ambientes serverless
+  const cookieStore = await cookies();
+  cookieStore.set("mcl_onboarding_completed", "true", { maxAge: 60 * 60 * 24 * 365, path: "/" });
+  cookieStore.set("mcl_user_profile", JSON.stringify(data), { maxAge: 60 * 60 * 24 * 365, path: "/" });
 
   revalidatePath("/");
   redirect("/inicio");
@@ -84,42 +83,57 @@ export async function getUserProfile() {
 
   const mode = persistenceMode();
 
+  // 1. Tenta carregar do banco de dados se habilitado
   if (mode === "postgresql") {
     try {
-      return await prisma.user.findUnique({
+      const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
       });
-    } catch (error) {
-      console.error("Erro no banco de dados (getUserProfile), usando memória temporária:", error);
-      const state = getDemoState();
-      let user = state.users.find(u => u.id === session.user?.id);
-      if (!user) {
-        user = {
-          id: session.user.id,
-          name: session.user.name || "Operador",
-          email: session.user.email || "",
-          active: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as any;
-        state.users.push(user as any);
+      if (dbUser && dbUser.termsAcceptedAt) {
+        return dbUser;
       }
-      return user;
+    } catch (error) {
+      console.error("Erro no banco de dados ao buscar perfil, usando fallback:", error);
     }
-  } else {
-    const state = getDemoState();
-    let user = state.users.find(u => u.id === session.user?.id);
-    if (!user) {
-      user = {
-        id: session.user.id,
-        name: session.user.name || "Operador",
-        email: session.user.email || "",
-        active: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as any;
-      state.users.push(user as any);
+  }
+
+  // 2. Fallback: Tenta ler dos cookies da sessão do navegador
+  const cookieStore = await cookies();
+  const onboardingCompleted = cookieStore.get("mcl_onboarding_completed")?.value;
+  const userProfileCookie = cookieStore.get("mcl_user_profile")?.value;
+
+  if (onboardingCompleted === "true") {
+    let parsedProfile = {};
+    if (userProfileCookie) {
+      try {
+        parsedProfile = JSON.parse(userProfileCookie);
+      } catch (e) {}
     }
+    return {
+      id: session.user.id,
+      name: session.user.name || "Operador Demonstrativo",
+      email: session.user.email || "",
+      active: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      termsAcceptedAt: new Date().toISOString(),
+      ...parsedProfile,
+    } as any;
+  }
+
+  // 3. Fallback: Tenta ler da memória do processo (para sessões rápidas/testes)
+  const state = getDemoState();
+  let user = state.users.find(u => u.id === session.user?.id);
+  if (user && user.termsAcceptedAt) {
     return user;
   }
+
+  // 4. Se não preencheu em nenhum lugar, retorna dados básicos com termsAcceptedAt null
+  // (isso forçará o redirecionamento para o onboarding)
+  return {
+    id: session.user.id,
+    name: session.user.name || "Operador Demonstrativo",
+    email: session.user.email || "",
+    termsAcceptedAt: null,
+  } as any;
 }

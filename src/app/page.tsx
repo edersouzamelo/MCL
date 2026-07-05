@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Boxes, Database, Route, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { PageTransition } from "@/components/PageTransition";
+import { DemoBanner } from "@/components/DemoBanner";
 
 export default function Home() {
   return (
