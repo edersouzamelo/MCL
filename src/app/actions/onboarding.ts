@@ -33,7 +33,7 @@ export async function completeOnboarding(formData: FormData) {
     });
   } else {
     const state = getDemoState();
-    const userIndex = state.users.findIndex(u => u.id === session.user.id);
+    const userIndex = state.users.findIndex(u => u.id === session.user?.id);
     if (userIndex >= 0) {
       state.users[userIndex] = {
         ...state.users[userIndex],
@@ -43,8 +43,6 @@ export async function completeOnboarding(formData: FormData) {
   }
 
   revalidatePath("/");
-  
-  return { success: true };
 }
 
 export async function getUserProfile() {
@@ -62,6 +60,6 @@ export async function getUserProfile() {
     });
   } else {
     const state = getDemoState();
-    return state.users.find(u => u.id === session.user.id) || null;
+    return state.users.find(u => u.id === session.user?.id) || null;
   }
 }
