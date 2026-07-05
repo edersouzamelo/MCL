@@ -57,6 +57,7 @@ export function UserSettingsMenu() {
               src={session.user.image} 
               alt="User avatar" 
               className="h-full w-full object-cover" 
+              referrerPolicy="no-referrer"
               onError={() => setImageError(true)}
             />
           ) : (

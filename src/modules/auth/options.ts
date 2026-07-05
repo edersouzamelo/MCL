@@ -50,6 +50,7 @@ function optionalProviders() {
           id: user.id,
           name: user.name,
           email: user.email,
+          image: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=059669`,
         };
       },
     }),
