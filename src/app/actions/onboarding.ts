@@ -27,10 +27,22 @@ export async function completeOnboarding(formData: FormData) {
   const mode = persistenceMode();
 
   if (mode === "postgresql") {
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: data,
-    });
+    try {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: data,
+      });
+    } catch (error) {
+      console.error("Erro no banco de dados (completeOnboarding), usando memória temporária:", error);
+      const state = getDemoState();
+      const userIndex = state.users.findIndex(u => u.id === session.user?.id);
+      if (userIndex >= 0) {
+        state.users[userIndex] = {
+          ...state.users[userIndex],
+          ...data,
+        };
+      }
+    }
   } else {
     const state = getDemoState();
     const userIndex = state.users.findIndex(u => u.id === session.user?.id);
@@ -55,9 +67,15 @@ export async function getUserProfile() {
   const mode = persistenceMode();
 
   if (mode === "postgresql") {
-    return await prisma.user.findUnique({
-      where: { id: session.user.id },
-    });
+    try {
+      return await prisma.user.findUnique({
+        where: { id: session.user.id },
+      });
+    } catch (error) {
+      console.error("Erro no banco de dados (getUserProfile), usando memória temporária:", error);
+      const state = getDemoState();
+      return state.users.find(u => u.id === session.user?.id) || null;
+    }
   } else {
     const state = getDemoState();
     return state.users.find(u => u.id === session.user?.id) || null;
