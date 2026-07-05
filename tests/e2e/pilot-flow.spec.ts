@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test("fluxo demonstrativo ponta a ponta", async ({ page }) => {
-  await page.goto("/entrar");
-  await page.getByRole("button", { name: /Entrar em modo demonstrativo/i }).click();
+  await page.goto("/");
+  await page.getByRole("link", { name: /^Entre$/i }).first().click();
+  await page.getByRole("button", { name: /^Entrar$/i }).click();
   await expect(page.getByRole("heading", { name: /Situacao geral da cadeia/i })).toBeVisible();
 
   await page.goto("/necessidades");

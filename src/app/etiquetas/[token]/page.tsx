@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { DemoBanner } from "@/components/DemoBanner";
+import { LabelPrintActions } from "@/components/LabelPrintActions";
 import { findUnitByQrToken } from "@/server/demo-store";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +15,11 @@ export default async function LabelPage({ params }: { params: Promise<{ token: s
 
   return (
     <div className="min-h-screen bg-white text-zinc-950">
-      <DemoBanner />
+      <div className="print:hidden">
+        <DemoBanner />
+      </div>
       <main className="mx-auto max-w-lg px-6 py-10 print:p-0">
+        <LabelPrintActions fallbackHref={`/unidades/${unit.qrToken}`} />
         <section className="rounded border-2 border-zinc-950 p-6 text-center print:border-black">
           <h1 className="text-xl font-semibold">MCL | Piloto Classe II</h1>
           <p className="mt-1 text-sm">Etiqueta sintetica de unidade logistica</p>

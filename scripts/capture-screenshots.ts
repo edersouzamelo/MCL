@@ -10,9 +10,12 @@ async function main() {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
+  await page.goto(`${baseURL}/`);
+  await page.screenshot({ path: path.join(outputDir, "capa.png"), fullPage: true });
+
   await page.goto(`${baseURL}/entrar`);
   await page.screenshot({ path: path.join(outputDir, "login.png"), fullPage: true });
-  await page.getByRole("button", { name: /Entrar em modo demonstrativo/i }).click();
+  await page.getByRole("button", { name: /^Entrar$/i }).click();
   await page.waitForURL("**/painel");
 
   const targets = [

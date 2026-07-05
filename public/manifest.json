@@ -8,9 +8,10 @@
   "theme_color": "#047857",
   "icons": [
     {
-      "src": "/icons/mcl-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/icons/mcl-logo.png",
+      "sizes": "961x1152",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

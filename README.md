@@ -48,7 +48,7 @@ ou:
 npm.cmd run dev -- -p 3010
 ```
 
-Acesse `http://localhost:3000`, use o código demonstrativo `MCL-DEMO-2026` e abra o scanner manual com:
+Acesse `http://localhost:3000`, clique em `Entre`, use o email `operador.demo@mcl.invalid` com a senha demonstrativa `MCL-DEMO-2026` e abra o scanner manual com:
 
 ```text
 MCL:UL:ul-coturno-caixa-001
@@ -107,6 +107,8 @@ AUTH_GOOGLE_ID=
 AUTH_GOOGLE_SECRET=
 DEMO_AUTH_ENABLED=true
 DEMO_ACCESS_CODE=MCL-DEMO-2026
+DEMO_USER_PASSWORD=MCL-DEMO-2026
+NEXTAUTH_URL=http://localhost:3000
 ```
 
 Login social não equivale a identidade institucional. Em eventual implantação institucional, o provedor demonstrativo deverá ser substituído ou integrado a um provedor autorizado.

@@ -2,47 +2,54 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
-import { appendAuditLog } from "@/server/demo-store";
+import { appendAuditLog, getDemoState } from "@/server/demo-store";
 
 function optionalProviders() {
   const providers: NextAuthOptions["providers"] = [
     CredentialsProvider({
       id: "demo",
-      name: "Modo demonstrativo",
+      name: "Email e senha demonstrativos",
       credentials: {
-        accessCode: { label: "Codigo demonstrativo", type: "password" },
+        email: { label: "Email", type: "email" },
+        password: { label: "Senha", type: "password" },
       },
       authorize(credentials) {
-        const expected = process.env.DEMO_ACCESS_CODE ?? "MCL-DEMO-2026";
+        const expectedPassword = process.env.DEMO_USER_PASSWORD ?? process.env.DEMO_ACCESS_CODE ?? "MCL-DEMO-2026";
         const enabled = process.env.DEMO_AUTH_ENABLED !== "false";
-        if (!enabled || credentials?.accessCode !== expected) {
+        const email = credentials?.email?.trim().toLowerCase() ?? "";
+        const password = credentials?.password ?? "";
+        const state = getDemoState();
+        const user = state.users.find((candidate) => candidate.active && candidate.email.toLowerCase() === email);
+        const scope = user ? state.userScopes.find((candidate) => candidate.userId === user.id && candidate.active) : undefined;
+
+        if (!enabled || !user || password !== expectedPassword) {
           appendAuditLog({
             actorId: "anonymous",
             action: "AUTH_DEMO_LOGIN",
             resourceType: "SESSION",
             resourceId: "demo",
             outcome: "NEGADO",
-            reason: "Codigo demonstrativo ausente ou invalido.",
-            metadata: { provider: "demo" },
+            reason: "Email ou senha demonstrativos ausentes ou invalidos.",
+            metadata: { provider: "demo", email: email || "nao-informado" },
           });
           return null;
         }
 
         appendAuditLog({
-          actorId: "user-demo-admin",
+          actorId: user.id,
           action: "AUTH_DEMO_LOGIN",
           resourceType: "SESSION",
           resourceId: "demo",
-          organizationId: "org-provedor-alfa",
+          organizationId: scope?.organizationId ?? "org-provedor-alfa",
           outcome: "SUCESSO",
-          reason: "Modo demonstrativo autenticado.",
+          reason: "Credenciais demonstrativas autenticadas.",
           metadata: { provider: "demo", institutionalIdentity: false },
         });
 
         return {
-          id: "user-demo-admin",
-          name: "Operador Demonstrativo",
-          email: "operador.demo@mcl.invalid",
+          id: user.id,
+          name: user.name,
+          email: user.email,
         };
       },
     }),

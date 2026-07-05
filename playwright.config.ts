@@ -8,7 +8,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm exec next dev -p 3010",
+    command: "npm run dev -- -p 3010",
     url: "http://127.0.0.1:3010/entrar",
     reuseExistingServer: true,
     timeout: 120_000,
@@ -16,7 +16,9 @@ export default defineConfig({
       AUTH_SECRET: "playwright-secret",
       DEMO_AUTH_ENABLED: "true",
       DEMO_ACCESS_CODE: "MCL-DEMO-2026",
+      DEMO_USER_PASSWORD: "MCL-DEMO-2026",
       NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3010",
+      NEXTAUTH_URL: "http://127.0.0.1:3010",
     },
   },
   projects: [
