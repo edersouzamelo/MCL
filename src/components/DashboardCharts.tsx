@@ -15,7 +15,7 @@ export function DashboardCharts({
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <div className="h-72 rounded border border-zinc-200 bg-white p-4">
+      <div className="h-72 rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
         <h2 className="mb-2 font-semibold">Estado das unidades logisticas</h2>
         <ResponsiveContainer width="100%" height="85%">
           <PieChart>
@@ -28,7 +28,7 @@ export function DashboardCharts({
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="h-72 rounded border border-zinc-200 bg-white p-4">
+      <div className="h-72 rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
         <h2 className="mb-2 font-semibold">Cobertura e entrega por necessidade</h2>
         <ResponsiveContainer width="100%" height="85%">
           <BarChart data={coverage}>

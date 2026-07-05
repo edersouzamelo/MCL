@@ -36,8 +36,8 @@ export function DemoLogin() {
         <label className="block text-sm font-medium text-zinc-800" htmlFor="email">
           Email
         </label>
-        <div className="flex min-h-11 items-center rounded border border-zinc-300 bg-white px-3 focus-within:border-emerald-600">
-          <Mail aria-hidden className="mr-2 h-4 w-4 shrink-0 text-zinc-500" />
+        <div className="flex min-h-11 items-center rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 focus-within:border-emerald-600">
+          <Mail aria-hidden className="mr-2 h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
           <input
             id="email"
             type="email"
@@ -54,8 +54,8 @@ export function DemoLogin() {
         <label className="block text-sm font-medium text-zinc-800" htmlFor="password">
           Senha
         </label>
-        <div className="flex min-h-11 items-center rounded border border-zinc-300 bg-white px-3 focus-within:border-emerald-600">
-          <KeyRound aria-hidden className="mr-2 h-4 w-4 shrink-0 text-zinc-500" />
+        <div className="flex min-h-11 items-center rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 focus-within:border-emerald-600">
+          <KeyRound aria-hidden className="mr-2 h-4 w-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
           <input
             id="password"
             type="password"
@@ -77,7 +77,7 @@ export function DemoLogin() {
         Entrar
       </button>
 
-      <div className="flex items-center gap-3 text-xs text-zinc-500">
+      <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
         <span className="h-px flex-1 bg-zinc-200" />
         <span>OAuth opcional</span>
         <span className="h-px flex-1 bg-zinc-200" />
@@ -87,7 +87,7 @@ export function DemoLogin() {
         <button
           type="button"
           onClick={() => signIn("google", { callbackUrl: "/inicio" })}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-zinc-300 px-4 py-2 font-semibold text-zinc-800 transition hover:bg-zinc-100"
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-semibold text-zinc-800 transition hover:bg-zinc-100"
         >
           <svg className="h-4 w-4" aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -100,7 +100,7 @@ export function DemoLogin() {
         <button
           type="button"
           onClick={() => signIn("github", { callbackUrl: "/inicio" })}
-          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-zinc-300 px-4 py-2 font-semibold text-zinc-800 transition hover:bg-zinc-100"
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 px-4 py-2 font-semibold text-zinc-800 transition hover:bg-zinc-100"
         >
           <GitPullRequest aria-hidden className="h-4 w-4" />
           GitHub

@@ -50,10 +50,10 @@ export default async function NeedDetailPage({ params }: { params: Promise<{ id:
             <Badge tone="warn">{need.status}</Badge>
           </div>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded bg-zinc-50 p-3"><dt>Solicitado</dt><dd className="font-semibold">{need.quantityRequested}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt>Aprovado</dt><dd className="font-semibold">{need.quantityApproved}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt>Cobertura</dt><dd className="font-semibold">{projection.coveragePercent}%</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt>Entregue</dt><dd className="font-semibold">{projection.deliveredPercent}%</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Solicitado</dt><dd className="font-semibold">{need.quantityRequested}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Aprovado</dt><dd className="font-semibold">{need.quantityApproved}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Cobertura</dt><dd className="font-semibold">{projection.coveragePercent}%</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Entregue</dt><dd className="font-semibold">{projection.deliveredPercent}%</dd></div>
           </dl>
           <div className="mt-4">
             <SourceStamp source={need} />
@@ -70,10 +70,10 @@ export default async function NeedDetailPage({ params }: { params: Promise<{ id:
           {possibleInstruments.length ? (
             <ul className="mt-2 space-y-2 text-sm">
               {possibleInstruments.map(({ link, instrument }) => (
-                <li key={link.id} className="rounded bg-zinc-50 p-3">
+                <li key={link.id} className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
                   <InlineLink href="/aquisicoes">{instrument?.reference}</InlineLink>
                   <p className="text-xs text-zinc-600">{link.justification}</p>
-                  <p className="text-xs text-zinc-500">Confianca manual: {Math.round((link.confidence ?? 0) * 100)}%</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Confianca manual: {Math.round((link.confidence ?? 0) * 100)}%</p>
                 </li>
               ))}
             </ul>

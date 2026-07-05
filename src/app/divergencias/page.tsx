@@ -20,7 +20,7 @@ export default function DivergencesPage() {
             <Card key={divergence.id}>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-sm text-zinc-500">{divergence.persistentCode}</p>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">{divergence.persistentCode}</p>
                   <h2 className="text-lg font-semibold">{divergence.title}</h2>
                   <p className="mt-1 text-sm text-zinc-600">Detectada em {formatDateTime(divergence.detectedAt)} por {divergence.sourceSystem}.</p>
                 </div>
@@ -30,8 +30,8 @@ export default function DivergencesPage() {
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <p className="rounded bg-zinc-50 p-3 text-sm"><strong>Esperado:</strong> {divergence.expected}</p>
-                <p className="rounded bg-zinc-50 p-3 text-sm"><strong>Observado:</strong> {divergence.observed}</p>
+                <p className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-sm"><strong>Esperado:</strong> {divergence.expected}</p>
+                <p className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-sm"><strong>Observado:</strong> {divergence.observed}</p>
               </div>
               {unit ? <p className="mt-3 text-sm"><InlineLink href={`/unidades/${unit.qrToken}`}>Abrir passaporte da unidade</InlineLink></p> : null}
             </Card>

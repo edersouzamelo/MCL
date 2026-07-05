@@ -47,14 +47,14 @@ export default function ConnectorsPage() {
             <ComprasGovSyncButton />
           </div>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Ultima sincronizacao</dt><dd className="font-semibold">{formatDateTime(comprasGov.lastRunAt)}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Endpoint</dt><dd className="font-semibold">{comprasGov.endpoint ?? "nao informado"}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Registros lidos</dt><dd className="font-semibold">{comprasGov.recordsRead ?? 0}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Aceitos</dt><dd className="font-semibold">{comprasGov.acceptedRecords ?? 0}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Atualizados</dt><dd className="font-semibold">{comprasGov.updatedRecords ?? 0}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Duplicados</dt><dd className="font-semibold">{comprasGov.duplicateRecords ?? 0}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Rejeitados/quarentena</dt><dd className="font-semibold">{comprasGov.rejectedRecords ?? 0}/{comprasGov.quarantinedRecords}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Duracao e mapa</dt><dd className="font-semibold">{comprasGov.durationMs ?? 0} ms - {comprasGov.mappingVersion}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Ultima sincronizacao</dt><dd className="font-semibold">{formatDateTime(comprasGov.lastRunAt)}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Endpoint</dt><dd className="font-semibold">{comprasGov.endpoint ?? "nao informado"}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Registros lidos</dt><dd className="font-semibold">{comprasGov.recordsRead ?? 0}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Aceitos</dt><dd className="font-semibold">{comprasGov.acceptedRecords ?? 0}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Atualizados</dt><dd className="font-semibold">{comprasGov.updatedRecords ?? 0}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Duplicados</dt><dd className="font-semibold">{comprasGov.duplicateRecords ?? 0}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Rejeitados/quarentena</dt><dd className="font-semibold">{comprasGov.rejectedRecords ?? 0}/{comprasGov.quarantinedRecords}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Duracao e mapa</dt><dd className="font-semibold">{comprasGov.durationMs ?? 0} ms - {comprasGov.mappingVersion}</dd></div>
           </dl>
         </Card>
       ) : null}

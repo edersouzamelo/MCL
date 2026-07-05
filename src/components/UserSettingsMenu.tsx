@@ -61,7 +61,7 @@ export function UserSettingsMenu() {
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="h-full w-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">
+            <div className="h-full w-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400">
               <User className="h-5 w-5" />
             </div>
           )}
@@ -74,14 +74,14 @@ export function UserSettingsMenu() {
           
           <div className="p-5 border-b border-zinc-800/80">
             <h3 className="font-semibold text-white truncate">{session?.user?.name || "Usuário"}</h3>
-            <p className="text-xs text-zinc-500 truncate mt-1">{session?.user?.email || ""}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-1">{session?.user?.email || ""}</p>
           </div>
 
           <div className="p-5 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
             
             {/* Idioma */}
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-3">{t.language}</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 block mb-3">{t.language}</label>
               <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-1">
                 <select 
                   value={language} 
@@ -97,7 +97,7 @@ export function UserSettingsMenu() {
 
             {/* Temas */}
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-3">{t.theme}</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 block mb-3">{t.theme}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => setTheme("light")}
@@ -116,7 +116,7 @@ export function UserSettingsMenu() {
 
             {/* Animações */}
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-3">{t.animations}</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 block mb-3">{t.animations}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => setAnimationsEnabled(false)}
@@ -135,7 +135,7 @@ export function UserSettingsMenu() {
 
             {/* Visualização */}
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-3">{t.view}</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 block mb-3">{t.view}</label>
               <div className="grid grid-cols-3 gap-2">
                 {(["pequena", "media", "grande"] as FontSize[]).map((size) => (
                   <button 

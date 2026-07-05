@@ -128,7 +128,7 @@ export default async function MaterialAnalysesPage() {
                   <Badge tone={item.priority === "ALTA" ? "warn" : "neutral"}>
                     {item.priority}
                   </Badge>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
                     Prazo: {new Date(item.requiredAt).toLocaleDateString("pt-BR")}
                   </span>
                 </div>
@@ -139,7 +139,7 @@ export default async function MaterialAnalysesPage() {
                   Demandante: <strong className="text-zinc-800">{item.orgName}</strong>
                 </p>
 
-                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 bg-zinc-50 rounded-lg p-3 text-xs text-zinc-600 border border-zinc-100">
+                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 text-xs text-zinc-600 border border-zinc-100">
                   <div>
                     Solicitado: <strong className="block text-sm text-zinc-900 mt-0.5">{item.quantityRequested}</strong>
                   </div>
@@ -156,7 +156,7 @@ export default async function MaterialAnalysesPage() {
               </div>
 
               <div className="flex flex-col items-stretch gap-2 md:items-end w-full md:w-auto">
-                <span className="text-xs font-medium text-zinc-500 bg-zinc-100 px-2.5 py-1 rounded text-center">
+                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 px-2.5 py-1 rounded text-center">
                   Status: {item.analysisStatus}
                 </span>
                 <Link

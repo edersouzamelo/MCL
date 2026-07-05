@@ -43,7 +43,7 @@ export default async function UnitPassportPage({ params }: { params: Promise<{ t
                 alt={`QR Code da unidade ${unit.persistentCode}`}
                 width={160}
                 height={160}
-                className="rounded border border-zinc-200"
+                className="rounded border border-zinc-200 dark:border-zinc-800"
                 unoptimized
               />
               <div>
@@ -55,12 +55,12 @@ export default async function UnitPassportPage({ params }: { params: Promise<{ t
               </div>
             </div>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <div className="rounded bg-zinc-50 p-3"><dt>Lote</dt><dd className="font-semibold">{passport.lot?.persistentCode}</dd></div>
-              <div className="rounded bg-zinc-50 p-3"><dt>Quantidade</dt><dd className="font-semibold">{unit.quantity} {unit.unit}</dd></div>
-              <div className="rounded bg-zinc-50 p-3"><dt>Condicao</dt><dd className="font-semibold">{passport.projection.condition}</dd></div>
-              <div className="rounded bg-zinc-50 p-3"><dt>Localizacao</dt><dd className="font-semibold">{passport.location?.name}</dd></div>
-              <div className="rounded bg-zinc-50 p-3"><dt>Organizacao</dt><dd className="font-semibold">{passport.organization?.name}</dd></div>
-              <div className="rounded bg-zinc-50 p-3"><dt>Confianca</dt><dd className="font-semibold">{Math.round(passport.projection.confidence * 100)}%</dd></div>
+              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Lote</dt><dd className="font-semibold">{passport.lot?.persistentCode}</dd></div>
+              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Quantidade</dt><dd className="font-semibold">{unit.quantity} {unit.unit}</dd></div>
+              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Condicao</dt><dd className="font-semibold">{passport.projection.condition}</dd></div>
+              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Localizacao</dt><dd className="font-semibold">{passport.location?.name}</dd></div>
+              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Organizacao</dt><dd className="font-semibold">{passport.organization?.name}</dd></div>
+              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Confianca</dt><dd className="font-semibold">{Math.round(passport.projection.confidence * 100)}%</dd></div>
             </dl>
             <div className="mt-4">
               <SourceStamp source={unit} />

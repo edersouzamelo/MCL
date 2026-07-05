@@ -11,7 +11,7 @@ export function LabelPrintActions({ fallbackHref }: { fallbackHref: string }) {
       <button
         type="button"
         onClick={() => router.push(fallbackHref)}
-        className="inline-flex items-center justify-center gap-2 rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50"
+        className="inline-flex items-center justify-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-800 shadow-sm hover:bg-zinc-50 dark:bg-zinc-800/50"
       >
         <ArrowLeft aria-hidden className="h-4 w-4" />
         Voltar

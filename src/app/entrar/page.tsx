@@ -29,7 +29,7 @@ export default function LoginPage() {
               Voltar para a capa
             </Link>
 
-            <Card className="p-6 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md shadow-2xl border-white/20">
+            <Card className="p-6 bg-white dark:bg-zinc-900/95 dark:bg-zinc-900/95 backdrop-blur-md shadow-2xl border-white/20">
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
                   <div className="mb-4 flex items-center gap-3">

@@ -124,7 +124,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
           <input type="hidden" name="militaryOrganization" value={selectedOm} required />
           
           {showOmDropdown && omSearch && (
-            <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+            <div className="absolute z-10 mt-1 w-full bg-white dark:bg-zinc-900 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
               {filteredOms.length === 0 ? (
                 <div className="px-4 py-2 text-gray-500">Nenhuma OM encontrada</div>
               ) : (

@@ -22,7 +22,7 @@ export default function ImportPage() {
           <h2 className="mb-3 text-lg font-semibold">Quarentena</h2>
           <ul className="space-y-3 text-sm">
             {state.quarantine.map((record) => (
-              <li key={record.id} className="rounded bg-zinc-50 p-3">
+              <li key={record.id} className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
                 <p className="font-semibold">{record.sourceRecordId}</p>
                 <p className="text-zinc-600">{record.reason}</p>
               </li>

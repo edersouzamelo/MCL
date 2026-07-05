@@ -65,7 +65,7 @@ export default function AcquisitionsPage() {
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] text-left text-sm">
-            <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
+            <thead className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
               <tr>
                 <th className="py-2">Referencia</th>
                 <th>Origem</th>
@@ -94,7 +94,7 @@ export default function AcquisitionsPage() {
                   <tr key={instrument.id} className="border-b border-zinc-100 align-top">
                     <td className="py-3">
                       <p className="font-semibold">{instrument.reference}</p>
-                      <p className="text-xs text-zinc-500">{instrument.externalReference ?? instrument.sourceRecordId}</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{instrument.externalReference ?? instrument.sourceRecordId}</p>
                     </td>
                     <td><Badge tone={originTone(origin, instrument.sourceSystem === "SIM-AQUISICAO")}>{origin}</Badge></td>
                     <td>{formatOptionalDate(instrument.validFrom)}<br />{formatOptionalDate(instrument.validUntil)}</td>
@@ -114,7 +114,7 @@ export default function AcquisitionsPage() {
                           {links.map((link) => (
                             <li key={link.id}>
                               <InlineLink href={`/necessidades/${link.fromId}`}>{link.fromId}</InlineLink>
-                              <p className="text-xs text-zinc-500">{link.justification ?? "sem justificativa"}</p>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400">{link.justification ?? "sem justificativa"}</p>
                             </li>
                           ))}
                         </ul>

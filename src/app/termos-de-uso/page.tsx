@@ -6,7 +6,7 @@ import { Hammer } from "lucide-react";
 export default function TermosDeUsoPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full text-center">
+      <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-xl max-w-lg w-full text-center">
         <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
           <Hammer className="w-10 h-10" />
         </div>

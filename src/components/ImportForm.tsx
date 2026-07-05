@@ -23,14 +23,14 @@ export function ImportForm() {
     <div className="space-y-3">
       <label className="block text-sm font-medium text-zinc-800">
         Formato
-        <select value={format} onChange={(event) => setFormat(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 px-3 py-2">
+        <select value={format} onChange={(event) => setFormat(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2">
           <option value="csv">CSV</option>
           <option value="json">JSON</option>
         </select>
       </label>
       <label className="block text-sm font-medium text-zinc-800">
         Conteudo
-        <textarea value={content} onChange={(event) => setContent(event.target.value)} className="mt-1 min-h-48 w-full rounded border border-zinc-300 px-3 py-2 font-mono text-sm" />
+        <textarea value={content} onChange={(event) => setContent(event.target.value)} className="mt-1 min-h-48 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 font-mono text-sm" />
       </label>
       <button type="button" onClick={submit} className="inline-flex items-center gap-2 rounded bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800">
         <Upload aria-hidden className="h-4 w-4" />

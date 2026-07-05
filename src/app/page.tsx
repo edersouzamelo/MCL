@@ -52,25 +52,25 @@ export default function Home() {
 
             <div className="grid gap-4 border-t border-white/10 pt-8 text-sm text-zinc-300">
               <div className="flex items-center gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-emerald-300">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-zinc-900/10 text-emerald-300">
                   <Boxes aria-hidden className="h-5 w-5" />
                 </span>
                 <span>Rastreabilidade por unidade logística</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sky-300">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-zinc-900/10 text-sky-300">
                   <Route aria-hidden className="h-5 w-5" />
                 </span>
                 <span>Fluxo material e informacional correlacionado</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-amber-300">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-zinc-900/10 text-amber-300">
                   <Database aria-hidden className="h-5 w-5" />
                 </span>
                 <span>Dados sintéticos para demonstração controlada</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-rose-300">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-zinc-900/10 text-rose-300">
                   <ShieldCheck aria-hidden className="h-5 w-5" />
                 </span>
                 <span>Auditoria e preservação da origem do dado</span>

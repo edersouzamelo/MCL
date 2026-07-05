@@ -375,16 +375,16 @@ export function CoverageJourneyClient({
       <Card>
         <div className="grid gap-2 sm:grid-cols-5 lg:grid-cols-10">
           {steps.map(([numberLabel, label, done]) => (
-            <div key={numberLabel} className="rounded bg-zinc-50 p-2 text-xs">
-              <span className="font-semibold text-zinc-500">{numberLabel}</span>
+            <div key={numberLabel} className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2 text-xs">
+              <span className="font-semibold text-zinc-500 dark:text-zinc-400">{numberLabel}</span>
               <p className="mt-1 font-semibold text-zinc-900">{label}</p>
-              <p className={done ? "text-emerald-700 font-semibold" : "text-zinc-500"}>{done ? "pronto" : "pendente"}</p>
+              <p className={done ? "text-emerald-700 font-semibold" : "text-zinc-500 dark:text-zinc-400"}>{done ? "pronto" : "pendente"}</p>
             </div>
           ))}
         </div>
       </Card>
 
-      {message ? <p className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p> : null}
+      {message ? <p className="rounded border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/30 p-3 text-sm text-emerald-900">{message}</p> : null}
       {error ? (
         <p className="flex items-center gap-2 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
           <AlertCircle aria-hidden className="h-4 w-4" />
@@ -403,12 +403,12 @@ export function CoverageJourneyClient({
             <Badge tone={need.priority === "ALTA" ? "warn" : "neutral"}>{need.status}</Badge>
           </div>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Organizacao</dt><dd className="font-semibold">{organizationName}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Classe interna</dt><dd className="font-semibold">{item.supplyClass}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Solicitado</dt><dd className="font-semibold">{need.quantityRequested} {variant.unit}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Estoque coberto</dt><dd className="font-semibold">{projection.stockCovered} {variant.unit}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Deficit</dt><dd className="font-semibold">{projection.deficit} {variant.unit}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Entrega fisica</dt><dd className="font-semibold">{projection.deliveredPercent}%</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Organizacao</dt><dd className="font-semibold">{organizationName}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Classe interna</dt><dd className="font-semibold">{item.supplyClass}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Solicitado</dt><dd className="font-semibold">{need.quantityRequested} {variant.unit}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Estoque coberto</dt><dd className="font-semibold">{projection.stockCovered} {variant.unit}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit</dt><dd className="font-semibold">{projection.deficit} {variant.unit}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Entrega fisica</dt><dd className="font-semibold">{projection.deliveredPercent}%</dd></div>
           </dl>
         </Card>
 
@@ -423,7 +423,7 @@ export function CoverageJourneyClient({
               <input
                 value={terms}
                 onChange={(event) => setTerms(event.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-800"
+                className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-800"
               />
             </label>
             <button
@@ -437,7 +437,7 @@ export function CoverageJourneyClient({
           </div>
 
           {mapping ? (
-            <div className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm">
+            <div className="mt-4 rounded border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/30 p-3 text-sm">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="font-semibold text-emerald-950">CATMAT confirmado: {mapping.externalItemCode}</p>
@@ -472,7 +472,7 @@ export function CoverageJourneyClient({
                 type="button"
                 onClick={() => setSelectedCandidateId(candidate.id)}
                 className={`rounded border p-3 text-left text-sm ${
-                  selectedCandidateId === candidate.id ? "border-emerald-600 bg-emerald-50" : "border-zinc-200 bg-white"
+                  selectedCandidateId === candidate.id ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30" : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
@@ -491,7 +491,7 @@ export function CoverageJourneyClient({
                   <div><dt>PDM</dt><dd className="font-semibold">{candidate.pdmCode ?? "-"}</dd></div>
                 </dl>
                 <p className="mt-3 text-xs text-zinc-600">Similaridade {Math.round(candidate.similarityScore * 100)}% - {candidate.similarityExplanation}</p>
-                <p className="mt-1 text-xs text-zinc-500">Origem {candidate.sourceSystem} - {candidate.sourceUpdatedAt ? formatDateTime(candidate.sourceUpdatedAt) : "sem atualizacao"}</p>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Origem {candidate.sourceSystem} - {candidate.sourceUpdatedAt ? formatDateTime(candidate.sourceUpdatedAt) : "sem atualizacao"}</p>
               </button>
             ))}
           </div>
@@ -505,7 +505,7 @@ export function CoverageJourneyClient({
               <input
                 value={justification}
                 onChange={(event) => setJustification(event.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-850"
+                className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-850"
               />
             </label>
             <button
@@ -530,11 +530,11 @@ export function CoverageJourneyClient({
             <div className="mt-3 flex flex-wrap gap-3 text-sm">
               <label>
                 <span className="font-semibold text-zinc-700">Inicio</span>
-                <input type="date" value={dateStart} onChange={(event) => setDateStart(event.target.value)} className="mt-1 block rounded border border-zinc-300 px-3 py-2" />
+                <input type="date" value={dateStart} onChange={(event) => setDateStart(event.target.value)} className="mt-1 block rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2" />
               </label>
               <label>
                 <span className="font-semibold text-zinc-700">Fim</span>
-                <input type="date" value={dateEnd} onChange={(event) => setDateEnd(event.target.value)} className="mt-1 block rounded border border-zinc-300 px-3 py-2" />
+                <input type="date" value={dateEnd} onChange={(event) => setDateEnd(event.target.value)} className="mt-1 block rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2" />
               </label>
             </div>
           </div>
@@ -574,7 +574,7 @@ export function CoverageJourneyClient({
                   key={entry.instrument.id}
                   type="button"
                   onClick={() => setSelectedEntry(entry)}
-                  className={`rounded border p-3 text-left text-sm ${selected ? "border-emerald-600 bg-emerald-50" : "border-zinc-200 bg-white"}`}
+                  className={`rounded border p-3 text-left text-sm ${selected ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30" : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -584,14 +584,14 @@ export function CoverageJourneyClient({
                     <Badge tone="info">{entry.instrument.status}</Badge>
                   </div>
                   <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-                    <div><dt className="text-zinc-500">Fornecedor</dt><dd className="font-semibold text-zinc-800">{entry.instrument.supplierName ?? "nao informado"}</dd></div>
-                    <div><dt className="text-zinc-500">Vigencia</dt><dd className="font-semibold text-zinc-800">{formatDateTime(entry.instrument.validFrom)} ate {formatDateTime(entry.instrument.validUntil)}</dd></div>
-                    <div><dt className="text-zinc-500">Qtd. homologada</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.quantity)}</dd></div>
-                    <div><dt className="text-zinc-500">Max. adesao (limite)</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.capacity)}</dd></div>
-                    <div><dt className="text-zinc-500">Valor unitario</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.unitValue)}</dd></div>
-                    <div><dt className="text-zinc-500">Valor total</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.totalValue)}</dd></div>
+                    <div><dt className="text-zinc-500 dark:text-zinc-400">Fornecedor</dt><dd className="font-semibold text-zinc-800">{entry.instrument.supplierName ?? "nao informado"}</dd></div>
+                    <div><dt className="text-zinc-500 dark:text-zinc-400">Vigencia</dt><dd className="font-semibold text-zinc-800">{formatDateTime(entry.instrument.validFrom)} ate {formatDateTime(entry.instrument.validUntil)}</dd></div>
+                    <div><dt className="text-zinc-500 dark:text-zinc-400">Qtd. homologada</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.quantity)}</dd></div>
+                    <div><dt className="text-zinc-500 dark:text-zinc-400">Max. adesao (limite)</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.capacity)}</dd></div>
+                    <div><dt className="text-zinc-500 dark:text-zinc-400">Valor unitario</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.unitValue)}</dd></div>
+                    <div><dt className="text-zinc-500 dark:text-zinc-400">Valor total</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.totalValue)}</dd></div>
                   </dl>
-                  <p className="mt-2 text-xs text-zinc-500">PNCP/referencia: {entry.instrument.externalReference ?? "nao informada"}</p>
+                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">PNCP/referencia: {entry.instrument.externalReference ?? "nao informada"}</p>
                 </button>
               );
             })}
@@ -618,9 +618,9 @@ export function CoverageJourneyClient({
             </button>
           </div>
           {unitRecords.length ? (
-            <div className="mt-4 max-h-[420px] overflow-auto border border-zinc-200 rounded-lg">
+            <div className="mt-4 max-h-[420px] overflow-auto border border-zinc-200 dark:border-zinc-800 rounded-lg">
               <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="bg-zinc-50 border-b border-zinc-200 text-xs uppercase text-zinc-500">
+                <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
                   <tr>
                     <th className="py-3 px-3">Unidade</th>
                     <th>Tipo</th>
@@ -632,7 +632,7 @@ export function CoverageJourneyClient({
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {unitRecords.map((record) => (
-                    <tr key={record.id} className="hover:bg-zinc-50/50">
+                    <tr key={record.id} className="hover:bg-zinc-50 dark:bg-zinc-800/50/50">
                       <td className="py-3 px-3 font-medium text-zinc-950">{record.codigoUnidade} - {record.nomeUnidade}</td>
                       <td className="text-zinc-600">{record.tipoUnidade ?? "-"}</td>
                       <td className="font-semibold text-zinc-900">{number(record.quantidadeRegistrada)}</td>
@@ -657,16 +657,16 @@ export function CoverageJourneyClient({
           {synthesis ? (
             <div className="mt-4 space-y-3">
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Deficit</dt><dd className="font-semibold">{number(synthesis.deficit)}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Qtd. potencial</dt><dd className="font-semibold">{number(synthesis.potentialQuantity)}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Atas vigentes</dt><dd className="font-semibold">{synthesis.currentAtaCount}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Confianca</dt><dd className="font-semibold text-indigo-700">{Math.round(synthesis.confidence * 100)}%</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Menor valor</dt><dd className="font-semibold">{money(synthesis.minUnitValue)}</dd></div>
-                <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Maior valor</dt><dd className="font-semibold">{money(synthesis.maxUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit</dt><dd className="font-semibold">{number(synthesis.deficit)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial</dt><dd className="font-semibold">{number(synthesis.potentialQuantity)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Atas vigentes</dt><dd className="font-semibold">{synthesis.currentAtaCount}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Confianca</dt><dd className="font-semibold text-indigo-700">{Math.round(synthesis.confidence * 100)}%</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor</dt><dd className="font-semibold">{money(synthesis.minUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor</dt><dd className="font-semibold">{money(synthesis.maxUnitValue)}</dd></div>
               </dl>
               <div className="space-y-2 text-sm text-zinc-700">
                 {synthesis.phrases.map((phrase) => (
-                  <p key={phrase} className="rounded bg-zinc-50 p-3">{phrase}</p>
+                  <p key={phrase} className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">{phrase}</p>
                 ))}
               </div>
               <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
@@ -691,16 +691,16 @@ export function CoverageJourneyClient({
         </Card>
       </div>
 
-      <Card className="border-t border-zinc-200 mt-6 bg-zinc-50/50">
+      <Card className="border-t border-zinc-200 dark:border-zinc-800 mt-6 bg-zinc-50 dark:bg-zinc-800/50/50">
         <details className="group">
           <summary className="flex items-center justify-between cursor-pointer font-semibold text-zinc-700 py-1 select-none">
             <span>Rastro de Execução (Como o MCL pesquisou)</span>
-            <span className="text-xs text-zinc-500 group-open:hidden border border-zinc-300 rounded px-2 py-0.5">expandir</span>
-            <span className="text-xs text-zinc-500 hidden group-open:inline border border-zinc-300 rounded px-2 py-0.5">recolher</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 group-open:hidden border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5">expandir</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 hidden group-open:inline border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5">recolher</span>
           </summary>
-          <div className="mt-4 text-xs text-zinc-600 space-y-3 font-mono border-t border-zinc-200/60 pt-4">
+          <div className="mt-4 text-xs text-zinc-600 space-y-3 font-mono border-t border-zinc-200 dark:border-zinc-800/60 pt-4">
             {queryTrace ? (
-              <div className="grid gap-4 sm:grid-cols-2 bg-zinc-50 p-4 rounded border border-zinc-200">
+              <div className="grid gap-4 sm:grid-cols-2 bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded border border-zinc-200 dark:border-zinc-800">
                 <div className="space-y-1.5">
                   <p><span className="font-semibold text-zinc-800">Endpoint:</span> {queryTrace.endpoint}</p>
                   <p><span className="font-semibold text-zinc-800">Tipo/Ação:</span> {queryTrace.kind}</p>
@@ -735,7 +735,7 @@ export function CoverageJourneyClient({
                 </div>
               </div>
             ) : (
-              <p className="text-zinc-500 italic">Pesquise o CATMAT, consulte atas vigentes ou saldos de unidades para auditar o rastro técnico da API oficial.</p>
+              <p className="text-zinc-500 dark:text-zinc-400 italic">Pesquise o CATMAT, consulte atas vigentes ou saldos de unidades para auditar o rastro técnico da API oficial.</p>
             )}
           </div>
         </details>

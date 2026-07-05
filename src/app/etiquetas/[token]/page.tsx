@@ -14,7 +14,7 @@ export default async function LabelPage({ params }: { params: Promise<{ token: s
   }
 
   return (
-    <div className="min-h-screen bg-white text-zinc-950">
+    <div className="min-h-screen bg-white dark:bg-zinc-900 text-zinc-950">
       <div className="print:hidden">
         <DemoBanner />
       </div>

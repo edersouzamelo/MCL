@@ -16,7 +16,7 @@ export default function AuditPage() {
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
+            <thead className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
               <tr>
                 <th className="py-2">Quando</th>
                 <th>Ator</th>

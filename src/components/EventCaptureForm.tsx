@@ -63,7 +63,7 @@ export function EventCaptureForm({
       <div className="grid gap-3 md:grid-cols-2">
         <label className="text-sm font-medium text-zinc-800">
           Evento
-          <select value={eventType} onChange={(event) => setEventType(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 px-3 py-2">
+          <select value={eventType} onChange={(event) => setEventType(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2">
             {allowedCaptureEvents.map((type) => (
               <option key={type} value={type}>
                 {type.replaceAll("_", " ")}
@@ -78,12 +78,12 @@ export function EventCaptureForm({
             min="1"
             value={quantity}
             onChange={(event) => setQuantity(Number(event.target.value))}
-            className="mt-1 w-full rounded border border-zinc-300 px-3 py-2"
+            className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2"
           />
         </label>
         <label className="text-sm font-medium text-zinc-800">
           Localizacao
-          <select value={locationId} onChange={(event) => setLocationId(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 px-3 py-2">
+          <select value={locationId} onChange={(event) => setLocationId(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2">
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.name}
@@ -93,12 +93,12 @@ export function EventCaptureForm({
         </label>
         <label className="text-sm font-medium text-zinc-800">
           Condicao
-          <input value={condition} onChange={(event) => setCondition(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 px-3 py-2" />
+          <input value={condition} onChange={(event) => setCondition(event.target.value)} className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2" />
         </label>
       </div>
       <label className="block text-sm font-medium text-zinc-800">
         Observacao
-        <textarea value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 min-h-24 w-full rounded border border-zinc-300 px-3 py-2" />
+        <textarea value={note} onChange={(event) => setNote(event.target.value)} className="mt-1 min-h-24 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2" />
       </label>
       {isCritical ? (
         <label className="flex items-start gap-2 text-sm text-zinc-700">

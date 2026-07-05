@@ -28,7 +28,7 @@ export default async function PrimeiroAcessoPage() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200">
+        <div className="bg-white dark:bg-zinc-900 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200">
           <OnboardingForm initialName={profile.name || ""} />
         </div>
       </div>

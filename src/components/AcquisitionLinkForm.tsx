@@ -61,7 +61,7 @@ export function AcquisitionLinkForm({
     <form onSubmit={submit} className="grid gap-3 md:grid-cols-[1fr_1fr]">
       <label className="grid gap-1 text-sm">
         <span className="font-medium text-zinc-700">Necessidade</span>
-        <select value={needId} onChange={(event) => setNeedId(event.target.value)} className="rounded border border-zinc-300 bg-white px-3 py-2">
+        <select value={needId} onChange={(event) => setNeedId(event.target.value)} className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2">
           {needs.map((need) => (
             <option key={need.id} value={need.id}>{need.label}</option>
           ))}
@@ -72,7 +72,7 @@ export function AcquisitionLinkForm({
         <select
           value={acquisitionInstrumentId}
           onChange={(event) => setAcquisitionInstrumentId(event.target.value)}
-          className="rounded border border-zinc-300 bg-white px-3 py-2"
+          className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2"
         >
           {instruments.map((instrument) => (
             <option key={instrument.id} value={instrument.id}>{instrument.label}</option>
@@ -84,7 +84,7 @@ export function AcquisitionLinkForm({
         <textarea
           value={justification}
           onChange={(event) => setJustification(event.target.value)}
-          className="min-h-24 rounded border border-zinc-300 bg-white px-3 py-2"
+          className="min-h-24 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2"
           placeholder="Ex.: item publico parece aderente ao CATMAT e precisa de avaliacao humana antes de uso operacional."
         />
       </label>

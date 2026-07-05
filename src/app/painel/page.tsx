@@ -336,14 +336,14 @@ export default async function DashboardPage() {
       </div>
 
       {/* Roteiro da Demonstração e Seleção do Cenário do Piloto */}
-      <section className="mt-6 bg-zinc-50 border border-zinc-200 rounded-lg p-5">
+      <section className="mt-6 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-5">
         <h2 className="text-base font-bold text-zinc-900">Cenário Atual do Piloto</h2>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
           <div>
             <p className="text-sm text-zinc-600">
               Material Demonstrativo Classe II: <strong className="text-zinc-800">Coturno operacional nº 42</strong>
             </p>
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
               Necessidade ativa de demonstração: {mainNeed?.persistentCode}
             </p>
           </div>
@@ -370,43 +370,43 @@ export default async function DashboardPage() {
           </div>
 
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Aguardando análise</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Aguardando análise</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{needsAwaitingAnalysis}</dd>
             </div>
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Sem CATMAT</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Sem CATMAT</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{materialsWithoutCatmat}</dd>
             </div>
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Com CATMAT</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Com CATMAT</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{materialsWithCatmat}</dd>
             </div>
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Com atas vigentes</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Com atas vigentes</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{materialsWithAtas}</dd>
             </div>
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Sem resultado</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Sem resultado</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{materialsWithoutResult}</dd>
             </div>
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Com saldo informado</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Com saldo informado</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{materialsWithBalance}</dd>
             </div>
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Desatualizadas</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Desatualizadas</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{staleAnalyses}</dd>
             </div>
-            <div className="rounded bg-zinc-50 p-3">
-              <dt className="text-zinc-500 text-xs">Falhas de consulta</dt>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Falhas de consulta</dt>
               <dd className="text-2xl font-bold text-zinc-950 mt-1">{queryFailures}</dd>
             </div>
           </dl>
 
           <div className="mt-6 overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-zinc-50 border-b border-zinc-200 text-xs uppercase text-zinc-500">
+              <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
                 <tr>
                   <th className="py-2.5 px-3">Material</th>
                   <th>Necessidade</th>
@@ -421,7 +421,7 @@ export default async function DashboardPage() {
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {tableRows.map((row) => (
-                  <tr key={row.needId} className="hover:bg-zinc-50/50">
+                  <tr key={row.needId} className="hover:bg-zinc-50 dark:bg-zinc-800/50/50">
                     <td className="py-3 px-3 font-semibold text-zinc-900">{row.material}</td>
                     <td className="font-mono text-xs text-zinc-600">{row.persistentCode}</td>
                     <td className="font-semibold text-zinc-700">{row.deficit}</td>
@@ -433,7 +433,7 @@ export default async function DashboardPage() {
                     <td className="font-semibold text-zinc-800">{row.atasVigentesCount}</td>
                     <td className="text-zinc-700">{row.saldoInformado}</td>
                     <td className="font-semibold text-indigo-700">{Math.round(row.confianca * 100)}%</td>
-                    <td className="text-xs text-zinc-500">{row.atualizadoEm !== "Nunca" ? formatDateTime(row.atualizadoEm) : "Nunca"}</td>
+                    <td className="text-xs text-zinc-500 dark:text-zinc-400">{row.atualizadoEm !== "Nunca" ? formatDateTime(row.atualizadoEm) : "Nunca"}</td>
                     <td className="py-3 px-3 text-right">
                       <InlineLink href={`/necessidades/${row.needId}/buscar-cobertura`}>
                         ABRIR ANÁLISE
@@ -461,11 +461,11 @@ export default async function DashboardPage() {
             <Badge tone="info">{metrics.contractualCoverage.sourceSystem}</Badge>
           </div>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Com possivel instrumento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.needsWithPossibleInstrument}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Sem instrumento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.needsWithoutInstrument}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Instrumentos vigentes</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.currentPublicInstruments}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Proximos do vencimento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.expiringPublicInstruments}</dd></div>
-            <div className="rounded bg-zinc-50 p-3"><dt className="text-zinc-500">Ultima sincronizacao</dt><dd className="font-semibold">{metrics.contractualCoverage.lastComprasGovSyncAt ? formatDateTime(metrics.contractualCoverage.lastComprasGovSyncAt) : "sem execucao"}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Com possivel instrumento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.needsWithPossibleInstrument}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Sem instrumento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.needsWithoutInstrument}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Instrumentos vigentes</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.currentPublicInstruments}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Proximos do vencimento</dt><dd className="text-2xl font-semibold">{metrics.contractualCoverage.expiringPublicInstruments}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Ultima sincronizacao</dt><dd className="font-semibold">{metrics.contractualCoverage.lastComprasGovSyncAt ? formatDateTime(metrics.contractualCoverage.lastComprasGovSyncAt) : "sem execucao"}</dd></div>
           </dl>
         </Card>
       </section>
@@ -475,7 +475,7 @@ export default async function DashboardPage() {
           <h2 className="mb-3 text-lg font-semibold">Necessidades acompanhadas</h2>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
+              <thead className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
                 <tr>
                   <th className="py-2">Codigo</th>
                   <th>Organizacao</th>
