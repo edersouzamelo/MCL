@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-colors">
         <div className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 transition-colors">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-            <Link href="/painel" className="flex items-center gap-3">
+            <Link href="/inicio" className="flex items-center gap-3">
               <BrandLogo className="h-14 w-14 shrink-0 transition-all" priority />
             </Link>
             
