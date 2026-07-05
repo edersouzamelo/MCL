@@ -12,7 +12,7 @@ export const metadata: Metadata = {
       {
         url: "/favicon.png",
         type: "image/png",
-        sizes: "961x1152",
+        sizes: "any",
       },
     ],
     shortcut: "/favicon.png",
