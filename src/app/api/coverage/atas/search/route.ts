@@ -21,6 +21,7 @@ type ArpRequestBody = {
   dataVigenciaInicialMin?: string;
   dataVigenciaInicialMax?: string;
   requestId?: string;
+  mappingSnapshot?: any;
 };
 
 function safeText(value: unknown) {
