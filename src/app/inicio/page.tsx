@@ -5,12 +5,30 @@ import { PageTransition } from "@/components/PageTransition";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 
 const metaNav = [
-  { href: "/necessidades", label: "Necessidade", icon: ClipboardList, color: "text-blue-400", bg: "bg-blue-400/10" },
-  { href: "/painel", label: "Crédito", icon: CreditCard, color: "text-emerald-400", bg: "bg-emerald-400/10" },
-  { href: "/aquisicoes", label: "Aquisição", icon: ShoppingCart, color: "text-amber-400", bg: "bg-amber-400/10" },
-  { href: "/scanner", label: "Recebimento", icon: PackageCheck, color: "text-violet-400", bg: "bg-violet-400/10" },
-  { href: "/painel", label: "Armazenagem", icon: Warehouse, color: "text-rose-400", bg: "bg-rose-400/10" },
-  { href: "/painel", label: "Entrega", icon: Truck, color: "text-sky-400", bg: "bg-sky-400/10" },
+  { 
+    href: "/necessidades", label: "Necessidade", icon: ClipboardList, color: "text-blue-400", bg: "bg-blue-400/10", border: "group-hover:border-blue-500/50", shadow: "group-hover:shadow-blue-500/20",
+    submenus: [ { label: "Registrar Demanda", href: "/necessidades" }, { label: "CATMAT e Atas", href: "/analises/materiais" } ]
+  },
+  { 
+    href: "/painel", label: "Crédito", icon: CreditCard, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "group-hover:border-emerald-500/50", shadow: "group-hover:shadow-emerald-500/20",
+    submenus: [ { label: "Painel Geral", href: "/painel" }, { label: "Execução Orçamentária", href: "/painel" } ]
+  },
+  { 
+    href: "/aquisicoes", label: "Aquisição", icon: ShoppingCart, color: "text-amber-400", bg: "bg-amber-400/10", border: "group-hover:border-amber-500/50", shadow: "group-hover:shadow-amber-500/20",
+    submenus: [ { label: "Instrumentos", href: "/aquisicoes" }, { label: "Conectores", href: "/conectores" } ]
+  },
+  { 
+    href: "/scanner", label: "Recebimento", icon: PackageCheck, color: "text-violet-400", bg: "bg-violet-400/10", border: "group-hover:border-violet-500/50", shadow: "group-hover:shadow-violet-500/20",
+    submenus: [ { label: "Scanner de Notas", href: "/scanner" }, { label: "Divergências", href: "/divergencias" }, { label: "Importação XML", href: "/importacao" } ]
+  },
+  { 
+    href: "/painel", label: "Armazenagem", icon: Warehouse, color: "text-rose-400", bg: "bg-rose-400/10", border: "group-hover:border-rose-500/50", shadow: "group-hover:shadow-rose-500/20",
+    submenus: [ { label: "Controle de Estoque", href: "/painel" }, { label: "Auditoria", href: "/auditoria" } ]
+  },
+  { 
+    href: "/painel", label: "Entrega", icon: Truck, color: "text-sky-400", bg: "bg-sky-400/10", border: "group-hover:border-sky-500/50", shadow: "group-hover:shadow-sky-500/20",
+    submenus: [ { label: "Roteirização", href: "/painel" }, { label: "Expedição", href: "/painel" } ]
+  },
 ];
 
 export default function InicioPage() {
@@ -49,20 +67,37 @@ export default function InicioPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 w-full max-w-4xl">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 w-full items-start">
             {metaNav.map((item, i) => (
-              <Link 
-                key={i} 
-                href={item.href}
-                className="group relative flex flex-col items-center p-6 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
-              >
-                <div className={`h-16 w-16 rounded-full flex items-center justify-center mb-4 ${item.bg} ${item.color} group-hover:scale-110 transition-transform duration-300`}>
-                  <item.icon className="h-8 w-8" strokeWidth={1.5} />
+              <div key={i} className="group relative w-full">
+                <div className={`relative flex flex-col items-center p-5 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 hover:bg-zinc-800/90 transition-all duration-300 shadow-xl hover:shadow-2xl hover:-translate-y-4 ${item.border} ${item.shadow}`}>
+                  <Link href={item.href} className="flex flex-col items-center w-full">
+                    <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-full flex items-center justify-center mb-4 ${item.bg} ${item.color} group-hover:scale-110 transition-transform duration-300`}>
+                      <item.icon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.5} />
+                    </div>
+                    <span className="text-sm sm:text-base font-semibold text-zinc-200 group-hover:text-white transition-colors">
+                      {item.label}
+                    </span>
+                  </Link>
+
+                  <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-300 w-full">
+                    <div className="overflow-hidden w-full flex flex-col opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">
+                      <div className="h-px w-full bg-zinc-700/50 my-4" />
+                      <div className="flex flex-col w-full gap-1.5">
+                        {item.submenus.map((sub, j) => (
+                          <Link 
+                            key={j} 
+                            href={sub.href}
+                            className="text-xs text-center text-zinc-400 hover:text-white transition-colors py-1.5 px-2 hover:bg-zinc-700/40 rounded-md truncate"
+                          >
+                            {sub.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-sm sm:text-base font-semibold text-zinc-200 group-hover:text-white transition-colors">
-                  {item.label}
-                </span>
-              </Link>
+              </div>
             ))}
           </div>
 
