@@ -1,5 +1,4 @@
 {
   "framework": "nextjs",
-  "buildCommand": "pnpm build",
-  "installCommand": "pnpm install --config.confirmModulesPurge=false"
+  "buildCommand": "pnpm build"
 }
