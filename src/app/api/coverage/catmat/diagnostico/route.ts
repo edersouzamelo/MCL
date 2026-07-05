@@ -38,6 +38,7 @@ async function consulta(label: string, baseUrl: string, params: Params) {
       envelopeKeys: json && typeof json === "object" ? Object.keys(json) : [],
       totalRegistros: json?.totalRegistros,
       totalPaginas: json?.totalPaginas,
+      paginasRestantes: json?.paginasRestantes,
       resultadoLength: resultado.length,
       firstRawItems: resultado.slice(0, 3),
       rawTextPreview: resultado.length ? undefined : text.slice(0, 700),
@@ -61,17 +62,29 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const terms = clean(url.searchParams.get("terms") ?? "coturno");
   const first = terms.split(/\s+/).find((token) => token.length >= 3) ?? terms;
+  const upper = terms.toUpperCase();
   const config = getComprasGovConfig();
 
-  const attempts = await Promise.all([
-    consulta("descricaoItem completo", config.baseUrl, { pagina: 1, descricaoItem: terms }),
-    consulta("descricaoItem primeiro termo", config.baseUrl, { pagina: 1, descricaoItem: first }),
-    consulta("descricaoItem primeiro termo status true", config.baseUrl, { pagina: 1, descricaoItem: first, statusItem: true }),
-    consulta("sem filtro textual", config.baseUrl, { pagina: 1 }),
-  ]);
+  const paramsList: [string, Params][] = [
+    ["descricaoItem completo", { pagina: 1, descricaoItem: terms }],
+    ["descricaoItem completo upper", { pagina: 1, descricaoItem: upper }],
+    ["descricaoItem primeiro termo", { pagina: 1, descricaoItem: first }],
+    ["descricaoItem primeiro termo status true", { pagina: 1, descricaoItem: first, statusItem: true }],
+    ["nomeItem completo", { pagina: 1, nomeItem: terms }],
+    ["nomeItem upper", { pagina: 1, nomeItem: upper }],
+    ["descricaoMaterial completo", { pagina: 1, descricaoMaterial: terms }],
+    ["descricao completo", { pagina: 1, descricao: terms }],
+    ["termo completo", { pagina: 1, termo: terms }],
+    ["termoBusca completo", { pagina: 1, termoBusca: terms }],
+    ["palavraChave completo", { pagina: 1, palavraChave: terms }],
+    ["q completo", { pagina: 1, q: terms }],
+    ["sem filtro textual", { pagina: 1 }],
+  ];
+
+  const attempts = await Promise.all(paramsList.map(([label, params]) => consulta(label, config.baseUrl, params)));
 
   return NextResponse.json({
-    diagnostic: "CATMAT_DIAGNOSTICO_BRUTO",
+    diagnostic: "CATMAT_DIAGNOSTICO_BRUTO_V2",
     endpoint: COMPRAS_GOV_CATMAT_ENDPOINT,
     baseUrl: config.baseUrl,
     terms,
