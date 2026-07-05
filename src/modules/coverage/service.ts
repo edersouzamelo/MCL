@@ -206,10 +206,13 @@ function numberFromDb(value: DbNumericValue): number | undefined {
 }
 
 function defaultDateRange() {
-  const year = new Date().getUTCFullYear();
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
   return {
-    start: `${year}-01-01`,
-    end: `${year}-12-31`,
+    start: "2024-01-01",
+    end: `${year}-${month}-${day}`,
   };
 }
 
@@ -472,7 +475,7 @@ export async function searchCatmatCandidates(
     {
       needId: input.needId,
       kind: "CATMAT_SEARCH",
-      endpoint: "https://catmat.com.br/api/v1/search",
+      endpoint: COMPRAS_GOV_CATMAT_ENDPOINT,
       params: queryParams,
       actorId: options.actorId,
       externalCatalog: "CATMAT",
@@ -483,44 +486,41 @@ export async function searchCatmatCandidates(
   try {
     let apiResult;
     try {
-      const fetchImpl = options.fetchImpl ?? fetch;
-      const response = await fetchImpl(
-        `https://catmat.com.br/api/v1/search?q=${encodeURIComponent(queryText)}`,
-        { headers: { accept: "application/json" } }
+      const { data, url } = await client.getJson(
+        COMPRAS_GOV_CATMAT_ENDPOINT,
+        queryParams,
+        comprasGovApiResponseSchema
       );
-      if (!response.ok) {
-         throw new Error(`Catmat API responded with ${response.status}`);
-      }
-      apiResult = { data: await response.json(), url: response.url };
+      apiResult = { data, url };
     } catch (apiError) {
       if (process.env.NODE_ENV === "test") {
         throw apiError;
       }
-      console.warn("Catmat.com.br API call failed, falling back to simulated candidates. Error:", apiError);
+      console.warn("ComprasGov CATMAT API call failed. Error:", apiError);
       apiResult = {
-        data: { hits: [], total: 0 },
-        url: "https://catmat.com.br/api/v1/search",
+        data: { resultado: [], totalRegistros: 0 },
+        url: COMPRAS_GOV_CATMAT_ENDPOINT,
       };
     }
     
     const { data, url } = apiResult;
     const fetchedAt = new Date().toISOString();
     
-    let candidates = (data.hits || [])
-      .map((raw: any) => ({
-        codigoItem: raw.codigo_item,
-        codigoGrupo: raw.codigo_grupo,
-        codigoClasse: raw.codigo_classe,
-        codigoPdm: raw.codigo_pdm,
-        descricaoItem: raw.descricao_item,
-        statusItem: true
-      }))
+    const parsedItems = (data.resultado || [])
+      .map((raw: any) => {
+        const parsed = comprasGovCatalogItemSchema.safeParse(raw);
+        return parsed.success ? parsed.data : null;
+      })
+      .filter((item): item is ComprasGovCatalogItem => item !== null);
+
+    let candidates = parsedItems
       .map((parsed: any) => candidateFromCatalogItem(parsed, query, input.needId, url, fetchedAt, queryText))
       .filter((candidate: any) => candidate.similarityScore > 0 || params.codigoItem || params.codigoClasse || params.codigoGrupo)
       .sort((a: any, b: any) => b.similarityScore - a.similarityScore)
       .slice(0, 12);
 
-    if (candidates.length === 0 && input.terms?.trim() && process.env.NODE_ENV !== "test") {
+    const allowSimulatedFallback = process.env.MCL_ALLOW_SIMULATED_CATMAT_FALLBACK === "true";
+    if (candidates.length === 0 && input.terms?.trim() && allowSimulatedFallback) {
       const cleanTerm = normalizeText(input.terms.trim());
       const mockItems: Array<{ code: string; desc: string; classCode?: string }> = [];
 
@@ -574,7 +574,7 @@ export async function searchCatmatCandidates(
       }));
     }
 
-    query.recordsRead = (data.hits || data.resultado || []).length;
+    query.recordsRead = (data.resultado || []).length;
     query.status = candidates.length ? "SUCCESS" : "NO_RESULTS";
     query.sourceUrl = url;
     query.finishedAt = fetchedAt;
@@ -619,8 +619,9 @@ export async function searchCatmatCandidates(
         });
       }
 
-      await prisma.coverageQuery.create({
-        data: {
+      await prisma.coverageQuery.upsert({
+        where: { id: query.id },
+        create: {
           id: query.id,
           needId: query.needId,
           kind: query.kind,
@@ -637,31 +638,14 @@ export async function searchCatmatCandidates(
           finishedAt: new Date(query.finishedAt),
           staleAt: query.staleAt ? new Date(query.staleAt) : null,
         },
+        update: {
+          status: query.status,
+          recordsRead: query.recordsRead,
+          sourceUrl: query.sourceUrl,
+          errorMessage: query.errorMessage,
+          finishedAt: new Date(query.finishedAt),
+        },
       });
-
-      if (candidates.length > 0) {
-        await prisma.catalogSearchCandidate.createMany({
-          data: candidates.map((c: any) => ({
-            id: c.id,
-            queryId: c.queryId,
-            needId: c.needId,
-            externalCatalog: c.externalCatalog,
-            externalItemCode: c.externalItemCode,
-            externalDescription: c.externalDescription,
-            groupCode: c.groupCode,
-            classCode: c.classCode,
-            pdmCode: c.pdmCode,
-            statusItem: c.statusItem,
-            similarityScore: c.similarityScore,
-            similarityExplanation: c.similarityExplanation,
-            sourceSystem: c.sourceSystem,
-            sourceUrl: c.sourceUrl,
-            sourceUpdatedAt: c.sourceUpdatedAt ? new Date(c.sourceUpdatedAt) : null,
-            fetchedAt: new Date(c.fetchedAt),
-            payload: c.payload as any,
-          })),
-        });
-      }
 
       await prisma.auditLog.create({
         data: {
@@ -707,8 +691,9 @@ export async function searchCatmatCandidates(
     query.finishedAt = new Date().toISOString();
 
     if (persistenceMode() === "postgresql") {
-      await prisma.coverageQuery.create({
-        data: {
+      await prisma.coverageQuery.upsert({
+        where: { id: query.id },
+        create: {
           id: query.id,
           needId: query.needId,
           kind: query.kind,
@@ -724,6 +709,13 @@ export async function searchCatmatCandidates(
           startedAt: new Date(query.startedAt),
           finishedAt: new Date(query.finishedAt),
           staleAt: query.staleAt ? new Date(query.staleAt) : null,
+        },
+        update: {
+          status: query.status,
+          recordsRead: query.recordsRead,
+          sourceUrl: query.sourceUrl,
+          errorMessage: query.errorMessage,
+          finishedAt: new Date(query.finishedAt),
         },
       });
     } else {
@@ -1224,6 +1216,7 @@ export async function searchArpsForConfirmedCatmat(
         entries,
         synthesis,
         totalRegistros: data.totalRegistros,
+        totalRegistrosApi: data.resultado.length,
         totalPaginas: data.totalPaginas,
         paginasRestantes: data.paginasRestantes,
         pagesConsulted: 1,
@@ -1428,6 +1421,7 @@ export async function searchArpsForConfirmedCatmat(
         entries,
         synthesis: buildCoverageSynthesis(state, input.needId, entries.map((entry) => entry.instrument), [], mapping.externalItemCode),
         totalRegistros: data.totalRegistros,
+        totalRegistrosApi: data.resultado.length,
         totalPaginas: data.totalPaginas,
         paginasRestantes: data.paginasRestantes,
         pagesConsulted: 1,

@@ -465,7 +465,9 @@ describe("consulta de cobertura orientada pela necessidade", () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("Timeout/SSL Error")) as unknown as typeof fetch;
 
     const originalEnv = process.env.NODE_ENV;
+    const originalFallback = process.env.MCL_ALLOW_SIMULATED_CATMAT_FALLBACK;
     (process.env as any).NODE_ENV = "development";
+    (process.env as any).MCL_ALLOW_SIMULATED_CATMAT_FALLBACK = "true";
 
     try {
       const candidatesResult = await searchCatmatCandidates(
@@ -487,6 +489,7 @@ describe("consulta de cobertura orientada pela necessidade", () => {
       expect(demo.coverageQueries[0].errorMessage).toBe("Timeout/SSL Error");
     } finally {
       (process.env as any).NODE_ENV = originalEnv;
+      (process.env as any).MCL_ALLOW_SIMULATED_CATMAT_FALLBACK = originalFallback;
     }
   });
 });

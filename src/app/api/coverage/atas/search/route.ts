@@ -50,6 +50,17 @@ function failure(
   retryable: boolean,
   trace?: Record<string, unknown>,
 ) {
+  const finalTrace = {
+    sourceUrl: trace?.sourceUrl ?? "https://compras.gov.br",
+    params: trace?.params ?? {},
+    catmatCode: trace?.catmatCode ?? "",
+    totalRegistros: 0,
+    count: 0,
+    stage: "ARP_SEARCH_FAILED",
+    persistenceMode: trace?.persistenceMode ?? "postgresql",
+    ...trace,
+  };
+
   routeLog("ARP_RESPONSE_SENT", {
     requestId,
     stage: "ARP_SEARCH_FAILED",
@@ -59,7 +70,21 @@ function failure(
   });
 
   return NextResponse.json(
-    { ok: false, stage: "ARP_SEARCH_FAILED", requestId, code, message, retryable, trace },
+    {
+      ok: false,
+      stage: "ARP_SEARCH_FAILED",
+      requestId,
+      code,
+      message,
+      retryable,
+      catmatCode: finalTrace.catmatCode,
+      count: 0,
+      totalRegistros: 0,
+      persistenceMode: finalTrace.persistenceMode,
+      sourceUrl: finalTrace.sourceUrl,
+      params: finalTrace.params,
+      trace: finalTrace,
+    },
     { status },
   );
 }
@@ -112,7 +137,7 @@ export async function POST(request: Request) {
       state,
       {
         ...body,
-        mappingSnapshot: stripNulls(mapping),
+        mappingSnapshot: stripNulls(mapping) as any,
         needId,
         analysisId,
         catalogMappingId,
@@ -124,10 +149,82 @@ export async function POST(request: Request) {
       { actorId: actor.id, organizationId: actor.organizationId, userAgent: request.headers.get("user-agent") ?? "mcl-web", requestId },
     );
 
-    const trace = { ...result.query, requestId, analysisId, catalogMappingId: mapping.id, catmatCode: mapping.externalItemCode, totalRegistros: result.totalRegistros, totalPaginas: result.totalPaginas, paginasRestantes: result.paginasRestantes, pagesConsulted: result.pagesConsulted, durationMs: result.durationMs, timeoutMs: result.timeoutMs, persistenceMode: mode };
-    const stage = result.entries.length > 0 ? "ARP_SEARCH_COMPLETED" : "ARP_SEARCH_EMPTY";
-    routeLog("ARP_RESPONSE_SENT", { requestId, needId, analysisId, catmatCode: mapping.externalItemCode, stage, durationMs: Date.now() - routeStartedAt, count: result.entries.length, status: "OK" });
-    return NextResponse.json({ ok: true, stage, requestId, catmatCode: mapping.externalItemCode, count: result.entries.length, items: result.entries, synthesis: result.synthesis, trace });
+    const trace = {
+      ...result.query,
+      requestId,
+      analysisId,
+      catalogMappingId: mapping.id,
+      catmatCode: mapping.externalItemCode,
+      totalRegistros: result.totalRegistros,
+      totalRegistrosApi: result.totalRegistrosApi,
+      totalPaginas: result.totalPaginas,
+      paginasRestantes: result.paginasRestantes,
+      pagesConsulted: result.pagesConsulted,
+      durationMs: result.durationMs,
+      timeoutMs: result.timeoutMs,
+      persistenceMode: mode,
+    };
+
+    // Check if items were received but all filtered by schema/codigoItem
+    const itemsReceivedButSchemaFiltered = result.entries.length === 0 && (result.totalRegistrosApi ?? 0) > 0;
+
+    let stage = result.entries.length > 0 ? "ARP_SEARCH_COMPLETED" : "ARP_SEARCH_EMPTY";
+
+    if (itemsReceivedButSchemaFiltered) {
+      stage = "ARP_ITEMS_RECEIVED_BUT_SCHEMA_FILTERED";
+      routeLog("ARP_RESPONSE_SENT", {
+        requestId,
+        needId,
+        analysisId,
+        catmatCode: mapping.externalItemCode,
+        stage,
+        durationMs: Date.now() - routeStartedAt,
+        count: 0,
+        status: "SCHEMA_FILTERED",
+      });
+
+      return NextResponse.json({
+        ok: false,
+        stage,
+        code: "ARP_ITEMS_RECEIVED_BUT_SCHEMA_FILTERED",
+        message: "A API do Compras.gov.br retornou dados de atas para a busca, mas todos os registros foram descartados durante a validacao por divergencia de codigoItem ou erro de validacao do schema.",
+        requestId,
+        catmatCode: mapping.externalItemCode,
+        count: 0,
+        totalRegistros: result.totalRegistros,
+        persistenceMode: mode,
+        sourceUrl: result.query.sourceUrl,
+        params: result.query.params,
+        items: [],
+        trace,
+      });
+    }
+
+    routeLog("ARP_RESPONSE_SENT", {
+      requestId,
+      needId,
+      analysisId,
+      catmatCode: mapping.externalItemCode,
+      stage,
+      durationMs: Date.now() - routeStartedAt,
+      count: result.entries.length,
+      status: "OK",
+    });
+
+    return NextResponse.json({
+      ok: true,
+      stage,
+      requestId,
+      catmatCode: mapping.externalItemCode,
+      count: result.entries.length,
+      totalRegistros: result.totalRegistros,
+      persistenceMode: mode,
+      sourceUrl: result.query.sourceUrl,
+      params: result.query.params,
+      items: result.entries,
+      synthesis: result.synthesis,
+      trace,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao consultar atas.";
     const isTimeout = message.toLowerCase().includes("tempo limite") || message.toLowerCase().includes("timeout") || message.toLowerCase().includes("abort");

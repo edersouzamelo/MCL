@@ -3,30 +3,37 @@ import { ArrowRight, ClipboardList, CreditCard, ShoppingCart, PackageCheck, Ware
 import { BrandLogo } from "@/components/BrandLogo";
 import { PageTransition } from "@/components/PageTransition";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
+import { SystemStatusIndicator } from "@/components/SystemStatusIndicator";
 
 const metaNav = [
   { 
     href: "/necessidades", label: "Necessidade", icon: ClipboardList, color: "text-blue-400", bg: "bg-blue-400/10", border: "group-hover:border-blue-500/50", shadow: "group-hover:shadow-blue-500/20",
+    systems: ["SIAFI", "SIASG", "PLAD"],
     submenus: [ { label: "Registrar Demanda", href: "/necessidades" }, { label: "CATMAT e Atas", href: "/analises/materiais" } ]
   },
   { 
     href: "/painel", label: "Crédito", icon: CreditCard, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "group-hover:border-emerald-500/50", shadow: "group-hover:shadow-emerald-500/20",
+    systems: ["SIAFI", "SOF", "Tesouro"],
     submenus: [ { label: "Painel Geral", href: "/painel" }, { label: "Execução Orçamentária", href: "/painel" } ]
   },
   { 
     href: "/aquisicoes", label: "Aquisição", icon: ShoppingCart, color: "text-amber-400", bg: "bg-amber-400/10", border: "group-hover:border-amber-500/50", shadow: "group-hover:shadow-amber-500/20",
+    systems: ["SIASG", "PNCP", "ComprasGov"],
     submenus: [ { label: "Instrumentos", href: "/aquisicoes" }, { label: "Conectores", href: "/conectores" } ]
   },
   { 
     href: "/scanner", label: "Recebimento", icon: PackageCheck, color: "text-violet-400", bg: "bg-violet-400/10", border: "group-hover:border-violet-500/50", shadow: "group-hover:shadow-violet-500/20",
+    systems: ["SISCOFIS", "SIAFI", "NF-e"],
     submenus: [ { label: "Scanner de Notas", href: "/scanner" }, { label: "Divergências", href: "/divergencias" }, { label: "Importação XML", href: "/importacao" } ]
   },
   { 
     href: "/painel", label: "Armazenagem", icon: Warehouse, color: "text-rose-400", bg: "bg-rose-400/10", border: "group-hover:border-rose-500/50", shadow: "group-hover:shadow-rose-500/20",
+    systems: ["SISCOFIS", "SIGMA", "AGIL"],
     submenus: [ { label: "Controle de Estoque", href: "/painel" }, { label: "Auditoria", href: "/auditoria" } ]
   },
   { 
     href: "/painel", label: "Entrega", icon: Truck, color: "text-sky-400", bg: "bg-sky-400/10", border: "group-hover:border-sky-500/50", shadow: "group-hover:shadow-sky-500/20",
+    systems: ["SIGMA", "Correios", "FreteTrans"],
     submenus: [ { label: "Roteirização", href: "/painel" }, { label: "Expedição", href: "/painel" } ]
   },
 ];
@@ -89,6 +96,9 @@ export default async function InicioPage() {
                       {item.label}
                     </span>
                   </Link>
+
+                  {/* Diagnosis / Online Connectivity simulation indicators */}
+                  <SystemStatusIndicator systems={item.systems} />
 
                   <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-300 w-full">
                     <div className="overflow-hidden w-full flex flex-col opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">

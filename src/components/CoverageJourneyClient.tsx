@@ -130,8 +130,11 @@ function number(value?: number) {
 }
 
 function todayYearRange() {
-  const year = new Date().getFullYear();
-  return { start: `${year}-01-01`, end: `${year}-12-31` };
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return { start: "2024-01-01", end: `${year}-${month}-${day}` };
 }
 
 export function CoverageJourneyClient({
@@ -476,10 +479,17 @@ export function CoverageJourneyClient({
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">CATMAT {candidate.externalItemCode}</p>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">CATMAT {candidate.externalItemCode}</p>
+                      {candidate.sourceSystem === "MCL_SIMULADO" && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">Simulado</span>
+                      )}
+                    </div>
                     {candidate.sourceSystem === "MCL_SIMULADO" && (
-                      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">Simulado</span>
+                      <p className="text-xs font-medium text-amber-700">
+                        CATMAT SIMULADO — não será usado para consulta real de atas
+                      </p>
                     )}
                   </div>
                   <Badge tone={candidate.statusItem ? "good" : "warn"}>{candidate.statusItem ? "ativo" : "inativo"}</Badge>
@@ -537,6 +547,9 @@ export function CoverageJourneyClient({
                 <input type="date" value={dateEnd} onChange={(event) => setDateEnd(event.target.value)} className="mt-1 block rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2" />
               </label>
             </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              A busca usa intervalo de início de vigência; atas iniciadas em anos anteriores podem continuar vigentes.
+            </p>
           </div>
           <button
             type="button"

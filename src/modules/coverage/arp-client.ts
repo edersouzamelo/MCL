@@ -94,6 +94,15 @@ export function classifyArpSearchResponse(
       };
     }
 
+    if (result.ok === false && result.code === "ARP_ITEMS_RECEIVED_BUT_SCHEMA_FILTERED") {
+      return {
+        status: "ERROR",
+        error: result.message,
+        entries: [],
+        trace: result.trace,
+      };
+    }
+
     const code = result.ok === false ? result.code : "HTTP_ERROR";
     const message = result.ok === false ? result.message : "Resposta HTTP sem sucesso.";
     return {
