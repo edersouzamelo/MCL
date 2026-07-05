@@ -1970,7 +1970,8 @@ export function buildCoverageSynthesis(
 }
 
 export function persistenceMode() {
-  return process.env.DATABASE_URL ? "postgresql" : "demo-memory";
+  // Temporariamente forçando o modo demo-memory para que o app funcione sem o banco de dados Supabase
+  return "demo-memory";
 }
 
 export async function getOrCreateMaterialAnalysis(needId: string, actorId: string) {
