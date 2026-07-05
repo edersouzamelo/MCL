@@ -3,7 +3,7 @@ import { Providers } from "@/providers/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MCL | Piloto Classe II",
+  title: "MCL",
   description:
     "Prototipo demonstrativo do Modelo de Continuidade Logistica para suprimento Classe II com dados sinteticos.",
   manifest: "/manifest.json",

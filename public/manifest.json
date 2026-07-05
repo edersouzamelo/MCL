@@ -1,6 +1,6 @@
 {
-  "name": "MCL | Piloto Classe II",
-  "short_name": "MCL Piloto",
+  "name": "MCL",
+  "short_name": "MCL",
   "description": "Prototipo demonstrativo com dados sinteticos para continuidade logistica Classe II.",
   "start_url": "/painel",
   "display": "standalone",
