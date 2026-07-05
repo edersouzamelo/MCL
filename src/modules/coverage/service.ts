@@ -641,7 +641,7 @@ export async function searchCatmatCandidates(
 
       if (candidates.length > 0) {
         await prisma.catalogSearchCandidate.createMany({
-          data: candidates.map((c) => ({
+          data: candidates.map((c: any) => ({
             id: c.id,
             queryId: c.queryId,
             needId: c.needId,
