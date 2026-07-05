@@ -1,79 +1,85 @@
 import Link from "next/link";
-import { ArrowRight, ClipboardList, CreditCard, ShoppingCart, PackageCheck, Warehouse, Truck } from "lucide-react";
+import { ArrowRight, Boxes, Database, Route, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { DemoBanner } from "@/components/DemoBanner";
-import { PageTransition } from "@/components/PageTransition";
-
-const metaNav = [
-  { href: "/necessidades", label: "Necessidade", icon: ClipboardList, color: "text-blue-400", bg: "bg-blue-400/10" },
-  { href: "/painel", label: "Crédito", icon: CreditCard, color: "text-emerald-400", bg: "bg-emerald-400/10" },
-  { href: "/aquisicoes", label: "Aquisição", icon: ShoppingCart, color: "text-amber-400", bg: "bg-amber-400/10" },
-  { href: "/scanner", label: "Recebimento", icon: PackageCheck, color: "text-violet-400", bg: "bg-violet-400/10" },
-  { href: "/painel", label: "Armazenagem", icon: Warehouse, color: "text-rose-400", bg: "bg-rose-400/10" },
-  { href: "/painel", label: "Entrega", icon: Truck, color: "text-sky-400", bg: "bg-sky-400/10" },
-];
 
 export default function Home() {
   return (
-    <PageTransition>
-      <div className="relative flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden">
-        <DemoBanner />
-        
-        {/* Background Image Container with Blur */}
-        <div className="absolute inset-0 top-[36px] z-0 overflow-hidden">
-          <div 
-            className="absolute inset-[-20px] bg-cover bg-center bg-no-repeat blur-sm" 
-            style={{ backgroundImage: 'url(/bg.png)' }} 
-          />
-          {/* Dark overlay to ensure contrast */}
-          <div className="absolute inset-0 bg-zinc-950/70" />
-        </div>
+    <div className="relative flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden">
+      <DemoBanner />
+      
+      {/* Background Image Container with Blur */}
+      <div className="absolute inset-0 top-[36px] z-0 overflow-hidden">
+        <div 
+          className="absolute inset-[-20px] bg-cover bg-center bg-no-repeat blur-md" 
+          style={{ backgroundImage: 'url(/bg.png)' }} 
+        />
+        {/* Dark overlay to ensure contrast */}
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
 
-        <main className="relative z-10 mx-auto flex h-[calc(100vh-36px)] w-full max-w-7xl flex-col items-center justify-center px-5 sm:px-8 py-10">
-          
-          <div className="flex flex-col items-center text-center mb-16">
+      <main className="relative z-10 mx-auto flex h-[calc(100vh-36px)] w-full max-w-7xl items-center justify-center px-5 sm:px-8 lg:px-10">
+        
+        <section className="grid w-full items-center gap-10 lg:grid-cols-2">
+          {/* Logo on the left */}
+          <div className="flex justify-center lg:justify-start">
             <BrandLogo
               tone="light"
               priority
-              className="h-28 w-28 sm:h-36 sm:w-36 drop-shadow-[0_10px_25px_rgba(255,255,255,0.1)] mb-8"
+              className="h-auto w-[min(70vw,360px)] drop-shadow-[0_20px_55px_rgba(255,255,255,0.16)] lg:w-[460px]"
+              sizes="(max-width: 640px) 70vw, (max-width: 1024px) 360px, 460px"
             />
-            <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-lg">
-              Ciclo Logístico
+          </div>
+
+          {/* Text and Icons on the right, with dark translucent veil */}
+          <div className="flex flex-col rounded-3xl bg-black/60 p-8 backdrop-blur-xl border border-white/10 shadow-2xl">
+            <h1 className="text-3xl font-semibold text-zinc-100 sm:text-4xl">
+              Modelo de Continuidade Logística
             </h1>
-            <p className="mt-4 text-lg text-zinc-300 max-w-2xl drop-shadow-md">
-              Acompanhe necessidade, aquisição, crédito, estoque, remessa e entrega em uma única cadeia informacional contínua.
+            <p className="mt-4 text-lg leading-relaxed text-zinc-300">
+              Interface demonstrativa para acompanhar necessidade, aquisição, crédito, estoque, unidade logística,
+              remessa e entrega em uma única cadeia informacional.
             </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 w-full max-w-4xl">
-            {metaNav.map((item, i) => (
-              <Link 
-                key={i} 
-                href={item.href}
-                className="group relative flex flex-col items-center p-6 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 hover:bg-zinc-800/80 hover:border-zinc-700 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
+            <div className="mt-8 mb-8 flex flex-wrap gap-3">
+              <Link
+                href="/entrar"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-emerald-500 px-6 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-400"
               >
-                <div className={`h-16 w-16 rounded-full flex items-center justify-center mb-4 ${item.bg} ${item.color} group-hover:scale-110 transition-transform duration-300`}>
-                  <item.icon className="h-8 w-8" strokeWidth={1.5} />
-                </div>
-                <span className="text-sm sm:text-base font-semibold text-zinc-200 group-hover:text-white transition-colors">
-                  {item.label}
-                </span>
+                Acessar Plataforma
+                <ArrowRight aria-hidden className="h-4 w-4" />
               </Link>
-            ))}
-          </div>
+            </div>
 
-          <div className="mt-16">
-            <Link
-              href="/entrar"
-              className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-emerald-600 px-8 font-semibold text-white transition hover:bg-emerald-500 shadow-lg hover:shadow-emerald-600/30"
-            >
-              Acessar Painel Central
-              <ArrowRight aria-hidden className="h-5 w-5" />
-            </Link>
+            <div className="grid gap-4 border-t border-white/10 pt-8 text-sm text-zinc-300">
+              <div className="flex items-center gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-emerald-300">
+                  <Boxes aria-hidden className="h-5 w-5" />
+                </span>
+                <span>Rastreabilidade por unidade logística</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sky-300">
+                  <Route aria-hidden className="h-5 w-5" />
+                </span>
+                <span>Fluxo material e informacional correlacionado</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-amber-300">
+                  <Database aria-hidden className="h-5 w-5" />
+                </span>
+                <span>Dados sintéticos para demonstração controlada</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-rose-300">
+                  <ShieldCheck aria-hidden className="h-5 w-5" />
+                </span>
+                <span>Auditoria e preservação da origem do dado</span>
+              </div>
+            </div>
           </div>
-          
-        </main>
-      </div>
-    </PageTransition>
+        </section>
+
+      </main>
+    </div>
   );
 }

@@ -18,12 +18,12 @@ export function DemoLogin() {
       email,
       password,
       redirect: false,
-      callbackUrl: "/painel",
+      callbackUrl: "/inicio",
     });
     setIsSubmitting(false);
 
     if (result?.ok) {
-      window.location.href = result.url ?? "/painel";
+      window.location.href = result.url ?? "/inicio";
       return;
     }
 
@@ -86,7 +86,7 @@ export function DemoLogin() {
       <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
-          onClick={() => signIn("google", { callbackUrl: "/painel" })}
+          onClick={() => signIn("google", { callbackUrl: "/inicio" })}
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-zinc-300 px-4 py-2 font-semibold text-zinc-800 transition hover:bg-zinc-100"
         >
           <svg className="h-4 w-4" aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
@@ -99,7 +99,7 @@ export function DemoLogin() {
         </button>
         <button
           type="button"
-          onClick={() => signIn("github", { callbackUrl: "/painel" })}
+          onClick={() => signIn("github", { callbackUrl: "/inicio" })}
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded border border-zinc-300 px-4 py-2 font-semibold text-zinc-800 transition hover:bg-zinc-100"
         >
           <GitPullRequest aria-hidden className="h-4 w-4" />

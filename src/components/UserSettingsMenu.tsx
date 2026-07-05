@@ -42,6 +42,8 @@ export function UserSettingsMenu() {
     logout: language === "en" ? "LOGOUT" : language === "es" ? "SALIR" : "SAIR DO SISTEMA",
   };
 
+  const [imageError, setImageError] = useState(false);
+
   return (
     <div className="relative" ref={menuRef}>
       {/* Trigger Button */}
@@ -50,8 +52,13 @@ export function UserSettingsMenu() {
           onClick={() => setIsOpen(!isOpen)}
           className="h-10 w-10 rounded-full overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 hover:border-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
-          {session?.user?.image ? (
-            <img src={session.user.image} alt="User avatar" className="h-full w-full object-cover" />
+          {session?.user?.image && !imageError ? (
+            <img 
+              src={session.user.image} 
+              alt="User avatar" 
+              className="h-full w-full object-cover" 
+              onError={() => setImageError(true)}
+            />
           ) : (
             <div className="h-full w-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500">
               <User className="h-5 w-5" />
