@@ -60,14 +60,15 @@ export default function InicioPage() {
               className="h-28 w-28 sm:h-36 sm:w-36 drop-shadow-[0_10px_25px_rgba(255,255,255,0.1)] mb-8"
             />
             <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-lg">
-              Ciclo Logístico
+              MCL
             </h1>
             <p className="mt-4 text-lg text-zinc-300 max-w-2xl drop-shadow-md">
               Acompanhe necessidade, aquisição, crédito, estoque, remessa e entrega em uma única cadeia informacional contínua.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 w-full items-start">
+          <div className="w-full min-h-[580px] md:min-h-[420px] xl:min-h-[280px] flex justify-center items-start">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 w-full items-start">
             {metaNav.map((item, i) => (
               <div key={i} className="group relative w-full">
                 <div className={`relative flex flex-col items-center p-5 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 hover:bg-zinc-800/90 transition-all duration-300 shadow-xl hover:shadow-2xl hover:-translate-y-4 ${item.border} ${item.shadow}`}>
@@ -99,6 +100,7 @@ export default function InicioPage() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
 
           <div className="mt-16">
