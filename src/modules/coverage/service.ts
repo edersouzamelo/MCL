@@ -1909,7 +1909,7 @@ export function buildCoverageSynthesis(
 }
 
 export function persistenceMode() {
-  return process.env.DATABASE_URL ? "postgresql" : "demo-memory";
+  return process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL ? "postgresql" : "demo-memory";
 }
 
 export async function getOrCreateMaterialAnalysis(needId: string, actorId: string) {
