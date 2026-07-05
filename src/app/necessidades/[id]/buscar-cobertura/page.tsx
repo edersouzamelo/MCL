@@ -12,12 +12,20 @@ export const dynamic = "force-dynamic";
 
 export default async function NeedCoverageSearchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const isPostgres = persistenceMode() === "postgresql";
+  let isPostgres = persistenceMode() === "postgresql";
   
-  let need, item, variant, mapping, stockCovered, orgName, projection, analysisId;
+  let need: any = {};
+  let item: any = {};
+  let variant: any = {};
+  let mapping: any = null;
+  let stockCovered = 0;
+  let orgName = "";
+  let projection: any = {};
+  let analysisId = "";
 
   if (isPostgres) {
-    const dbNeed = await prisma.need.findUnique({
+    try {
+      const dbNeed = await prisma.need.findUnique({
       where: { id },
     });
     if (!dbNeed) {
@@ -68,7 +76,13 @@ export default async function NeedCoverageSearchPage({ params }: { params: Promi
       coveragePercent: Math.round((stockCovered / dbNeed.quantityApproved) * 100),
       deliveredPercent: 0,
     };
-  } else {
+  } catch (error) {
+    console.error("Database query failed on buscar-cobertura page, falling back to memory:", error);
+    isPostgres = false;
+  }
+}
+  
+  if (!isPostgres) {
     const state = getDemoState();
     const demoNeed = state.needs.find((candidate) => candidate.id === id);
     if (!demoNeed) {

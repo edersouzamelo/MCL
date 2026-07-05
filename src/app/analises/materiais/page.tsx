@@ -26,23 +26,24 @@ interface MaterialNeedItem {
 }
 
 export default async function MaterialAnalysesPage() {
-  const isPostgres = persistenceMode() === "postgresql";
+  let isPostgres = persistenceMode() === "postgresql";
   let items: MaterialNeedItem[] = [];
 
   if (isPostgres) {
-    const dbNeeds = await prisma.need.findMany({
-      include: {
-        variant: {
-          include: {
-            item: true,
+    try {
+      const dbNeeds = await prisma.need.findMany({
+        include: {
+          variant: {
+            include: {
+              item: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    const dbOrganizations = await prisma.organization.findMany();
-    const dbCoverages = await prisma.needCoverage.findMany();
-    const dbAnalyses = await prisma.materialCoverageAnalysis.findMany();
+      const dbOrganizations = await prisma.organization.findMany();
+      const dbCoverages = await prisma.needCoverage.findMany();
+      const dbAnalyses = await prisma.materialCoverageAnalysis.findMany();
 
     items = dbNeeds.map((need: (typeof dbNeeds)[number]) => {
       const org = dbOrganizations.find((o: (typeof dbOrganizations)[number]) => o.id === need.organizationId);
@@ -76,8 +77,14 @@ export default async function MaterialAnalysesPage() {
         requiredAt: need.requiredAt.toISOString(),
         analysisStatus: statusLabel,
       };
-    });
-  } else {
+      });
+    } catch (error) {
+      console.error("Database query failed on materials page, falling back to memory:", error);
+      isPostgres = false;
+    }
+  }
+
+  if (!isPostgres) {
     // Falling back to demo state in memory
     const state = getDemoState();
     items = state.needs.map((need) => {

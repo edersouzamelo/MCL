@@ -79,11 +79,12 @@ function isoFromDbDate(value: Date | string): string {
 }
 
 export default async function DashboardPage() {
-  const isPostgres = persistenceMode() === "postgresql";
-  let state: DemoState;
+  let isPostgres = persistenceMode() === "postgresql";
+  let state: DemoState = getDemoState();
 
   if (isPostgres) {
-    const dbNeeds = await prisma.need.findMany();
+    try {
+      const dbNeeds = await prisma.need.findMany();
     const dbVariants = await prisma.itemVariant.findMany();
     const dbItems = await prisma.supplyItem.findMany();
     const dbOrganizations = await prisma.organization.findMany();
@@ -167,7 +168,13 @@ export default async function DashboardPage() {
         },
       ],
     };
-  } else {
+    } catch (error) {
+      console.error("Erro ao carregar dados do Supabase no Painel, usando memória:", error);
+      isPostgres = false;
+    }
+  }
+
+  if (!isPostgres) {
     state = getDemoState();
   }
 
@@ -202,10 +209,11 @@ export default async function DashboardPage() {
   let tableRows: MaterialCoverageRow[] = [];
 
   if (isPostgres) {
-    const dbAnalyses = (await prisma.materialCoverageAnalysis.findMany()) as DbMaterialCoverageAnalysisDashboard[];
-    const dbCandidates = (await prisma.acquisitionCoverageCandidate.findMany()) as DbAcquisitionCoverageCandidateDashboard[];
-    const dbMappings = (await prisma.itemCatalogMapping.findMany({ where: { status: "ACTIVE" } })) as DbItemCatalogMappingDashboard[];
-    const dbInstruments = (await prisma.acquisitionInstrument.findMany()) as DbAcquisitionInstrumentDashboard[];
+    try {
+      const dbAnalyses = (await prisma.materialCoverageAnalysis.findMany()) as DbMaterialCoverageAnalysisDashboard[];
+      const dbCandidates = (await prisma.acquisitionCoverageCandidate.findMany()) as DbAcquisitionCoverageCandidateDashboard[];
+      const dbMappings = (await prisma.itemCatalogMapping.findMany({ where: { status: "ACTIVE" } })) as DbItemCatalogMappingDashboard[];
+      const dbInstruments = (await prisma.acquisitionInstrument.findMany()) as DbAcquisitionInstrumentDashboard[];
 
     // eslint-disable-next-line react-hooks/purity
     const nowTime = Date.now();
@@ -280,7 +288,13 @@ export default async function DashboardPage() {
         atualizadoEm: analysis ? isoFromDbDate(analysis.updatedAt) : "Nunca",
       };
     });
-  } else {
+    } catch (error) {
+      console.error("Erro ao carregar métricas adicionais do Supabase no Painel, usando memória:", error);
+      isPostgres = false;
+    }
+  }
+
+  if (!isPostgres) {
     // Cálculo em memória
     needsAwaitingAnalysis = state.needs.filter(
       (n) => !state.itemCatalogMappings.some((m) => m.needId === n.id && m.status === "ACTIVE")

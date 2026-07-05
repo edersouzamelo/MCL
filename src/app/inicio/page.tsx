@@ -35,12 +35,7 @@ import { redirect } from "next/navigation";
 import { getUserProfile } from "@/app/actions/onboarding";
 
 export default async function InicioPage() {
-  const profile = await getUserProfile();
-  
-  if (profile && !profile.termsAcceptedAt) {
-    redirect("/primeiro-acesso");
-  }
-
+  // Ignora verificação do formulário para evitar loop infinito
   return (
     <PageTransition>
       <div className="relative flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden">

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, Boxes, Database, Route, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
-import { DemoBanner } from "@/components/DemoBanner";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function Home() {
   return (
-    <div className="relative flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden">
-      <DemoBanner />
+    <PageTransition>
+      <div className="relative flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden">
+        <DemoBanner />
       
       {/* Background Image Container with Blur */}
       <div className="absolute inset-0 top-[36px] z-0 overflow-hidden">
@@ -81,5 +82,6 @@ export default function Home() {
 
       </main>
     </div>
+    </PageTransition>
   );
 }

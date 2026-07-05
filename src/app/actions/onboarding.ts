@@ -47,7 +47,17 @@ export async function completeOnboarding(formData: FormData) {
         state.users[userIndex] = {
           ...state.users[userIndex],
           ...data,
-        };
+        } as any;
+      } else {
+        state.users.push({
+          id: session.user.id,
+          name: session.user.name || "Operador",
+          email: session.user.email || "",
+          active: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          ...data,
+        } as any);
       }
     }
   } else {
@@ -82,10 +92,34 @@ export async function getUserProfile() {
     } catch (error) {
       console.error("Erro no banco de dados (getUserProfile), usando memória temporária:", error);
       const state = getDemoState();
-      return state.users.find(u => u.id === session.user?.id) || null;
+      let user = state.users.find(u => u.id === session.user?.id);
+      if (!user) {
+        user = {
+          id: session.user.id,
+          name: session.user.name || "Operador",
+          email: session.user.email || "",
+          active: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as any;
+        state.users.push(user as any);
+      }
+      return user;
     }
   } else {
     const state = getDemoState();
-    return state.users.find(u => u.id === session.user?.id) || null;
+    let user = state.users.find(u => u.id === session.user?.id);
+    if (!user) {
+      user = {
+        id: session.user.id,
+        name: session.user.name || "Operador",
+        email: session.user.email || "",
+        active: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as any;
+      state.users.push(user as any);
+    }
+    return user;
   }
 }
