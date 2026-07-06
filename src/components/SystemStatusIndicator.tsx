@@ -1,38 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
+import type { SourceSystemCatalogEntry } from "@/modules/connectors/catalog";
 
 interface SystemStatusIndicatorProps {
-  systems: string[];
+  systems: SourceSystemCatalogEntry[];
 }
 
-function SystemStatusItem({ name }: { name: string }) {
-  const [status, setStatus] = useState<"loading" | "online" | "offline">("loading");
-  const [latency, setLatency] = useState<number | undefined>(undefined);
+function SystemStatusItem({ system }: { system: SourceSystemCatalogEntry }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
-  useEffect(() => {
-    // Generate a random duration for the simulated check (between 1200ms and 2800ms)
-    const delay = 1200 + Math.random() * 1600;
-    
-    const timer = setTimeout(() => {
-      // Determine simulated outcome
-      // Some systems are more unstable for demonstration purposes
-      const failureRate = name === "Correios" || name === "SISCOFIS" ? 0.3 : 0.1;
-      const isOnline = Math.random() > failureRate;
-
-      if (isOnline) {
-        setStatus("online");
-        setLatency(Math.round(45 + Math.random() * 180));
-      } else {
-        setStatus("offline");
-      }
-    }, delay);
-
-    return () => clearTimeout(timer);
-  }, [name]);
+  let circleColorClass = "border-zinc-700 bg-zinc-900/60";
+  let badgeColorClass = "bg-zinc-500";
+  let statusText = "Mapeado";
+  let statusColorClass = "text-zinc-400";
+  
+  if (system.status === "FALHA") {
+    circleColorClass = "border-rose-500/50 shadow-[0_0_8px_rgba(239,68,68,0.2)]";
+    badgeColorClass = "bg-rose-500";
+    statusText = "Falha";
+    statusColorClass = "text-rose-400";
+  } else if (system.nature === "SINTETICA_DEMONSTRATIVA" || system.maturity === "DEMONSTRATIVO") {
+    circleColorClass = "border-indigo-500/50 shadow-[0_0_8px_rgba(99,102,241,0.2)]";
+    badgeColorClass = "bg-indigo-500";
+    statusText = "Simulador / Demo";
+    statusColorClass = "text-indigo-400";
+  } else if (system.status === "SAUDAVEL" && (system.maturity === "INTEGRADO_REAL" || system.maturity === "INTEGRADO_PARCIAL")) {
+    circleColorClass = "border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.25)]";
+    badgeColorClass = "bg-emerald-500";
+    statusText = "Conectado";
+    statusColorClass = "text-emerald-400";
+  } else if (
+    system.maturity === "PLANEJADO" ||
+    system.status === "PENDENTE" ||
+    system.status === "NAO_CONFIGURADO" ||
+    system.status === "ATRASADO"
+  ) {
+    circleColorClass = "border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]";
+    badgeColorClass = "bg-amber-500";
+    statusText = "Pendente";
+    statusColorClass = "text-amber-400";
+  } else if (system.status === "NAO_INTEGRADO" || system.integrationMethod === "NAO_INTEGRADO") {
+    circleColorClass = "border-zinc-800 bg-zinc-950/40 opacity-60";
+    badgeColorClass = "bg-zinc-650";
+    statusText = "Sem Integração";
+    statusColorClass = "text-zinc-400";
+  }
 
   return (
     <div 
@@ -45,16 +60,9 @@ function SystemStatusItem({ name }: { name: string }) {
         className={`
           relative flex items-center justify-center w-7 h-7 rounded-full 
           bg-zinc-950/80 backdrop-blur-sm border transition-all duration-300
-          ${status === "loading" && "border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)] animate-pulse"}
-          ${status === "online" && "border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.25)] hover:scale-105"}
-          ${status === "offline" && "border-rose-500/50 shadow-[0_0_10px_rgba(239,68,68,0.25)] hover:scale-105"}
+          ${circleColorClass}
         `}
       >
-        {/* Ring animations for loading */}
-        {status === "loading" && (
-          <div className="absolute inset-0 rounded-full border-t-2 border-l-2 border-amber-500 animate-spin" />
-        )}
-
         {/* Mini MCL logo inside */}
         <BrandLogo 
           tone="light" 
@@ -62,42 +70,40 @@ function SystemStatusItem({ name }: { name: string }) {
         />
 
         {/* Indicator Badge at corner */}
-        {status === "online" && (
+        {statusText === "Conectado" && (
           <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 flex items-center justify-center border border-zinc-950 text-white animate-scaleIn">
             <Check className="w-2.5 h-2.5 stroke-[3]" />
           </div>
         )}
-        {status === "offline" && (
+        {statusText === "Falha" && (
           <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-500 flex items-center justify-center border border-zinc-950 text-white animate-scaleIn">
             <X className="w-2.5 h-2.5 stroke-[3]" />
           </div>
+        )}
+        {statusText === "Pendente" && (
+          <div className="absolute -bottom-0.5 -right-0.5 w-2 w-2 rounded-full bg-amber-500 border border-zinc-950" />
+        )}
+        {statusText === "Simulador / Demo" && (
+          <div className="absolute -bottom-0.5 -right-0.5 w-2 w-2 rounded-full bg-indigo-500 border border-zinc-950" />
         )}
       </div>
 
       {/* Glassmorphic Tooltip */}
       {showTooltip && (
         <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 z-50 flex flex-col items-center animate-fadeIn pointer-events-none">
-          <div className="bg-zinc-950/95 border border-zinc-800 backdrop-blur-md text-white text-[11px] rounded-lg py-1.5 px-2.5 shadow-2xl min-w-[120px] text-center flex flex-col gap-0.5">
-            <span className="font-bold text-zinc-100">{name}</span>
+          <div className="bg-zinc-950/95 border border-zinc-805 backdrop-blur-md text-white text-[11px] rounded-lg py-2 px-3 shadow-2xl min-w-[150px] text-center flex flex-col gap-1">
+            <span className="font-bold text-zinc-200 border-b border-zinc-800 pb-1">{system.name}</span>
             <div className="flex items-center justify-center gap-1.5 mt-0.5">
-              {status === "loading" && (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                  <span className="text-amber-400 font-medium">Verificando...</span>
-                </>
-              )}
-              {status === "online" && (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-emerald-400 font-medium">Conectado</span>
-                  <span className="text-zinc-500 font-mono text-[9px] ml-1">{latency}ms</span>
-                </>
-              )}
-              {status === "offline" && (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                  <span className="text-rose-400 font-medium">Desconectado</span>
-                </>
+              <span className={`w-1.5 h-1.5 rounded-full ${badgeColorClass}`} />
+              <span className={`${statusColorClass} font-semibold`}>{statusText}</span>
+            </div>
+            <div className="text-[9px] text-zinc-400 flex flex-col gap-0.5 mt-1 text-left">
+              <div><strong>Maturidade:</strong> {system.maturity}</div>
+              <div><strong>Método:</strong> {system.integrationMethod}</div>
+              {(system.lastMessage || system.observation) && (
+                <div className="max-w-[140px] text-[8px] text-zinc-550 leading-tight mt-0.5 border-t border-zinc-800/40 pt-1">
+                  <strong>Nota:</strong> {system.lastMessage || system.observation}
+                </div>
               )}
             </div>
           </div>
@@ -110,10 +116,18 @@ function SystemStatusItem({ name }: { name: string }) {
 }
 
 export function SystemStatusIndicator({ systems }: SystemStatusIndicatorProps) {
+  if (systems.length === 0) {
+    return (
+      <div className="text-[10px] text-zinc-500 italic mt-3 mb-1">
+        Nenhuma fonte mapeada
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-center gap-2 mt-3 mb-1">
       {systems.map((system) => (
-        <SystemStatusItem key={system} name={system} />
+        <SystemStatusItem key={system.id} system={system} />
       ))}
     </div>
   );
