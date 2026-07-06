@@ -4,7 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { ComprasGovSyncButton } from "@/components/ComprasGovSyncButton";
 import { Badge, Card, PageHeader, formatDateTime } from "@/components/ui";
 import { getDemoState } from "@/server/demo-store";
-import { getDiagnosticData, type SourceSystemDomain } from "@/modules/connectors/catalog";
+import { getDiagnosticData, type SourceSystemDomain, type SourceSystemCatalogEntry } from "@/modules/connectors/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +19,43 @@ const DOMAIN_ORDER: SourceSystemDomain[] = [
   "Local / derivado / contingência"
 ];
 
-const DOMAIN_MAP: { [key: string]: SourceSystemDomain } = {
-  necessidades: "Necessidades",
-  orcamento: "Orçamento e finanças",
-  aquisicoes: "Aquisições",
-  recebimento: "Recebimento",
-  armazenagem: "Estoque / armazém",
-  transporte: "Transporte / distribuição",
+interface DomainContext {
+  title: string;
+  description: string;
+  domainName: SourceSystemDomain;
+}
+
+const DOMAIN_CONTEXTS: { [key: string]: DomainContext } = {
+  necessidades: {
+    title: "Necessidades logísticas",
+    description: "Mapeamento de demandas, e-PRDU, PGC/PCA, SIGELOG/PDRLog e simulação de deficits operacionais.",
+    domainName: "Necessidades",
+  },
+  orcamento: {
+    title: "Crédito e Execução Financeira",
+    description: "SIAFI, SAG, controles orçamentários, saldos de créditos e relatórios locais consolidando limites de empenho.",
+    domainName: "Orçamento e finanças",
+  },
+  aquisicoes: {
+    title: "Aquisições e Instrumentos",
+    description: "Pesquisa de atas de registro de preços, homologações CATMAT/ARP, Compras.gov e publicações no PNCP.",
+    domainName: "Aquisições",
+  },
+  recebimento: {
+    title: "Recebimento Físico e Documental",
+    description: "Piloto de passaporte logístico, validação física com Scanner QR nativo e importação de notas fiscais XML.",
+    domainName: "Recebimento",
+  },
+  armazenagem: {
+    title: "Armazenagem e Endereçamento",
+    description: "Controle de estoques físicos, depósitos, auditoria material no piloto e integrações mapeadas com o SISCOFIS-WEB.",
+    domainName: "Estoque / armazém",
+  },
+  transporte: {
+    title: "Transporte e Distribuição",
+    description: "Roteirização, expedição de remessas e rastreamento de entregas, conciliando simuladores locais e lacunas a mapear.",
+    domainName: "Transporte / distribuição",
+  },
 };
 
 function getStatusBadgeTone(status: string) {
@@ -111,6 +141,80 @@ function getMethodLabel(method: string) {
   }
 }
 
+function getDomainSummary(domainSystems: SourceSystemCatalogEntry[]) {
+  if (domainSystems.length === 0) {
+    return { label: "Lacuna", color: "text-zinc-500 border-zinc-700/50 bg-zinc-900/50" };
+  }
+
+  const relevantSystems = domainSystems.filter(sys => sys.sourceKind !== "DEMO_SIMULATOR");
+  const hasFailure = relevantSystems.some(sys => sys.status === "FALHA");
+  if (hasFailure) {
+    return { label: "Falha", color: "text-rose-450 border-rose-500/40 bg-rose-500/10" };
+  }
+
+  const hasConnectedReal = relevantSystems.some(sys => 
+    sys.status === "SAUDAVEL" && 
+    sys.maturity === "INTEGRADO_REAL" && 
+    (sys.sourceKind === "EXTERNAL_SYSTEM" || sys.sourceKind === "PUBLIC_SOURCE")
+  );
+  if (hasConnectedReal) {
+    return { label: "Conectado", color: "text-emerald-450 border-emerald-500/40 bg-emerald-500/10" };
+  }
+
+  const hasPartialOrNative = domainSystems.some(sys => 
+    sys.status === "SAUDAVEL" && 
+    (sys.maturity === "INTEGRADO_PARCIAL" || sys.sourceKind === "MCL_NATIVE_CAPABILITY") &&
+    sys.id !== "mcl-qr-recebimento" &&
+    sys.id !== "mcl-storage-pilot" &&
+    sys.id !== "mcl-delivery-pilot"
+  );
+  if (hasPartialOrNative) {
+    return { label: "Parcial", color: "text-amber-405 border-amber-500/30 bg-amber-500/10" };
+  }
+
+  const hasNativeFunctional = domainSystems.some(sys => 
+    sys.status === "SAUDAVEL" && 
+    (sys.sourceKind === "MCL_NATIVE_CAPABILITY" || sys.sourceKind === "DEMO_SIMULATOR")
+  );
+
+  const hasMappedNotIntegrated = domainSystems.some(sys => 
+    sys.status === "NAO_INTEGRADO" || 
+    sys.status === "PENDENTE" || 
+    sys.status === "NAO_CONFIGURADO" || 
+    sys.status === "ATRASADO" ||
+    sys.maturity === "PLANEJADO" ||
+    sys.maturity === "MAPEADO_NAO_INTEGRADO"
+  );
+
+  const hasGapToMap = domainSystems.some(sys => sys.sourceKind === "GAP_TO_MAP");
+
+  if (hasNativeFunctional && hasMappedNotIntegrated) {
+    if (domainSystems.some(sys => sys.domain === "Aquisições" && sys.id === "compras-gov" && sys.status === "SAUDAVEL")) {
+      return { label: "Parcial", color: "text-amber-405 border-amber-500/30 bg-amber-500/10" };
+    }
+    return { label: "Demo/Pendente", color: "text-indigo-400 border-indigo-500/30 bg-indigo-500/10" };
+  }
+
+  if (hasNativeFunctional) {
+    return { label: "Demo", color: "text-indigo-400 border-indigo-500/30 bg-indigo-500/10" };
+  }
+
+  if (hasMappedNotIntegrated && hasGapToMap) {
+    return { label: "Lacuna/Pendente", color: "text-zinc-450 border-zinc-700/50 bg-zinc-900/50" };
+  }
+
+  if (hasMappedNotIntegrated) {
+    return { label: "Pendente", color: "text-zinc-400 border-zinc-800 bg-zinc-900/30" };
+  }
+
+  const allGaps = domainSystems.every(sys => sys.sourceKind === "GAP_TO_MAP" || sys.maturity === "DESCONHECIDO");
+  if (allGaps) {
+    return { label: "Lacuna", color: "text-zinc-450 border-zinc-700/50 bg-zinc-900/50" };
+  }
+
+  return { label: "Pendente", color: "text-zinc-400 border-zinc-800 bg-zinc-900/30" };
+}
+
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
@@ -118,13 +222,29 @@ interface PageProps {
 export default async function ConnectorsPage({ searchParams }: PageProps) {
   const resolvedParams = await searchParams;
   const rawDominio = typeof resolvedParams?.dominio === "string" ? resolvedParams.dominio : undefined;
-  const filterDomain = rawDominio ? DOMAIN_MAP[rawDominio] : undefined;
+  const domainCtx = rawDominio ? DOMAIN_CONTEXTS[rawDominio] : undefined;
+  const filterDomain = domainCtx?.domainName;
 
   const state = getDemoState();
   const diagnosis = getDiagnosticData(state);
   const { environment, systems } = diagnosis;
 
   const domainsToRender = filterDomain ? [filterDomain] : DOMAIN_ORDER;
+
+  // Active domain stats calculation
+  const domainSystems = filterDomain ? systems.filter(sys => sys.domain === filterDomain) : [];
+  const totalSources = domainSystems.length;
+  const statusSummary = getDomainSummary(domainSystems);
+
+  const countKind = (kind: string) => domainSystems.filter(sys => sys.sourceKind === kind).length;
+
+  const countNative = countKind("MCL_NATIVE_CAPABILITY");
+  const countSimulator = countKind("DEMO_SIMULATOR");
+  const countGap = countKind("GAP_TO_MAP");
+  const countFailed = domainSystems.filter(sys => sys.status === "FALHA" && sys.sourceKind !== "DEMO_SIMULATOR").length;
+
+  const runTimes = domainSystems.map(s => s.lastRunAt).filter(Boolean) as string[];
+  const lastRunStr = runTimes.length > 0 ? formatDateTime(runTimes.sort().reverse()[0]) : undefined;
 
   const icon = {
     SAUDAVEL: CheckCircle2,
@@ -176,21 +296,67 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* Active Filter Banner */}
-      {filterDomain && (
-        <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl mb-6 flex items-center justify-between shadow-sm border-l-4 border-l-indigo-500">
-          <div className="flex items-center gap-2">
-            <Database className="h-5 w-5 text-indigo-500 shrink-0" />
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Filtro ativo por dimensão: <strong className="text-indigo-600 dark:text-indigo-400">{filterDomain}</strong>
-            </span>
+      {/* Domain Context Header */}
+      {domainCtx && (
+        <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 mb-8 shadow-sm border-l-4 border-l-indigo-500">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-250 dark:border-zinc-800 pb-4 mb-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <Database className="h-6 w-6 text-indigo-500 shrink-0" />
+                <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">{domainCtx.title}</h1>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-3xl leading-relaxed">{domainCtx.description}</p>
+            </div>
+            
+            <div className="flex items-center gap-3 shrink-0">
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border tracking-wide ${statusSummary.color}`}>
+                STATUS DO DOMÍNIO: {statusSummary.label.toUpperCase()}
+              </span>
+              <Link 
+                href="/conectores" 
+                className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 bg-zinc-200/50 dark:bg-zinc-850 py-1.5 px-3 rounded-lg border border-zinc-300 dark:border-zinc-750 transition-colors"
+              >
+                Limpar Filtro
+              </Link>
+            </div>
           </div>
-          <Link 
-            href="/conectores" 
-            className="text-xs font-semibold text-indigo-650 hover:text-indigo-550 dark:text-indigo-350 dark:hover:text-indigo-250 bg-indigo-50 dark:bg-indigo-950/40 py-1.5 px-3 rounded-lg border border-indigo-200 dark:border-indigo-900/60 transition-colors shrink-0"
-          >
-            Limpar filtro
-          </Link>
+
+          {/* Grid of details/contadores */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mt-4">
+            <div className="p-3 bg-white dark:bg-zinc-950/20 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
+              <span className="text-[9px] text-zinc-500 dark:text-zinc-500 font-medium block uppercase tracking-wider">Fontes Mapeadas</span>
+              <span className="text-base font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{totalSources}</span>
+            </div>
+            
+            <div className="p-3 bg-white dark:bg-zinc-950/20 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
+              <span className="text-[9px] text-zinc-500 dark:text-zinc-500 font-medium block uppercase tracking-wider">Capacidades Nativas</span>
+              <span className="text-base font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{countNative}</span>
+            </div>
+
+            <div className="p-3 bg-white dark:bg-zinc-950/20 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
+              <span className="text-[9px] text-zinc-500 dark:text-zinc-500 font-medium block uppercase tracking-wider">Simuladores</span>
+              <span className="text-base font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{countSimulator}</span>
+            </div>
+
+            <div className="p-3 bg-white dark:bg-zinc-950/20 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
+              <span className="text-[9px] text-zinc-500 dark:text-zinc-500 font-medium block uppercase tracking-wider">Lacunas</span>
+              <span className="text-base font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{countGap}</span>
+            </div>
+
+            <div className="p-3 bg-white dark:bg-zinc-950/20 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50">
+              <span className="text-[9px] text-zinc-500 dark:text-zinc-500 font-medium block uppercase tracking-wider">Fontes com Falha</span>
+              <span className="text-base font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">
+                <span className={countFailed > 0 ? "text-rose-600 dark:text-rose-500" : "text-zinc-800 dark:text-zinc-200"}>{countFailed}</span>
+              </span>
+            </div>
+
+            <div className="p-3 bg-white dark:bg-zinc-950/20 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 col-span-2 sm:col-span-1">
+              <span className="text-[9px] text-zinc-500 dark:text-zinc-500 font-medium block uppercase tracking-wider">Última Execução Disponível</span>
+              <span className="text-[10px] font-semibold text-zinc-850 dark:text-zinc-300 mt-1 block truncate" title={lastRunStr ?? "N/A"}>
+                {lastRunStr ?? "Não disponível"}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -207,8 +373,12 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
               </h2>
 
               {domainSystems.length === 0 ? (
-                <div className="bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800 border-dashed p-6 rounded-xl text-center">
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Nenhum sistema de origem ou conector mapeado para esta dimensão da cadeia logística.</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800 border-dashed p-8 rounded-xl text-center max-w-lg mx-auto">
+                  <Database className="h-8 w-8 text-zinc-450 mx-auto mb-3" strokeWidth={1.5} />
+                  <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Nenhuma fonte de dados mapeada</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+                    O MCL conhece esta lacuna, mas ainda não recebeu fonte autorizada para esta dimensão da cadeia logística.
+                  </p>
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2">

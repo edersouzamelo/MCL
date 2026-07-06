@@ -123,7 +123,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Depende de autorização institucional e contrato de interconexão técnica.",
         "Acesso restrito a usuários e redes autenticadas do e-PRDU."
       ],
-      observation: "Não chamar automaticamente; depende de autorização e contrato técnico."
+      observation: "Fonte mapeada, não integrada. Este sistema é restrito e depende de autorização institucional."
     },
     // B) SIGELOG / PDRLog
     {
@@ -140,7 +140,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Escopo funcional real de distribuição e necessidades de fardamento precisa ser homologado.",
         "Ausência de endpoints públicos expostos."
       ],
-      observation: "Confirmar escopo real antes de implementar conector."
+      observation: "Fonte mapeada, não integrada. Depende de autorização do órgão gestor e homologação de escopo."
     },
     // C) PGC / PCA
     {
@@ -157,7 +157,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Acesso restrito ao sistema de planejamento de contratações do Governo Federal.",
         "Não substitui necessidade logística operacional emergencial ou demanda tática do e-PRDU."
       ],
-      observation: "Fonte de planejamento da contratação. Não substitui necessidade logística operacional, e-PRDU, SIGELOG/PDRLog ou demanda emergencial."
+      observation: "Fonte de planejamento da contratação. Não substitui necessidade logística operacional emergencial ou demanda tática."
     },
     // D) PNCP
     {
@@ -237,7 +237,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Ambiente restrito sob rede segura do Governo Federal (Serpro/STN).",
         "Vedado o uso de dados de saldo financeiro ou empenhos reais em ambiente de piloto de homologação."
       ],
-      observation: "Não chamar, não simular saldo real, não inserir dados reais."
+      observation: "Fonte mapeada, não integrada. Este sistema é restrito e depende de autorização institucional."
     },
     // H) SAG
     {
@@ -288,7 +288,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Não comprova recebimento documental, patrimonial, fiscal ou financeiro oficial.",
         "Não deve receber dados reais sem autorização institucional."
       ],
-      observation: "Registra evento físico de recebimento no piloto. Não comprova recebimento documental, fiscal, patrimonial ou financeiro oficial."
+      observation: "Capacidade nativa demonstrativa. Fluxo disponível apenas para piloto; não substitui sistema oficial."
     },
     // K) SISCOFIS-WEB
     {
@@ -305,7 +305,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Rede corporativa militar fechada.",
         "Proibido simular estoque ou depósitos reais sem conformidade de segurança."
       ],
-      observation: "Não simular estoque real."
+      observation: "Fonte mapeada, não integrada. Rede corporativa militar fechada."
     },
     // L) MCL — Piloto de Armazenagem e Endereçamento
     {
@@ -322,7 +322,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Capacidade nativa para fins demonstrativos.",
         "Não substitui SISCOFIS-WEB ou registros patrimoniais oficiais."
       ],
-      observation: "Capacidade nativa para registrar MATERIAL_ARMAZENADO, localização, condição e vínculo com unidade logística. Não substitui SISCOFIS-WEB."
+      observation: "Capacidade nativa demonstrativa. Fluxo de armazenamento para piloto; não substitui o SISCOFIS-WEB oficial."
     },
     // M) Transporte externo / sistema a mapear
     {
@@ -355,7 +355,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Limita-se ao registro demonstrativo interno no MCL.",
         "Não realiza emissão de guias de transporte ou contratação de frete real."
       ],
-      observation: "Capacidade nativa para registrar REMESSA_EXPEDIDA, MATERIAL_EM_TRANSITO e MATERIAL_ENTREGUE no piloto. Não substitui sistema oficial de transporte."
+      observation: "Capacidade nativa demonstrativa. Fluxo de remessa e entrega para piloto; não substitui sistema oficial."
     },
     // O) Controles locais / planilhas / relatórios
     {
@@ -372,7 +372,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Dados inseridos por operadores demonstrativos.",
         "Sujeito a falha e divergência de digitação manual."
       ],
-      observation: "Permitido apenas quando explicitamente marcado como local/manual/derivado."
+      observation: "Capacidade nativa demonstrativa. Dados inseridos localmente por operadores para contingência."
     },
     
     // Active simulator connectors to keep existing test/demo data mapped cleanly
