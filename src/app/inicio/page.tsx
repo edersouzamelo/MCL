@@ -44,34 +44,46 @@ const metaNav = [
 
 function getDomainSummary(domainSystems: SourceSystemCatalogEntry[]) {
   if (domainSystems.length === 0) {
-    return { label: "Lacuna", color: "text-zinc-400 border-zinc-700/50 bg-zinc-900/50" };
+    return { label: "Lacuna", color: "text-zinc-500 border-zinc-700/50 bg-zinc-900/50" };
   }
 
-  // Se qualquer fonte real tiver status FALHA
-  const realSystems = domainSystems.filter(sys => sys.nature !== "SINTETICA_DEMONSTRATIVA" && sys.nature !== "DESCONHECIDA_A_MAPEAR");
-  const hasRealFailure = realSystems.some(sys => sys.status === "FALHA");
-  if (hasRealFailure) {
-    return { label: "Falha", color: "text-rose-400 border-rose-500/40 bg-rose-500/15" };
+  // FALHA: somente se uma fonte relevante (não simulador de demonstração isolado) estiver falhando
+  const relevantSystems = domainSystems.filter(sys => sys.sourceKind !== "DEMO_SIMULATOR");
+  const hasFailure = relevantSystems.some(sys => sys.status === "FALHA");
+  if (hasFailure) {
+    return { label: "Falha", color: "text-rose-400 border-rose-500/40 bg-rose-500/15 animate-pulse" };
   }
 
-  // Se houver qualquer falha mesmo em simuladores
-  const hasAnyFailure = domainSystems.some(sys => sys.status === "FALHA");
-  if (hasAnyFailure) {
-    return { label: "Falha", color: "text-rose-400 border-rose-500/40 bg-rose-500/15" };
-  }
-
-  // Se houver fonte real ativa (SAUDAVEL) e integrada (REAL/PARCIAL)
-  const activeReal = realSystems.filter(sys => sys.status === "SAUDAVEL" && (sys.maturity === "INTEGRADO_REAL" || sys.maturity === "INTEGRADO_PARCIAL"));
-  if (activeReal.length > 0) {
-    const isPartial = activeReal.some(sys => sys.maturity === "INTEGRADO_PARCIAL");
-    if (isPartial) {
-      return { label: "Parcial", color: "text-amber-400 border-amber-500/30 bg-amber-500/10" };
-    }
+  // CONECTADO: somente se houver fonte real integrada saudável
+  const hasConnectedReal = relevantSystems.some(sys => 
+    sys.status === "SAUDAVEL" && 
+    sys.maturity === "INTEGRADO_REAL" && 
+    (sys.sourceKind === "EXTERNAL_SYSTEM" || sys.sourceKind === "PUBLIC_SOURCE")
+  );
+  if (hasConnectedReal) {
     return { label: "Conectado", color: "text-emerald-450 border-emerald-500/40 bg-emerald-500/15" };
   }
 
-  // Se houver fontes mapeadas mas pendentes/não integradas
-  const hasRealMapeado = realSystems.some(sys => 
+  // PARCIAL: se houver fonte real parcial, API pública parcial ou capacidade nativa funcional com limitações
+  const hasPartialOrNative = domainSystems.some(sys => 
+    sys.status === "SAUDAVEL" && 
+    (sys.maturity === "INTEGRADO_PARCIAL" || sys.sourceKind === "MCL_NATIVE_CAPABILITY") &&
+    sys.id !== "mcl-qr-recebimento" && // Manter Recebimento como DEMO
+    sys.id !== "mcl-storage-pilot" &&
+    sys.id !== "mcl-delivery-pilot"
+  );
+  if (hasPartialOrNative) {
+    return { label: "Parcial", color: "text-amber-400 border-amber-500/30 bg-amber-500/10" };
+  }
+
+  // DEMO: se o domínio tiver capacidade nativa MCL funcional ou simulador, mas sem fonte oficial integrada
+  const hasNativeFunctional = domainSystems.some(sys => 
+    sys.status === "SAUDAVEL" && 
+    (sys.sourceKind === "MCL_NATIVE_CAPABILITY" || sys.sourceKind === "DEMO_SIMULATOR")
+  );
+
+  // PENDENTE: se houver fontes mapeadas não integradas ou capacidade nativa prevista (status PENDENTE/PLANEJADO)
+  const hasMappedNotIntegrated = domainSystems.some(sys => 
     sys.status === "NAO_INTEGRADO" || 
     sys.status === "PENDENTE" || 
     sys.status === "NAO_CONFIGURADO" || 
@@ -80,19 +92,30 @@ function getDomainSummary(domainSystems: SourceSystemCatalogEntry[]) {
     sys.maturity === "MAPEADO_NAO_INTEGRADO"
   );
 
-  if (hasRealMapeado) {
-    return { label: "Pendente", color: "text-zinc-400 border-zinc-800 bg-zinc-900/30" };
+  const hasGapToMap = domainSystems.some(sys => sys.sourceKind === "GAP_TO_MAP");
+
+  if (hasNativeFunctional && hasMappedNotIntegrated) {
+    if (domainSystems.some(sys => sys.domain === "Aquisições" && sys.id === "compras-gov" && sys.status === "SAUDAVEL")) {
+      return { label: "Parcial", color: "text-amber-400 border-amber-500/30 bg-amber-500/10" };
+    }
+    return { label: "Demo/Pendente", color: "text-indigo-400 border-indigo-500/30 bg-indigo-500/10" };
   }
 
-  // Se todas as fontes forem simuladores
-  const allDemo = domainSystems.every(sys => sys.nature === "SINTETICA_DEMONSTRATIVA" || sys.nature === "MANUAL_VALIDADA");
-  if (allDemo) {
+  if (hasNativeFunctional) {
     return { label: "Demo", color: "text-indigo-400 border-indigo-500/30 bg-indigo-500/10" };
   }
 
-  // Se houver lacunas
-  const hasGap = domainSystems.some(sys => sys.nature === "DESCONHECIDA_A_MAPEAR" || sys.maturity === "DESCONHECIDO");
-  if (hasGap) {
+  if (hasMappedNotIntegrated && hasGapToMap) {
+    return { label: "Lacuna/Pendente", color: "text-zinc-450 border-zinc-700/50 bg-zinc-900/50" };
+  }
+
+  if (hasMappedNotIntegrated) {
+    return { label: "Pendente", color: "text-zinc-400 border-zinc-800 bg-zinc-900/30" };
+  }
+
+  // LACUNA: se não houver sistema externo identificado nem capacidade nativa definida
+  const allGaps = domainSystems.every(sys => sys.sourceKind === "GAP_TO_MAP" || sys.maturity === "DESCONHECIDO");
+  if (allGaps) {
     return { label: "Lacuna", color: "text-zinc-450 border-zinc-700/50 bg-zinc-900/50" };
   }
 

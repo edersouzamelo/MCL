@@ -52,6 +52,19 @@ function getNatureLabel(nature: string) {
   }
 }
 
+function getSourceKindLabel(kind: string) {
+  switch (kind) {
+    case "EXTERNAL_SYSTEM": return "Sistema Externo Oficial";
+    case "PUBLIC_SOURCE": return "Fonte Pública Real";
+    case "DOCUMENT_SOURCE": return "Fonte Documental";
+    case "LOCAL_DERIVED_SOURCE": return "Visão Local / Derivada";
+    case "MCL_NATIVE_CAPABILITY": return "Capacidade Nativa MCL";
+    case "DEMO_SIMULATOR": return "Simulador Demonstrativo";
+    case "GAP_TO_MAP": return "Lacuna a Mapear";
+    default: return "Desconhecido";
+  }
+}
+
 function getAuthorityLabel(authority: string) {
   switch (authority) {
     case "OFICIAL": return "Autoridade Primária/Oficial";
@@ -185,6 +198,8 @@ export default function ConnectorsPage() {
                                 </Badge>
                               </div>
                               <p className="text-[11px] text-zinc-500 mt-1">
+                                Tipo: <strong className="text-zinc-700 dark:text-zinc-400">{getSourceKindLabel(system.sourceKind)}</strong>
+                                <span className="mx-1.5">•</span>
                                 Natureza: <strong className="text-zinc-700 dark:text-zinc-400">{getNatureLabel(system.nature)}</strong>
                               </p>
                             </div>
