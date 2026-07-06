@@ -149,7 +149,7 @@ function getDomainSummary(domainSystems: SourceSystemCatalogEntry[]) {
   const relevantSystems = domainSystems.filter(sys => sys.sourceKind !== "DEMO_SIMULATOR");
   const hasFailure = relevantSystems.some(sys => sys.status === "FALHA");
   if (hasFailure) {
-    return { label: "Falha", color: "text-rose-400 border-rose-500/40 bg-rose-500/10" };
+    return { label: "Falha", color: "text-rose-450 border-rose-500/40 bg-rose-500/10" };
   }
 
   const hasConnectedReal = relevantSystems.some(sys => 
@@ -158,7 +158,7 @@ function getDomainSummary(domainSystems: SourceSystemCatalogEntry[]) {
     (sys.sourceKind === "EXTERNAL_SYSTEM" || sys.sourceKind === "PUBLIC_SOURCE")
   );
   if (hasConnectedReal) {
-    return { label: "Conectado", color: "text-emerald-450 border-emerald-500/40 bg-emerald-500/10" };
+    return { label: "Conectado", color: "text-emerald-400 border-emerald-500/40 bg-emerald-500/10" };
   }
 
   const hasPartialOrNative = domainSystems.some(sys => 
@@ -200,7 +200,7 @@ function getDomainSummary(domainSystems: SourceSystemCatalogEntry[]) {
   }
 
   if (hasMappedNotIntegrated && hasGapToMap) {
-    return { label: "Lacuna/Pendente", color: "text-zinc-450 border-zinc-700/50 bg-zinc-900/50" };
+    return { label: "Lacuna/Pendente", color: "text-zinc-400 border-zinc-700/50 bg-zinc-900/50" };
   }
 
   if (hasMappedNotIntegrated) {
@@ -209,7 +209,7 @@ function getDomainSummary(domainSystems: SourceSystemCatalogEntry[]) {
 
   const allGaps = domainSystems.every(sys => sys.sourceKind === "GAP_TO_MAP" || sys.maturity === "DESCONHECIDO");
   if (allGaps) {
-    return { label: "Lacuna", color: "text-zinc-450 border-zinc-700/50 bg-zinc-900/50" };
+    return { label: "Lacuna", color: "text-zinc-400 border-zinc-700/50 bg-zinc-900/50" };
   }
 
   return { label: "Pendente", color: "text-zinc-400 border-zinc-800 bg-zinc-900/30" };
@@ -274,7 +274,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
 
       {/* Persistent Demonstration Banner */}
       <div className="bg-rose-500/10 border border-rose-500/30 text-rose-200 p-4 rounded-xl mb-6 flex items-start gap-3 shadow-md">
-        <ShieldAlert className="h-5 w-5 text-rose-450 shrink-0 mt-0.5" />
+        <ShieldAlert className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
         <div>
           <strong className="text-sm font-bold block mb-0.5">AMBIENTE DEMONSTRATIVO DO PILOTO</strong>
           <span className="text-xs text-rose-300">
@@ -302,7 +302,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
         {/* Domain Context Header */}
         {domainCtx && (
           <div className="bg-zinc-100/40 dark:bg-zinc-950/20 border border-zinc-200/50 dark:border-zinc-800/40 rounded-2xl p-6 shadow-sm border-l-4 border-l-indigo-500">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-250 dark:border-zinc-800/60 pb-4 mb-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800/60 pb-4 mb-4">
               <div>
                 <div className="flex items-center gap-2.5">
                   <Database className="h-6 w-6 text-indigo-550 dark:text-indigo-400 shrink-0" />
@@ -317,7 +317,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
                 </span>
                 <Link 
                   href="/conectores" 
-                  className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 bg-zinc-200/50 dark:bg-zinc-850 py-1.5 px-3 rounded-lg border border-zinc-300 dark:border-zinc-750 transition-colors"
+                  className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 bg-zinc-200/50 dark:bg-zinc-800 py-1.5 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 transition-colors"
                 >
                   Limpar Filtro
                 </Link>
@@ -327,35 +327,35 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
             {/* Grid of details/contadores */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
               <div className="p-4 bg-white/40 dark:bg-zinc-950/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800/40 shadow-sm">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-450 font-bold block uppercase tracking-wider">Fontes Mapeadas</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold block uppercase tracking-wider">Fontes Mapeadas</span>
                 <span className="text-xl font-extrabold text-zinc-900 dark:text-white mt-1 block">{totalSources}</span>
               </div>
               
               <div className="p-4 bg-white/40 dark:bg-zinc-950/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800/40 shadow-sm">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-450 font-bold block uppercase tracking-wider">Capacidades Nativas</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold block uppercase tracking-wider">Capacidades Nativas</span>
                 <span className="text-xl font-extrabold text-zinc-900 dark:text-white mt-1 block">{countNative}</span>
               </div>
 
               <div className="p-4 bg-white/40 dark:bg-zinc-950/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800/40 shadow-sm">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-450 font-bold block uppercase tracking-wider">Simuladores</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold block uppercase tracking-wider">Simuladores</span>
                 <span className="text-xl font-extrabold text-zinc-900 dark:text-white mt-1 block">{countSimulator}</span>
               </div>
 
               <div className="p-4 bg-white/40 dark:bg-zinc-950/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800/40 shadow-sm">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-450 font-bold block uppercase tracking-wider">Lacunas</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold block uppercase tracking-wider">Lacunas</span>
                 <span className="text-xl font-extrabold text-zinc-900 dark:text-white mt-1 block">{countGap}</span>
               </div>
 
               <div className="p-4 bg-white/40 dark:bg-zinc-950/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800/40 shadow-sm">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-450 font-bold block uppercase tracking-wider">Fontes com Falha</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold block uppercase tracking-wider">Fontes com Falha</span>
                 <span className="text-xl font-extrabold mt-1 block">
                   <span className={countFailed > 0 ? "text-rose-500" : "text-zinc-900 dark:text-zinc-100"}>{countFailed}</span>
                 </span>
               </div>
 
               <div className="p-4 bg-white/40 dark:bg-zinc-950/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800/40 shadow-sm col-span-2 sm:col-span-1">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-450 font-bold block uppercase tracking-wider">Última Execução</span>
-                <span className="text-xs font-semibold text-zinc-850 dark:text-zinc-300 mt-2 block truncate" title={lastRunStr ?? "N/A"}>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold block uppercase tracking-wider">Última Execução</span>
+                <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-300 mt-2 block truncate" title={lastRunStr ?? "N/A"}>
                   {lastRunStr ?? "Não disponível"}
                 </span>
               </div>
@@ -369,17 +369,17 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
             const domainSystems = systems.filter((sys) => sys.domain === domain);
 
             return (
-              <section key={domain} className="border-b border-zinc-200 dark:border-zinc-850 pb-8 last:border-b-0 last:pb-0">
+              <section key={domain} className="border-b border-zinc-200 dark:border-zinc-800 pb-8 last:border-b-0 last:pb-0">
                 <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
                   <Database className="h-5 w-5 text-zinc-400" />
                   Dimensão: {domain}
                 </h2>
 
                 {domainSystems.length === 0 ? (
-                  <div className="bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-205 dark:border-zinc-800/80 border-dashed p-8 rounded-2xl text-center max-w-lg mx-auto">
+                  <div className="bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800/85 border-dashed p-8 rounded-2xl text-center max-w-lg mx-auto">
                     <Database className="h-8 w-8 text-zinc-400 mx-auto mb-3" strokeWidth={1.5} />
                     <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Nenhuma fonte de dados mapeada</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-450 mt-1.5 leading-relaxed">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
                       O MCL conhece esta lacuna, mas ainda não recebeu fonte autorizada para esta dimensão da cadeia logística.
                     </p>
                   </div>
@@ -409,9 +409,9 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
                                   </Badge>
                                 </div>
                                 <p className="text-[11px] text-zinc-500 mt-1">
-                                  Tipo: <strong className="text-zinc-700 dark:text-zinc-400">{getSourceKindLabel(system.sourceKind)}</strong>
+                                  Tipo: <strong className="text-zinc-700 dark:text-zinc-300">{getSourceKindLabel(system.sourceKind)}</strong>
                                   <span className="mx-1.5">•</span>
-                                  Natureza: <strong className="text-zinc-700 dark:text-zinc-400">{getNatureLabel(system.nature)}</strong>
+                                  Natureza: <strong className="text-zinc-700 dark:text-zinc-300">{getNatureLabel(system.nature)}</strong>
                                 </p>
                               </div>
 
@@ -443,7 +443,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
                             )}
 
                             {system.lastMessage && (
-                              <p className="mt-3 text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed bg-zinc-50 dark:bg-zinc-950/10 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-850">
+                              <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed bg-zinc-50 dark:bg-zinc-950/10 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800">
                                 <strong>Diagnóstico:</strong> {system.lastMessage}
                               </p>
                             )}
@@ -464,48 +464,48 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
                           {/* Telemetry/Metadata Grid */}
                           <div className="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4">
                             <dl className="grid gap-2 grid-cols-2 text-[11px]">
-                              <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                              <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                 <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Autoridade de dados</dt>
-                                <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{getAuthorityLabel(system.authority)}</dd>
+                                <dd className="font-semibold text-zinc-800 dark:text-zinc-250">{getAuthorityLabel(system.authority)}</dd>
                               </div>
-                              <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                              <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                 <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Método de Integração</dt>
-                                <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{getMethodLabel(system.integrationMethod)}</dd>
+                                <dd className="font-semibold text-zinc-800 dark:text-zinc-250">{getMethodLabel(system.integrationMethod)}</dd>
                               </div>
 
                               {/* Telemetry Details for Compras.gov */}
                               {system.telemetry ? (
                                 <>
-                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5 col-span-2">
+                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5 col-span-2">
                                     <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Último Endpoint Sincronizado</dt>
-                                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200 font-mono text-[10px] truncate" title={system.telemetry.endpoint ?? ""}>{system.telemetry.endpoint ?? "Nao configurado"}</dd>
+                                    <dd className="font-semibold text-zinc-800 dark:text-zinc-250 font-mono text-[10px] truncate" title={system.telemetry.endpoint ?? ""}>{system.telemetry.endpoint ?? "Nao configurado"}</dd>
                                   </div>
-                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                     <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Registros Lidos</dt>
-                                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{system.telemetry.recordsRead ?? 0}</dd>
+                                    <dd className="font-semibold text-zinc-800 dark:text-zinc-250">{system.telemetry.recordsRead ?? 0}</dd>
                                   </div>
-                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                     <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Registros Importados</dt>
-                                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{system.telemetry.acceptedRecords ?? 0}</dd>
+                                    <dd className="font-semibold text-zinc-800 dark:text-zinc-250">{system.telemetry.acceptedRecords ?? 0}</dd>
                                   </div>
-                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                     <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Atualizados / Duplicados</dt>
-                                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{system.telemetry.updatedRecords ?? 0} / {system.telemetry.duplicateRecords ?? 0}</dd>
+                                    <dd className="font-semibold text-zinc-800 dark:text-zinc-250">{system.telemetry.updatedRecords ?? 0} / {system.telemetry.duplicateRecords ?? 0}</dd>
                                   </div>
-                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                     <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Rejeitados / Duração</dt>
-                                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{system.telemetry.rejectedRecords ?? 0} / {system.telemetry.durationMs ?? 0}ms</dd>
+                                    <dd className="font-semibold text-zinc-800 dark:text-zinc-250">{system.telemetry.rejectedRecords ?? 0} / {system.telemetry.durationMs ?? 0}ms</dd>
                                   </div>
                                 </>
                               ) : (
                                 <>
-                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                     <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Maturidade do Fluxo</dt>
-                                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{getMaturityLabel(system.maturity)}</dd>
+                                    <dd className="font-semibold text-zinc-800 dark:text-zinc-250">{getMaturityLabel(system.maturity)}</dd>
                                   </div>
-                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-850/45 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
+                                  <div className="rounded-lg bg-zinc-100/35 dark:bg-zinc-800/40 border border-zinc-200/30 dark:border-zinc-800/30 p-2.5">
                                     <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Última sincronização</dt>
-                                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">
+                                    <dd className="font-semibold text-zinc-800 dark:text-zinc-250">
                                       {system.lastRunAt ? formatDateTime(system.lastRunAt) : "Nunca executado"}
                                     </dd>
                                   </div>
@@ -527,7 +527,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
       <Card className="mt-10">
         <div className="flex items-center gap-2">
           <Globe aria-hidden className="h-5 w-5 text-emerald-700 shrink-0" />
-          <p className="text-xs text-zinc-650 dark:text-zinc-400">
+          <p className="text-xs text-zinc-600 dark:text-zinc-400">
             <strong>Arquitetura Federada do MCL:</strong> Os dados exibidos nesta plataforma são integrados dinamicamente sob demanda ou via carga local de contigência de acordo com as autorizações e restrições de rede das fontes oficiais.
           </p>
         </div>

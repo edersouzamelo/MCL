@@ -56,10 +56,10 @@ export default function DashboardPage() {
         <MetricCard label="Divergencias abertas" value={metrics.openDivergences} detail="Monitoramento operacional" tone={metrics.openDivergences ? "bad" : "good"} />
       </div>
 
-      <section className="mt-6 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 rounded-lg p-5">
-        <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Cenario atual do piloto</h2>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Necessidade ativa de demonstracao: <strong>{mainNeed?.persistentCode ?? "sem necessidade ativa"}</strong>. O painel foi estabilizado para nao depender de leitura direta do PostgreSQL enquanto a cadeia CATMAT e sincronizada.
+      <section className="mt-6 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/60 rounded-xl p-5">
+        <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Cenário atual do piloto</h2>
+        <p className="mt-2 text-sm text-zinc-650 dark:text-zinc-300">
+          Necessidade ativa de demonstração: <strong className="font-bold text-zinc-900 dark:text-white">{mainNeed?.persistentCode ?? "sem necessidade ativa"}</strong>. O painel foi estabilizado para não depender de leitura direta do PostgreSQL enquanto a cadeia CATMAT é sincronizada.
         </p>
       </section>
 
@@ -67,39 +67,47 @@ export default function DashboardPage() {
         <Card>
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Cobertura de aquisicao por material</h2>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Acompanhamento da correlacao CATMAT de necessidades com atas e saldos.</p>
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Cobertura de aquisição por material</h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Acompanhamento da correlação CATMAT de necessidades com atas e saldos.</p>
             </div>
             <Badge tone="info">{catmatMapped} CATMAT vinculados · {atasCount} atas</Badge>
           </div>
 
           <div className="mt-6 overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
+              <thead className="bg-zinc-50 dark:bg-zinc-950/50 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-455">
                 <tr>
                   <th className="py-2.5 px-3">Material</th>
-                  <th>Organizacao</th>
+                  <th>Organização</th>
                   <th>Solicitado</th>
                   <th>Coberto</th>
-                  <th>Deficit</th>
+                  <th>Déficit</th>
                   <th>CATMAT</th>
                   <th>Atas</th>
                   <th>Cobertura</th>
-                  <th className="px-3 text-right">Acao</th>
+                  <th className="px-3 text-right">Ação</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                 {tableRows.map((row) => (
-                  <tr key={row.needId} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                    <td className="py-3 px-3 font-semibold text-zinc-900 dark:text-zinc-100">{row.material}</td>
+                  <tr key={row.needId} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/35 transition-colors duration-150">
+                    <td className="py-3 px-3 font-bold text-zinc-900 dark:text-zinc-100">{row.material}</td>
                     <td className="text-zinc-700 dark:text-zinc-300">{row.organization}</td>
-                    <td>{row.requested}</td>
-                    <td>{row.covered}</td>
-                    <td className="font-semibold">{row.deficit}</td>
-                    <td><span className={`px-2 py-0.5 rounded text-xs font-semibold ${row.catmatCode === "Pendente" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{row.catmatCode}</span></td>
-                    <td>{row.atasCount}</td>
-                    <td>{row.coverage}%</td>
-                    <td className="py-3 px-3 text-right"><InlineLink href={`/necessidades/${row.needId}/buscar-cobertura`}>ABRIR ANALISE</InlineLink></td>
+                    <td className="text-zinc-800 dark:text-zinc-300">{row.requested}</td>
+                    <td className="text-zinc-800 dark:text-zinc-300">{row.covered}</td>
+                    <td className="font-extrabold text-rose-650 dark:text-rose-400">{row.deficit}</td>
+                    <td>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                        row.catmatCode === "Pendente" 
+                          ? "bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-500/20" 
+                          : "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20"
+                      }`}>
+                        {row.catmatCode}
+                      </span>
+                    </td>
+                    <td className="text-zinc-800 dark:text-zinc-300">{row.atasCount}</td>
+                    <td className="font-medium text-zinc-900 dark:text-zinc-100">{row.coverage}%</td>
+                    <td className="py-3 px-3 text-right"><InlineLink href={`/necessidades/${row.needId}/buscar-cobertura`}>ABRIR ANÁLISE</InlineLink></td>
                   </tr>
                 ))}
               </tbody>

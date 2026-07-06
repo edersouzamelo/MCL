@@ -129,46 +129,46 @@ export default async function MaterialAnalysesPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded">
+                  <span className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-350 px-2 py-0.5 rounded border border-zinc-200/50 dark:border-zinc-700/50">
                     {item.persistentCode}
                   </span>
                   <Badge tone={item.priority === "ALTA" ? "warn" : "neutral"}>
                     {item.priority}
                   </Badge>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="text-xs text-zinc-550 dark:text-zinc-400">
                     Prazo: {new Date(item.requiredAt).toLocaleDateString("pt-BR")}
                   </span>
                 </div>
-                <h2 className="mt-2 text-xl font-bold text-zinc-900">
+                <h2 className="mt-2 text-xl font-bold text-zinc-950 dark:text-zinc-50">
                   {item.itemName} - {item.variantLabel} (Tam: {item.size})
                 </h2>
-                <p className="text-sm text-zinc-600 mt-1">
-                  Demandante: <strong className="text-zinc-800">{item.orgName}</strong>
+                <p className="text-sm text-zinc-650 dark:text-zinc-400 mt-1">
+                  Demandante: <strong className="font-semibold text-zinc-800 dark:text-zinc-200">{item.orgName}</strong>
                 </p>
 
-                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg p-3 text-xs text-zinc-600 border border-zinc-100">
+                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl p-4 text-xs text-zinc-600 dark:text-zinc-400 border border-zinc-200/40 dark:border-zinc-800/60 shadow-sm">
                   <div>
-                    Solicitado: <strong className="block text-sm text-zinc-900 mt-0.5">{item.quantityRequested}</strong>
+                    Solicitado: <strong className="block text-sm font-bold text-zinc-900 dark:text-white mt-0.5">{item.quantityRequested}</strong>
                   </div>
                   <div>
-                    Aprovado: <strong className="block text-sm text-zinc-900 mt-0.5">{item.quantityApproved}</strong>
+                    Aprovado: <strong className="block text-sm font-bold text-zinc-900 dark:text-white mt-0.5">{item.quantityApproved}</strong>
                   </div>
                   <div>
-                    Estoque livre/reservado: <strong className="block text-sm text-zinc-900 mt-0.5">{item.stockCovered}</strong>
+                    Estoque livre/reservado: <strong className="block text-sm font-bold text-zinc-900 dark:text-white mt-0.5">{item.stockCovered}</strong>
                   </div>
                   <div>
-                    Deficit calculado: <strong className="block text-sm text-red-600 mt-0.5">{item.deficit}</strong>
+                    Déficit calculado: <strong className="block text-sm font-extrabold text-rose-650 dark:text-rose-400 mt-0.5">{item.deficit}</strong>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col items-stretch gap-2 md:items-end w-full md:w-auto">
-                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 px-2.5 py-1 rounded text-center">
+                <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-250 dark:border-zinc-700 px-2.5 py-1 rounded-lg text-center">
                   Status: {item.analysisStatus}
                 </span>
                 <Link
                   href={`/necessidades/${item.id}/buscar-cobertura`}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm text-center py-2 px-4 rounded shadow-sm hover:shadow transition-all block w-full md:w-auto"
+                  className="bg-indigo-650 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-semibold text-sm text-center py-2 px-4 rounded-lg shadow-sm hover:shadow hover:-translate-y-0.5 transition-all duration-200 block w-full md:w-auto"
                 >
                   ABRIR CATMAT E ATAS
                 </Link>

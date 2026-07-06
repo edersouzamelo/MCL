@@ -25,7 +25,7 @@ export function PageHeader({
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <section className={clsx(
-      "rounded-xl border border-zinc-200/80 dark:border-zinc-850 bg-white dark:bg-zinc-900/60 p-5 shadow-sm hover:shadow-md transition-all duration-200",
+      "rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-5 shadow-sm hover:shadow-md transition-all duration-200",
       className
     )}>
       {children}
@@ -66,25 +66,25 @@ export function MetricCard({
     <Card className={clsx("border-l-4", color)}>
       <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{label}</p>
       <p className="mt-2 text-3xl font-extrabold text-zinc-950 dark:text-zinc-50">{value}</p>
-      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{detail}</p>
+      <p className="mt-1 text-sm text-zinc-650 dark:text-zinc-400">{detail}</p>
     </Card>
   );
 }
 
 export function Badge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "good" | "warn" | "bad" | "info" }) {
   const color = {
-    neutral: "bg-zinc-100/80 text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300 border-zinc-200/60 dark:border-zinc-750",
+    neutral: "bg-zinc-100/80 text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800",
     good: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20 dark:border-emerald-500/10",
     warn: "bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/10",
-    bad: "bg-rose-500/10 text-rose-800 dark:text-rose-455 border-rose-500/20 dark:border-rose-500/10",
-    info: "bg-sky-500/10 text-sky-800 dark:text-sky-400 border-sky-500/20 dark:border-sky-500/10",
+    bad: "bg-rose-500/10 text-rose-800 dark:text-rose-400 border-rose-500/20 dark:border-rose-500/10",
+    info: "bg-sky-500/10 text-sky-850 dark:text-sky-400 border-sky-500/20 dark:border-sky-500/10",
   }[tone];
   return <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border", color)}>{children}</span>;
 }
 
 export function SourceStamp({ source }: { source: SourceMetadata }) {
   return (
-    <dl className="grid gap-2 rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-xs text-zinc-650 dark:text-zinc-400 sm:grid-cols-3">
+    <dl className="grid gap-2 rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-xs text-zinc-600 dark:text-zinc-400 sm:grid-cols-3">
       <div>
         <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Fonte</dt>
         <dd>{source.sourceSystem}</dd>
@@ -117,11 +117,11 @@ export function Timeline({ events }: { events: LogisticsEvent[] }) {
   return (
     <ol className="space-y-3">
       {events.map((event) => (
-        <li key={event.id} className="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-4 shadow-sm">
+        <li key={event.id} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-4 shadow-sm">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="font-semibold text-zinc-900 dark:text-zinc-100">{event.eventType.replaceAll("_", " ")}</p>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">{event.persistentCode}</p>
+              <p className="text-sm text-zinc-550 dark:text-zinc-400">{event.persistentCode}</p>
             </div>
             <Badge tone={event.dataNature === "divergente" ? "bad" : "info"}>{event.dataNature}</Badge>
           </div>

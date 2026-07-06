@@ -24,8 +24,10 @@ export default function NeedsPage() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <InlineLink href={`/necessidades/${need.id}`}>{need.persistentCode}</InlineLink>
-                  <h2 className="mt-1 text-lg font-semibold dark:text-zinc-100">{item?.name} - {variant?.label}</h2>
-                  <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{organizationName(state, need.organizationId)} solicitou {need.quantityRequested} {variant?.unit}.</p>
+                  <h2 className="mt-1 text-lg font-bold text-zinc-950 dark:text-zinc-50">{item?.name} - {variant?.label}</h2>
+                  <p className="mt-1 text-sm text-zinc-650 dark:text-zinc-400">
+                    <strong className="font-semibold text-zinc-800 dark:text-zinc-200">{organizationName(state, need.organizationId)}</strong> solicitou <strong className="font-semibold text-zinc-800 dark:text-zinc-200">{need.quantityRequested} {variant?.unit}</strong>.
+                  </p>
                 </div>
                 <div className="flex flex-col items-start gap-2 md:items-end">
                   <Badge tone={need.priority === "ALTA" ? "warn" : "neutral"}>{need.priority}</Badge>
@@ -33,9 +35,15 @@ export default function NeedsPage() {
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <p className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-sm dark:text-zinc-300">Cobertura: <strong>{projection.coveragePercent}%</strong></p>
-                <p className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-sm dark:text-zinc-300">Entrega: <strong>{projection.deliveredPercent}%</strong></p>
-                <p className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-sm dark:text-zinc-300">Divergencias corrigidas: <strong>{projection.correctedDivergences}</strong></p>
+                <p className="rounded-lg bg-zinc-50 dark:bg-zinc-950/45 p-3 text-sm text-zinc-650 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-800/40">
+                  Cobertura: <strong className="font-bold text-zinc-900 dark:text-white">{projection.coveragePercent}%</strong>
+                </p>
+                <p className="rounded-lg bg-zinc-50 dark:bg-zinc-950/45 p-3 text-sm text-zinc-650 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-800/40">
+                  Entrega: <strong className="font-bold text-zinc-900 dark:text-white">{projection.deliveredPercent}%</strong>
+                </p>
+                <p className="rounded-lg bg-zinc-50 dark:bg-zinc-950/45 p-3 text-sm text-zinc-650 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-800/40">
+                  Divergências corrigidas: <strong className="font-bold text-zinc-900 dark:text-white">{projection.correctedDivergences}</strong>
+                </p>
               </div>
               <div className="mt-4">
                 <SourceStamp source={need} />

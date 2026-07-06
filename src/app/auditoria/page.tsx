@@ -28,13 +28,13 @@ export default function AuditPage() {
             </thead>
             <tbody>
               {state.auditLogs.map((log) => (
-                <tr key={log.id} className="border-b border-zinc-100">
-                  <td className="py-3">{formatDateTime(log.occurredAt)}</td>
-                  <td>{log.actorId}</td>
-                  <td>{log.action}</td>
-                  <td>{log.resourceType}:{log.resourceId}</td>
+                <tr key={log.id} className="border-b border-zinc-150 dark:border-zinc-800/60 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/35 transition-colors duration-150">
+                  <td className="py-3 text-zinc-800 dark:text-zinc-300">{formatDateTime(log.occurredAt)}</td>
+                  <td className="font-semibold text-zinc-900 dark:text-zinc-100">{log.actorId}</td>
+                  <td className="text-zinc-700 dark:text-zinc-300">{log.action}</td>
+                  <td className="font-mono text-xs text-zinc-650 dark:text-zinc-400">{log.resourceType}:{log.resourceId}</td>
                   <td><Badge tone={log.outcome === "SUCESSO" ? "good" : "bad"}>{log.outcome}</Badge></td>
-                  <td>{log.reason}</td>
+                  <td className="text-xs text-zinc-550 dark:text-zinc-400 max-w-xs truncate" title={log.reason}>{log.reason}</td>
                 </tr>
               ))}
             </tbody>

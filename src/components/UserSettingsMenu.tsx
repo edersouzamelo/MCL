@@ -70,7 +70,7 @@ export function UserSettingsMenu() {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 rounded-xl bg-zinc-900 shadow-2xl border border-zinc-800 text-zinc-300 z-50 overflow-hidden transform origin-top-right transition-all">
+        <div className="absolute right-0 mt-3 w-80 rounded-xl bg-zinc-900 shadow-2xl border border-zinc-800 text-zinc-300 z-50 overflow-hidden transform origin-top-right transition-all animate-menu-in">
           
           <div className="p-5 border-b border-zinc-800/80">
             <h3 className="font-semibold text-white truncate">{session?.user?.name || "Usuário"}</h3>
@@ -82,15 +82,15 @@ export function UserSettingsMenu() {
             {/* Idioma */}
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 block mb-3">{t.language}</label>
-              <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-1">
+              <div className="bg-zinc-950 border border-zinc-850 rounded-lg p-1">
                 <select 
                   value={language} 
                   onChange={(e) => setLanguage(e.target.value as Language)}
                   className="w-full bg-transparent text-sm font-medium text-white px-3 py-2 outline-none cursor-pointer appearance-none"
                 >
-                  <option value="pt-BR">BR Português (BR)</option>
-                  <option value="en">EN English</option>
-                  <option value="es">ES Español</option>
+                  <option value="pt-BR" className="bg-zinc-950 text-white">BR Português (BR)</option>
+                  <option value="en" className="bg-zinc-950 text-white">EN English</option>
+                  <option value="es" className="bg-zinc-950 text-white">ES Español</option>
                 </select>
               </div>
             </div>
@@ -101,13 +101,13 @@ export function UserSettingsMenu() {
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => setTheme("light")}
-                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${theme === "light" ? "bg-zinc-800 border-emerald-600/50 text-emerald-400" : "border-zinc-800 hover:bg-zinc-800/50"}`}
+                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${theme === "light" ? "bg-zinc-800 border-emerald-650 text-emerald-400" : "border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/50"}`}
                 >
                   {t.light}
                 </button>
                 <button 
                   onClick={() => setTheme("dark")}
-                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${theme === "dark" ? "bg-zinc-800 border-emerald-600/50 text-emerald-400" : "border-zinc-800 hover:bg-zinc-800/50"}`}
+                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${theme === "dark" ? "bg-zinc-800 border-emerald-650 text-emerald-400" : "border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/50"}`}
                 >
                   {t.dark}
                 </button>
@@ -120,13 +120,13 @@ export function UserSettingsMenu() {
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => setAnimationsEnabled(false)}
-                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${!animationsEnabled ? "bg-zinc-800 border-emerald-600/50 text-emerald-400" : "border-zinc-800 hover:bg-zinc-800/50"}`}
+                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${!animationsEnabled ? "bg-zinc-800 border-emerald-650 text-emerald-400" : "border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/50"}`}
                 >
                   OFF
                 </button>
                 <button 
                   onClick={() => setAnimationsEnabled(true)}
-                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${animationsEnabled ? "bg-zinc-800 border-emerald-600/50 text-emerald-400" : "border-zinc-800 hover:bg-zinc-800/50"}`}
+                  className={`px-3 py-2.5 text-xs font-semibold rounded-md border transition-all ${animationsEnabled ? "bg-zinc-800 border-emerald-650 text-emerald-400" : "border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/50"}`}
                 >
                   ON
                 </button>
@@ -141,7 +141,7 @@ export function UserSettingsMenu() {
                   <button 
                     key={size}
                     onClick={() => setFontSize(size)}
-                    className={`px-2 py-2.5 text-[11px] font-semibold rounded-md border transition-all ${fontSize === size ? "bg-zinc-800 border-emerald-600/50 text-emerald-400" : "border-zinc-800 hover:bg-zinc-800/50"}`}
+                    className={`px-2 py-2.5 text-[11px] font-semibold rounded-md border transition-all ${fontSize === size ? "bg-zinc-800 border-emerald-650 text-emerald-400" : "border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800/50"}`}
                   >
                     {t[size === "pequena" ? "small" : size === "media" ? "medium" : "large"]}
                   </button>
