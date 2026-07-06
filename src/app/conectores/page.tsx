@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Activity, AlertCircle, AlertTriangle, CheckCircle2, Clock3, Database, Globe, HelpCircle, Info, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ComprasGovSyncButton } from "@/components/ComprasGovSyncButton";
@@ -17,6 +18,15 @@ const DOMAIN_ORDER: SourceSystemDomain[] = [
   "Documental",
   "Local / derivado / contingência"
 ];
+
+const DOMAIN_MAP: { [key: string]: SourceSystemDomain } = {
+  necessidades: "Necessidades",
+  orcamento: "Orçamento e finanças",
+  aquisicoes: "Aquisições",
+  recebimento: "Recebimento",
+  armazenagem: "Estoque / armazém",
+  transporte: "Transporte / distribuição",
+};
 
 function getStatusBadgeTone(status: string) {
   switch (status) {
@@ -101,10 +111,20 @@ function getMethodLabel(method: string) {
   }
 }
 
-export default function ConnectorsPage() {
+interface PageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function ConnectorsPage({ searchParams }: PageProps) {
+  const resolvedParams = await searchParams;
+  const rawDominio = typeof resolvedParams?.dominio === "string" ? resolvedParams.dominio : undefined;
+  const filterDomain = rawDominio ? DOMAIN_MAP[rawDominio] : undefined;
+
   const state = getDemoState();
   const diagnosis = getDiagnosticData(state);
   const { environment, systems } = diagnosis;
+
+  const domainsToRender = filterDomain ? [filterDomain] : DOMAIN_ORDER;
 
   const icon = {
     SAUDAVEL: CheckCircle2,
@@ -156,9 +176,27 @@ export default function ConnectorsPage() {
         </div>
       )}
 
+      {/* Active Filter Banner */}
+      {filterDomain && (
+        <div className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl mb-6 flex items-center justify-between shadow-sm border-l-4 border-l-indigo-500">
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-indigo-500 shrink-0" />
+            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Filtro ativo por dimensão: <strong className="text-indigo-600 dark:text-indigo-400">{filterDomain}</strong>
+            </span>
+          </div>
+          <Link 
+            href="/conectores" 
+            className="text-xs font-semibold text-indigo-650 hover:text-indigo-550 dark:text-indigo-350 dark:hover:text-indigo-250 bg-indigo-50 dark:bg-indigo-950/40 py-1.5 px-3 rounded-lg border border-indigo-200 dark:border-indigo-900/60 transition-colors shrink-0"
+          >
+            Limpar filtro
+          </Link>
+        </div>
+      )}
+
       {/* Systems Catalogs grouped by Domain */}
       <div className="space-y-10">
-        {DOMAIN_ORDER.map((domain) => {
+        {domainsToRender.map((domain) => {
           const domainSystems = systems.filter((sys) => sys.domain === domain);
 
           return (

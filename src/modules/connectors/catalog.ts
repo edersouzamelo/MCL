@@ -406,7 +406,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
     },
     {
       id: "connector-transport",
-      name: "Simulador de Transporte do Piloto",
+      name: "Simulador Técnico de Falha de Transporte",
       domain: "Transporte / distribuição",
       sourceKind: "DEMO_SIMULATOR",
       authority: "SINTETICA",
