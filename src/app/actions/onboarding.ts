@@ -107,7 +107,7 @@ export async function getUserProfile() {
     if (userProfileCookie) {
       try {
         parsedProfile = JSON.parse(userProfileCookie);
-      } catch (e) {}
+      } catch {}
     }
     return {
       id: session.user.id,
@@ -123,7 +123,7 @@ export async function getUserProfile() {
 
   // 3. Fallback: Tenta ler da memória do processo (para sessões rápidas/testes)
   const state = getDemoState();
-  let user = state.users.find(u => u.id === session.user?.id);
+  const user = state.users.find(u => u.id === session.user?.id);
   if (user && user.termsAcceptedAt) {
     return user;
   }

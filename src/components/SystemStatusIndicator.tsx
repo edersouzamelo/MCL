@@ -4,12 +4,6 @@ import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 
-interface SystemStatus {
-  name: string;
-  status: "loading" | "online" | "offline";
-  latency?: number;
-}
-
 interface SystemStatusIndicatorProps {
   systems: string[];
 }

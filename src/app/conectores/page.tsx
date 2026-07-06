@@ -1,180 +1,308 @@
-import { Activity, AlertCircle, CheckCircle2, Clock3 } from "lucide-react";
+import { Activity, AlertCircle, AlertTriangle, CheckCircle2, Clock3, Database, Globe, HelpCircle, Info, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ComprasGovSyncButton } from "@/components/ComprasGovSyncButton";
-import { Badge, Card, InlineLink, PageHeader, formatDateTime } from "@/components/ui";
+import { Badge, Card, PageHeader, formatDateTime } from "@/components/ui";
 import { getDemoState } from "@/server/demo-store";
+import { getDiagnosticData, type SourceSystemDomain } from "@/modules/connectors/catalog";
 
 export const dynamic = "force-dynamic";
 
+const DOMAIN_ORDER: SourceSystemDomain[] = [
+  "Necessidades",
+  "Aquisições",
+  "Orçamento e finanças",
+  "Recebimento",
+  "Estoque / armazém",
+  "Transporte / distribuição",
+  "Documental",
+  "Local / derivado / contingência"
+];
+
+function getStatusBadgeTone(status: string) {
+  switch (status) {
+    case "SAUDAVEL": return "good";
+    case "FALHA": return "bad";
+    case "ATRASADO":
+    case "NAO_CONFIGURADO": return "warn";
+    case "PENDENTE": return "info";
+    default: return "neutral";
+  }
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case "SAUDAVEL": return "SAUDÁVEL";
+    case "ATRASADO": return "ATRASADO";
+    case "FALHA": return "FALHA";
+    case "PENDENTE": return "PENDENTE";
+    case "NAO_INTEGRADO": return "NÃO INTEGRADO";
+    case "NAO_CONFIGURADO": return "NÃO CONFIGURADO";
+    default: return status;
+  }
+}
+
+function getNatureLabel(nature: string) {
+  switch (nature) {
+    case "REAL_PUBLICA": return "Fonte Pública Real";
+    case "REAL_RESTRITA_NAO_INTEGRADA": return "Sistema Restrito Real";
+    case "LOCAL_DERIVADA": return "Visão Local/Derivada";
+    case "MANUAL_VALIDADA": return "Entrada Manual Validada";
+    case "SINTETICA_DEMONSTRATIVA": return "Sintética Demonstrativa";
+    default: return "Desconhecida a Mapear";
+  }
+}
+
+function getAuthorityLabel(authority: string) {
+  switch (authority) {
+    case "OFICIAL": return "Autoridade Primária/Oficial";
+    case "AUXILIAR": return "Autoridade Auxiliar";
+    case "DERIVADA": return "Autoridade Derivada/Secundária";
+    case "SINTETICA": return "Sem Autoridade (Simulador)";
+    default: return "A Confirmar";
+  }
+}
+
+function getMaturityLabel(maturity: string) {
+  switch (maturity) {
+    case "INTEGRADO_REAL": return "Integrado (Real)";
+    case "INTEGRADO_PARCIAL": return "Integrado Parcial";
+    case "PLANEJADO": return "Mapeado / Planejado";
+    case "MAPEADO_NAO_INTEGRADO": return "Mapeado / Não Integrado";
+    case "DEMONSTRATIVO": return "Demonstrativo (Piloto)";
+    default: return "Desconhecido / Lacuna";
+  }
+}
+
+function getMethodLabel(method: string) {
+  switch (method) {
+    case "API": return "Integração via API";
+    case "EVENTO": return "Barramento de Eventos";
+    case "ETL": return "ETL Periódico";
+    case "CSV": return "Carga de CSV";
+    case "JSON": return "Carga de JSON";
+    case "XML": return "Importação XML";
+    case "PLANILHA": return "Planilha Local";
+    case "REFERENCIA_DOCUMENTAL": return "Referência Documental";
+    case "ENTRADA_HUMANA_VALIDADA": return "Entrada Humana";
+    default: return "Sem Integração";
+  }
+}
+
 export default function ConnectorsPage() {
   const state = getDemoState();
+  const diagnosis = getDiagnosticData(state);
+  const { environment, systems } = diagnosis;
+
   const icon = {
     SAUDAVEL: CheckCircle2,
     ATRASADO: Clock3,
     FALHA: AlertCircle,
     SINCRONIZANDO: Activity,
     DESABILITADO: Clock3,
+    PENDENTE: Clock3,
+    NAO_INTEGRADO: AlertCircle,
+    NAO_CONFIGURADO: AlertCircle,
+    DESCONHECIDO: HelpCircle,
   };
-
-  const officialIds = ["compras-gov", "siafi", "siscofis", "pncp", "sigelog"];
-  // Sort official connectors to always have a clean order
-  const officialConnectors = state.connectors
-    .filter((c) => officialIds.includes(c.id))
-    .sort((a, b) => officialIds.indexOf(a.id) - officialIds.indexOf(b.id));
-    
-  const demoConnectors = state.connectors.filter((c) => !officialIds.includes(c.id));
 
   return (
     <AppShell>
       <PageHeader
-        title="Saude dos conectores"
-        description="Monitor em tempo real dos conectores oficiais da cadeia logística e simuladores demonstrativos."
-        action={<InlineLink href="/analises/materiais">Abrir CATMAT e atas</InlineLink>}
+        title="Catálogo de Sistemas de Origem e Diagnóstico"
+        description="Monitoramento federado das fontes de dados da cadeia logística do MCL. Mapeamento analítico de integridade, autoridade e maturidade."
+        action={
+          <div className="flex items-center gap-3">
+            <Badge tone={environment.database === "persistent" ? "good" : "warn"}>
+              {environment.database === "persistent" ? "Banco PostgreSQL Ativo" : "Modo Memória Fallback"}
+            </Badge>
+          </div>
+        }
       />
 
-      {/* Section 1: Conectores Oficiais da Cadeia Logística */}
-      <section className="mb-8">
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
-          <Activity className="h-5 w-5 text-emerald-700" />
-          Conectores de Sistemas da Cadeia Logística
-        </h2>
-        
-        <div className="grid gap-6 md:grid-cols-2">
-          {officialConnectors.map((connector) => {
-            const Icon = icon[connector.status as keyof typeof icon] || CheckCircle2;
-            const borderTone = 
-              connector.status === "SAUDAVEL" 
-                ? "border-l-4 border-l-emerald-600" 
-                : connector.status === "FALHA" 
-                  ? "border-l-4 border-l-rose-600" 
-                  : "border-l-4 border-l-amber-500";
-
-            return (
-              <Card key={connector.id} className={`${borderTone} flex flex-col justify-between hover:shadow-md transition-shadow duration-300`}>
-                <div>
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{connector.name}</h3>
-                        <Badge tone={connector.status === "SAUDAVEL" ? "good" : connector.status === "FALHA" ? "bad" : "warn"}>
-                          {connector.status}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 text-xs text-zinc-500">Fonte do sistema: <strong className="text-zinc-700 dark:text-zinc-300">{connector.sourceSystem}</strong></p>
-                      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">{connector.message}</p>
-                    </div>
-                    
-                    {connector.id === "compras-gov" ? (
-                      <div className="shrink-0">
-                        <ComprasGovSyncButton />
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-semibold py-1.5 px-3 bg-zinc-50 dark:bg-zinc-800/20 rounded-md border border-zinc-100 dark:border-zinc-800 shrink-0">
-                        <Icon className={`h-4 w-4 ${connector.status === "SAUDAVEL" ? "text-emerald-600" : connector.status === "FALHA" ? "text-rose-600" : "text-amber-500"}`} />
-                        <span>{connector.status === "SAUDAVEL" ? "Ativo" : connector.status === "FALHA" ? "Inativo" : "Aviso"}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {connector.id === "compras-gov" && (
-                    <div className="mt-3 text-xs text-indigo-700 font-medium">
-                      <InlineLink href="/analises/materiais">Ir para busca por CATMAT e atas</InlineLink>
-                    </div>
-                  )}
-                </div>
-
-                <dl className="mt-6 grid gap-2.5 grid-cols-2 text-xs border-t border-zinc-100 dark:border-zinc-850 pt-4">
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Última sincronização</dt>
-                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{formatDateTime(connector.lastRunAt)}</dd>
-                  </div>
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Endpoint integrado</dt>
-                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200 truncate" title={connector.endpoint ?? "Não informado"}>{connector.endpoint ?? "Não informado"}</dd>
-                  </div>
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Registros lidos</dt>
-                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{connector.recordsRead ?? 0}</dd>
-                  </div>
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Aceitos / Importados</dt>
-                    <dd className="font-semibold text-zinc-855 dark:text-zinc-200">{connector.acceptedRecords ?? connector.recordsImported ?? 0}</dd>
-                  </div>
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Atualizados</dt>
-                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{connector.updatedRecords ?? 0}</dd>
-                  </div>
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Duplicados detectados</dt>
-                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">{connector.duplicateRecords ?? 0}</dd>
-                  </div>
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Rejeitados / Quarentena</dt>
-                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200">
-                      {connector.rejectedRecords ?? 0} / {connector.quarantinedRecords ?? 0}
-                    </dd>
-                  </div>
-                  <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2.5">
-                    <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Duração e versão</dt>
-                    <dd className="font-semibold text-zinc-850 dark:text-zinc-200 truncate" title={`${connector.durationMs ?? 0} ms - ${connector.mappingVersion ?? "v1"}`}>
-                      {connector.durationMs ?? 0} ms - {connector.mappingVersion ?? "v1"}
-                    </dd>
-                  </div>
-                </dl>
-              </Card>
-            );
-          })}
+      {/* Persistent Demonstration Banner */}
+      <div className="bg-rose-500/10 border border-rose-500/30 text-rose-200 p-4 rounded-xl mb-6 flex items-start gap-3 shadow-md">
+        <ShieldAlert className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+        <div>
+          <strong className="text-sm font-bold block mb-0.5">AMBIENTE DEMONSTRATIVO DO PILOTO</strong>
+          <span className="text-xs text-rose-300">
+            Esta interface destina-se a fins de simulação e homologação de escopo. Não constitui sistema oficial de governo. 
+            <strong> Não insira dados reais, informações classificadas ou credenciais de produção sob hipótese alguma.</strong>
+          </span>
         </div>
-      </section>
+      </div>
 
-      {/* Section 2: Simuladores do Piloto */}
-      <section className="mb-8">
-        <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
-          <Activity className="h-5 w-5 text-sky-700" />
-          Simuladores Internos do Piloto (Ambiente de Demonstração)
-        </h2>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          {demoConnectors.map((connector) => {
-            const Icon = icon[connector.status as keyof typeof icon] || CheckCircle2;
-            const borderTone = 
-              connector.status === "SAUDAVEL" 
-                ? "border-l-4 border-l-emerald-600" 
-                : connector.status === "FALHA" 
-                  ? "border-l-4 border-l-rose-600" 
-                  : "border-l-4 border-l-amber-500";
-
-            return (
-              <Card key={connector.id} className={`${borderTone} flex flex-col justify-between hover:shadow-md transition-shadow duration-300`}>
-                <div>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Icon aria-hidden className={`h-5 w-5 ${connector.status === "SAUDAVEL" ? "text-emerald-700" : connector.status === "FALHA" ? "text-rose-700" : "text-amber-500"}`} />
-                      <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{connector.name}</h3>
-                    </div>
-                    <Badge tone={connector.status === "SAUDAVEL" ? "good" : connector.status === "ATRASADO" ? "warn" : "bad"}>
-                      {connector.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{connector.message}</p>
-                </div>
-                
-                <dl className="mt-6 space-y-2 text-xs border-t border-zinc-100 dark:border-zinc-800 pt-4">
-                  <div className="flex justify-between gap-3"><dt className="text-zinc-500">Fonte</dt><dd className="font-semibold text-zinc-850 dark:text-zinc-200">{connector.sourceSystem}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-zinc-500">Última execução</dt><dd className="font-semibold text-zinc-850 dark:text-zinc-200">{formatDateTime(connector.lastRunAt)}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-zinc-500">Registros Importados</dt><dd className="font-semibold text-zinc-850 dark:text-zinc-200">{connector.recordsImported}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-zinc-500">Em Quarentena</dt><dd className="font-semibold text-zinc-850 dark:text-zinc-200">{connector.quarantinedRecords}</dd></div>
-                </dl>
-              </Card>
-            );
-          })}
+      {environment.database === "memory" && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 p-4 rounded-xl mb-6 flex items-start gap-3 shadow-md">
+          <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <strong className="text-sm font-bold block mb-0.5">Aviso de Persistência</strong>
+            <span className="text-xs text-amber-300">
+              A aplicação está operando em modo de fallback em memória. Quaisquer alterações em atas, confirmações ou status dos simuladores serão redefinidos se a aplicação for reiniciada.
+            </span>
+          </div>
         </div>
-      </section>
+      )}
 
-      <Card className="mt-6">
+      {/* Systems Catalogs grouped by Domain */}
+      <div className="space-y-10">
+        {DOMAIN_ORDER.map((domain) => {
+          const domainSystems = systems.filter((sys) => sys.domain === domain);
+
+          return (
+            <section key={domain} className="border-b border-zinc-200 dark:border-zinc-800 pb-8 last:border-b-0 last:pb-0">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+                <Database className="h-5 w-5 text-zinc-400" />
+                Dimensão: {domain}
+              </h2>
+
+              {domainSystems.length === 0 ? (
+                <div className="bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800 border-dashed p-6 rounded-xl text-center">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Nenhum sistema de origem ou conector mapeado para esta dimensão da cadeia logística.</p>
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2">
+                  {domainSystems.map((system) => {
+                    const Icon = icon[system.status as keyof typeof icon] || HelpCircle;
+                    const borderTone = 
+                      system.status === "SAUDAVEL" 
+                        ? "border-l-4 border-l-emerald-600 bg-zinc-50/50 dark:bg-zinc-900/20" 
+                        : system.status === "FALHA" 
+                          ? "border-l-4 border-l-rose-600 bg-zinc-50/50 dark:bg-zinc-900/20" 
+                          : system.status === "NAO_INTEGRADO"
+                            ? "border-l-4 border-l-zinc-700 bg-zinc-50/30 dark:bg-zinc-900/10 opacity-75"
+                            : "border-l-4 border-l-amber-500 bg-zinc-50/50 dark:bg-zinc-900/20";
+
+                    return (
+                      <Card key={system.id} className={`${borderTone} flex flex-col justify-between hover:shadow-md transition-shadow duration-300`}>
+                        <div>
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">{system.name}</h3>
+                                <Badge tone={getStatusBadgeTone(system.status)}>
+                                  {getStatusLabel(system.status)}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-zinc-500 mt-1">
+                                Natureza: <strong className="text-zinc-700 dark:text-zinc-400">{getNatureLabel(system.nature)}</strong>
+                              </p>
+                            </div>
+
+                            {system.id === "compras-gov" ? (
+                              <div className="shrink-0">
+                                <ComprasGovSyncButton />
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-semibold py-1.5 px-3 bg-zinc-100/50 dark:bg-zinc-800/40 rounded-md border border-zinc-200 dark:border-zinc-800 shrink-0">
+                                <Icon className={`h-4 w-4 ${
+                                  system.status === "SAUDAVEL" ? "text-emerald-600" : 
+                                  system.status === "FALHA" ? "text-rose-600" : 
+                                  system.status === "NAO_INTEGRADO" ? "text-zinc-500" : 
+                                  "text-amber-500"
+                                }`} />
+                                <span className="text-[11px]">{getMaturityLabel(system.maturity)}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Observations / Messages */}
+                          {system.observation && (
+                            <div className="mt-3 bg-zinc-100/60 dark:bg-zinc-900/40 border border-zinc-200/50 dark:border-zinc-800/50 rounded-lg p-2.5 flex items-start gap-2">
+                              <Info className="h-4 w-5 text-indigo-500 shrink-0 mt-0.5" />
+                              <span className="text-xs text-zinc-700 dark:text-zinc-300 italic">
+                                <strong>Observação:</strong> {system.observation}
+                              </span>
+                            </div>
+                          )}
+
+                          {system.lastMessage && (
+                            <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed bg-zinc-50 dark:bg-zinc-900/30 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-850">
+                              <strong>Diagnóstico:</strong> {system.lastMessage}
+                            </p>
+                          )}
+
+                          {/* Limitations List */}
+                          {system.limitations.length > 0 && (
+                            <div className="mt-4">
+                              <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">Limitações / Restrições do Sistema:</span>
+                              <ul className="list-disc list-inside text-xs text-zinc-500 dark:text-zinc-400 space-y-1 pl-1">
+                                {system.limitations.map((limit, idx) => (
+                                  <li key={idx} className="leading-relaxed">{limit}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Telemetry/Metadata Grid */}
+                        <div className="mt-6 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+                          <dl className="grid gap-2 grid-cols-2 text-[11px]">
+                            <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                              <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Autoridade de dados</dt>
+                              <dd className="font-semibold text-zinc-800 dark:text-zinc-200">{getAuthorityLabel(system.authority)}</dd>
+                            </div>
+                            <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                              <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Método de Integração</dt>
+                              <dd className="font-semibold text-zinc-800 dark:text-zinc-200">{getMethodLabel(system.integrationMethod)}</dd>
+                            </div>
+
+                            {/* Telemetry Details for Compras.gov */}
+                            {system.telemetry ? (
+                              <>
+                                <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2 col-span-2">
+                                  <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Último Endpoint Sincronizado</dt>
+                                  <dd className="font-semibold text-zinc-800 dark:text-zinc-200 font-mono text-[10px] truncate" title={system.telemetry.endpoint ?? ""}>{system.telemetry.endpoint ?? "Nao configurado"}</dd>
+                                </div>
+                                <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                                  <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Registros Lidos</dt>
+                                  <dd className="font-semibold text-zinc-800 dark:text-zinc-200">{system.telemetry.recordsRead ?? 0}</dd>
+                                </div>
+                                <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                                  <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Registros Importados</dt>
+                                  <dd className="font-semibold text-zinc-800 dark:text-zinc-200">{system.telemetry.acceptedRecords ?? 0}</dd>
+                                </div>
+                                <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                                  <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Atualizados / Duplicados</dt>
+                                  <dd className="font-semibold text-zinc-800 dark:text-zinc-200">{system.telemetry.updatedRecords ?? 0} / {system.telemetry.duplicateRecords ?? 0}</dd>
+                                </div>
+                                <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                                  <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Rejeitados / Duração</dt>
+                                  <dd className="font-semibold text-zinc-800 dark:text-zinc-200">{system.telemetry.rejectedRecords ?? 0} / {system.telemetry.durationMs ?? 0}ms</dd>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                                  <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Maturidade do Fluxo</dt>
+                                  <dd className="font-semibold text-zinc-800 dark:text-zinc-200">{getMaturityLabel(system.maturity)}</dd>
+                                </div>
+                                <div className="rounded bg-zinc-100/50 dark:bg-zinc-800/20 p-2">
+                                  <dt className="text-zinc-500 dark:text-zinc-400 font-medium mb-0.5">Última sincronização</dt>
+                                  <dd className="font-semibold text-zinc-800 dark:text-zinc-200">
+                                    {system.lastRunAt ? formatDateTime(system.lastRunAt) : "Nunca executado"}
+                                  </dd>
+                                </div>
+                              </>
+                            )}
+                          </dl>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      <Card className="mt-10">
         <div className="flex items-center gap-2">
-          <Activity aria-hidden className="h-5 w-5 text-emerald-700" />
-          <p className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">Os conectores da cadeia logística operam em tempo real ou sob agendamento, garantindo que os dados fiquem sincronizados com o MCL para um diagnóstico íntegro e unificado.</p>
+          <Globe aria-hidden className="h-5 w-5 text-emerald-700 shrink-0" />
+          <p className="text-xs text-zinc-650 dark:text-zinc-400">
+            <strong>Arquitetura Federada do MCL:</strong> Os dados exibidos nesta plataforma são integrados dinamicamente sob demanda ou via carga local de contigência de acordo com as autorizações e restrições de rede das fontes oficiais.
+          </p>
         </div>
       </Card>
     </AppShell>

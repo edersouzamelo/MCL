@@ -19,28 +19,47 @@ interface SettingsContextData {
 const SettingsContext = createContext<SettingsContextData>({} as SettingsContextData);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>("pt-BR");
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
-  const [fontSize, setFontSize] = useState<FontSize>("media");
-  const [theme, setTheme] = useState<string>("light");
-  
-  // Load from localStorage on mount
-  useEffect(() => {
-    const savedLang = localStorage.getItem("mcl-lang") as Language;
-    if (savedLang) setLanguage(savedLang);
-    
-    const savedAnim = localStorage.getItem("mcl-anim");
-    if (savedAnim !== null) setAnimationsEnabled(savedAnim === "true");
-    
-    const savedFont = localStorage.getItem("mcl-font") as FontSize;
-    if (savedFont) setFontSize(savedFont);
-
-    const savedTheme = localStorage.getItem("mcl_theme");
-    if (savedTheme) {
-      setTheme(savedTheme);
-      if (savedTheme === "dark") document.documentElement.classList.add("dark");
-      else document.documentElement.classList.remove("dark");
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("mcl-lang") as Language) || "pt-BR";
     }
+    return "pt-BR";
+  });
+  const [animationsEnabled, setAnimationsEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mcl-anim");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+  const [fontSize, setFontSize] = useState<FontSize>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("mcl-font") as FontSize) || "media";
+    }
+    return "media";
+  });
+  const [theme, setTheme] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("mcl_theme") || "light";
+    }
+    return "light";
+  });
+  
+  // Apply visual classes on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("mcl_theme") || "light";
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+
+    const savedFont = localStorage.getItem("mcl-font") as FontSize || "media";
+    const root = document.documentElement;
+    root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
+    if (savedFont === "pequena") root.classList.add("text-[14px]");
+    else if (savedFont === "media") root.classList.add("text-[16px]");
+    else if (savedFont === "grande") root.classList.add("text-[18px]");
   }, []);
 
   const handleLanguageChange = (lang: Language) => {
