@@ -90,6 +90,10 @@ model User {
   militaryRole         String?
   militaryOrganization String?
   termsAcceptedAt      DateTime?
+  prefLanguage         String?     @default("pt-BR")
+  prefTheme            String?     @default("light")
+  prefFontSize         String?     @default("media")
+  prefAnimations       Boolean?    @default(true)
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
   scopes               UserScope[]

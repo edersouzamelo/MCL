@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { saveUserPreferences, loadUserPreferences } from "@/app/actions/preferences";
 
 export type Language = "pt-BR" | "en" | "es";
 export type FontSize = "pequena" | "media" | "grande";
@@ -19,69 +21,101 @@ interface SettingsContextData {
 const SettingsContext = createContext<SettingsContextData>({} as SettingsContextData);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("mcl-lang") as Language) || "pt-BR";
-    }
-    return "pt-BR";
-  });
-  const [animationsEnabled, setAnimationsEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mcl-anim");
-      return saved !== null ? saved === "true" : true;
-    }
-    return true;
-  });
-  const [fontSize, setFontSize] = useState<FontSize>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("mcl-font") as FontSize) || "media";
-    }
-    return "media";
-  });
-  const [theme, setTheme] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("mcl_theme") || "light";
-    }
-    return "light";
-  });
-  
-  // Apply visual classes on mount
+  const { data: session, status } = useSession();
+
+  const [language, setLanguage] = useState<Language>("pt-BR");
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+  const [fontSize, setFontSize] = useState<FontSize>("media");
+  const [theme, setTheme] = useState<string>("light");
+
+  // Load from local storage on mount (fast visual restore)
   useEffect(() => {
-    const savedTheme = localStorage.getItem("mcl_theme") || "light";
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
+    const localLang = (localStorage.getItem("mcl-lang") as Language) || "pt-BR";
+    const localAnim = localStorage.getItem("mcl-anim") !== "false"; // Default is true
+    const localFont = (localStorage.getItem("mcl-font") as FontSize) || "media";
+    const localTheme = localStorage.getItem("mcl_theme") || "light";
+
+    setLanguage(localLang);
+    setAnimationsEnabled(localAnim);
+    setFontSize(localFont);
+    setTheme(localTheme);
+
+    // Apply visual classes
+    const root = document.documentElement;
+    if (localTheme === "dark") {
+      root.classList.add("dark");
     } else {
-      document.documentElement.classList.remove("dark");
+      root.classList.remove("dark");
     }
 
-    const savedFont = localStorage.getItem("mcl-font") as FontSize || "media";
-    const root = document.documentElement;
     root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
-    if (savedFont === "pequena") root.classList.add("text-[14px]");
-    else if (savedFont === "media") root.classList.add("text-[16px]");
-    else if (savedFont === "grande") root.classList.add("text-[18px]");
+    if (localFont === "pequena") root.classList.add("text-[14px]");
+    else if (localFont === "media") root.classList.add("text-[16px]");
+    else if (localFont === "grande") root.classList.add("text-[18px]");
   }, []);
+
+  // Fetch from server DB when user logs in/authenticates
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.id) {
+      loadUserPreferences().then((serverPrefs) => {
+        if (serverPrefs) {
+          setLanguage(serverPrefs.language as Language);
+          setAnimationsEnabled(serverPrefs.animationsEnabled);
+          setFontSize(serverPrefs.fontSize as FontSize);
+          setTheme(serverPrefs.theme);
+
+          localStorage.setItem("mcl-lang", serverPrefs.language);
+          localStorage.setItem("mcl-anim", String(serverPrefs.animationsEnabled));
+          localStorage.setItem("mcl-font", serverPrefs.fontSize);
+          localStorage.setItem("mcl_theme", serverPrefs.theme);
+
+          // Apply visual classes
+          const root = document.documentElement;
+          if (serverPrefs.theme === "dark") {
+            root.classList.add("dark");
+          } else {
+            root.classList.remove("dark");
+          }
+
+          root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
+          if (serverPrefs.fontSize === "pequena") root.classList.add("text-[14px]");
+          else if (serverPrefs.fontSize === "media") root.classList.add("text-[16px]");
+          else if (serverPrefs.fontSize === "grande") root.classList.add("text-[18px]");
+        }
+      });
+    }
+  }, [status, session?.user?.id]);
 
   const handleLanguageChange = (lang: Language) => {
     setLanguage(lang);
     localStorage.setItem("mcl-lang", lang);
+    if (status === "authenticated") {
+      saveUserPreferences({ language: lang, theme, fontSize, animationsEnabled });
+    }
   };
 
   const handleAnimationsChange = (enabled: boolean) => {
     setAnimationsEnabled(enabled);
     localStorage.setItem("mcl-anim", String(enabled));
+    if (status === "authenticated") {
+      saveUserPreferences({ language, theme, fontSize, animationsEnabled: enabled });
+    }
   };
 
   const handleFontSizeChange = (size: FontSize) => {
     setFontSize(size);
     localStorage.setItem("mcl-font", size);
     
-    // Apply font size to document html to affect REM sizing globally (Tailwind's base)
+    // Apply font size class to document
     const root = document.documentElement;
     root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
     if (size === "pequena") root.classList.add("text-[14px]");
     else if (size === "media") root.classList.add("text-[16px]");
     else if (size === "grande") root.classList.add("text-[18px]");
+
+    if (status === "authenticated") {
+      saveUserPreferences({ language, theme, fontSize: size, animationsEnabled });
+    }
   };
 
   const handleThemeChange = (newTheme: string) => {
@@ -91,6 +125,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.classList.add("dark");
     } else {
       document.documentElement.classList.remove("dark");
+    }
+
+    if (status === "authenticated") {
+      saveUserPreferences({ language, theme: newTheme, fontSize, animationsEnabled });
     }
   };
 
