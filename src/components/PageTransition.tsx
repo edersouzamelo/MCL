@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/refs */
+
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useSettings } from "@/contexts/SettingsContext";

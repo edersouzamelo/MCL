@@ -22,7 +22,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50"
+      className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 transition-colors"
     >
       {pending ? "Salvando..." : "Salvar e Continuar"}
     </button>
@@ -50,7 +50,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
   return (
     <form action={completeOnboarding} className="space-y-6">
       <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="name" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Nome Completo
         </label>
         <div className="mt-1">
@@ -61,14 +61,14 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             required
             defaultValue={initialName}
             disabled
-            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 text-gray-500 sm:text-sm"
+            className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-800 rounded-lg shadow-sm bg-zinc-100 dark:bg-zinc-950/20 text-zinc-400 dark:text-zinc-500 sm:text-sm"
           />
-          <p className="mt-1 text-xs text-gray-500">O nome é puxado automaticamente do seu provedor de login.</p>
+          <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">O nome é puxado automaticamente do seu provedor de login.</p>
         </div>
       </div>
 
       <div>
-        <label htmlFor="rank" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="rank" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Posto / Graduação
         </label>
         <div className="mt-1">
@@ -78,13 +78,13 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             type="text"
             required
             placeholder="Ex: Cel, Maj, Cap, 1º Ten, 1º Sgt"
-            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
+            className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm placeholder-zinc-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor="militaryRole" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="militaryRole" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Função (RAE)
         </label>
         <div className="mt-1">
@@ -92,11 +92,11 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             id="militaryRole"
             name="militaryRole"
             required
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
+            className="block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
           >
-            <option value="">Selecione uma função...</option>
+            <option value="" className="bg-white dark:bg-zinc-950">Selecione uma função...</option>
             {FUNCOES_RAE.map((funcao) => (
-              <option key={funcao} value={funcao}>
+              <option key={funcao} value={funcao} className="bg-white dark:bg-zinc-950">
                 {funcao}
               </option>
             ))}
@@ -105,7 +105,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
       </div>
 
       <div className="relative">
-        <label htmlFor="militaryOrganization" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="militaryOrganization" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Organização Militar (OM)
         </label>
         <div className="mt-1 relative">
@@ -119,19 +119,19 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               setSelectedOm("");
             }}
             onFocus={() => setShowOmDropdown(true)}
-            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
+            className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm placeholder-zinc-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
           />
           <input type="hidden" name="militaryOrganization" value={selectedOm} required />
           
           {showOmDropdown && omSearch && (
-            <div className="absolute z-10 mt-1 w-full bg-white dark:bg-zinc-900 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+            <div className="absolute z-20 mt-1.5 w-full bg-white dark:bg-zinc-950 shadow-2xl max-h-60 rounded-lg py-1 border border-zinc-200 dark:border-zinc-800 overflow-auto focus:outline-none sm:text-sm custom-scrollbar">
               {filteredOms.length === 0 ? (
-                <div className="px-4 py-2 text-gray-500">Nenhuma OM encontrada</div>
+                <div className="px-4 py-2 text-zinc-500">Nenhuma OM encontrada</div>
               ) : (
                 filteredOms.map((om) => (
                   <div
                     key={om.id}
-                    className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-emerald-50 hover:text-emerald-900 text-gray-900"
+                    className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-emerald-600/20 hover:text-emerald-400 text-zinc-850 dark:text-zinc-200 transition-colors"
                     onClick={() => {
                       setSelectedOm(om.name);
                       setOmSearch(om.name);
@@ -148,7 +148,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
       </div>
 
       <div>
-        <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="address" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Endereço
         </label>
         <div className="mt-1">
@@ -157,14 +157,14 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             name="address"
             type="text"
             required
-            className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
+            className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm placeholder-zinc-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="phone" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Telefone
           </label>
           <div className="mt-1">
@@ -173,12 +173,12 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               name="phone"
               type="tel"
               required
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
+              className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm placeholder-zinc-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
             />
           </div>
         </div>
         <div>
-          <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="whatsapp" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             WhatsApp
           </label>
           <div className="mt-1">
@@ -187,7 +187,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               name="whatsapp"
               type="tel"
               required
-              className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-white bg-white dark:bg-zinc-800"
+              className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm placeholder-zinc-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
             />
           </div>
         </div>
@@ -202,12 +202,12 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             required
             checked={acceptedTerms}
             onChange={(e) => setAcceptedTerms(e.target.checked)}
-            className="focus:ring-emerald-500 h-4 w-4 text-emerald-600 border-gray-300 rounded"
+            className="focus:ring-emerald-500 h-4 w-4 text-emerald-600 border-zinc-300 dark:border-zinc-700 rounded dark:bg-zinc-950"
           />
         </div>
         <div className="ml-3 text-sm">
-          <label htmlFor="terms" className="font-medium text-gray-700">
-            Li e concordo com os <a href="/termos-de-uso" target="_blank" className="text-emerald-600 hover:text-emerald-500">Termos de Uso</a>.
+          <label htmlFor="terms" className="font-medium text-zinc-700 dark:text-zinc-300">
+            Li e concordo com os <a href="/termos-de-uso" target="_blank" className="text-emerald-500 hover:text-emerald-400 underline transition-colors">Termos de Uso</a>.
           </label>
         </div>
       </div>

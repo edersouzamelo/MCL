@@ -71,7 +71,7 @@ export async function loadUserPreferences() {
       if (dbUser) {
         return {
           language: dbUser.prefLanguage || "pt-BR",
-          theme: dbUser.prefTheme || "light",
+          theme: dbUser.prefTheme || "dark",
           fontSize: dbUser.prefFontSize || "media",
           animationsEnabled: dbUser.prefAnimations !== null ? dbUser.prefAnimations : true,
         };
@@ -87,7 +87,7 @@ export async function loadUserPreferences() {
   if (user) {
     return {
       language: (user as any).prefLanguage || "pt-BR",
-      theme: (user as any).prefTheme || "light",
+      theme: (user as any).prefTheme || "dark",
       fontSize: (user as any).prefFontSize || "media",
       animationsEnabled: (user as any).prefAnimations !== undefined ? (user as any).prefAnimations : true,
     };
@@ -103,7 +103,7 @@ export async function loadUserPreferences() {
   if (cookieLang || cookieTheme || cookieFont || cookieAnim) {
     return {
       language: cookieLang || "pt-BR",
-      theme: cookieTheme || "light",
+      theme: cookieTheme || "dark",
       fontSize: cookieFont || "media",
       animationsEnabled: cookieAnim !== undefined ? cookieAnim === "true" : true,
     };

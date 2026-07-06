@@ -91,7 +91,7 @@ model User {
   militaryOrganization String?
   termsAcceptedAt      DateTime?
   prefLanguage         String?     @default("pt-BR")
-  prefTheme            String?     @default("light")
+  prefTheme            String?     @default("dark")
   prefFontSize         String?     @default("media")
   prefAnimations       Boolean?    @default(true)
   createdAt            DateTime    @default(now())

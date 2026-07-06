@@ -37,6 +37,10 @@ export async function completeOnboarding(formData: FormData) {
           id: session.user.id,
           email: session.user.email,
           name: session.user.name,
+          prefTheme: "dark",
+          prefAnimations: true,
+          prefLanguage: "pt-BR",
+          prefFontSize: "media",
           ...data,
         },
       });
@@ -59,6 +63,10 @@ export async function completeOnboarding(formData: FormData) {
       name: session.user.name || "Operador",
       email: session.user.email || "",
       active: true,
+      prefTheme: "dark",
+      prefAnimations: true,
+      prefLanguage: "pt-BR",
+      prefFontSize: "media",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...data,
@@ -69,6 +77,12 @@ export async function completeOnboarding(formData: FormData) {
   const cookieStore = await cookies();
   cookieStore.set("mcl_onboarding_completed", "true", { maxAge: 60 * 60 * 24 * 365, path: "/" });
   cookieStore.set("mcl_user_profile", JSON.stringify(data), { maxAge: 60 * 60 * 24 * 365, path: "/" });
+  
+  // Salva preferências iniciais nos cookies também
+  cookieStore.set("mcl_pref_language", "pt-BR", { maxAge: 60 * 60 * 24 * 365, path: "/" });
+  cookieStore.set("mcl_pref_theme", "dark", { maxAge: 60 * 60 * 24 * 365, path: "/" });
+  cookieStore.set("mcl_pref_font_size", "media", { maxAge: 60 * 60 * 24 * 365, path: "/" });
+  cookieStore.set("mcl_pref_animations", "true", { maxAge: 60 * 60 * 24 * 365, path: "/" });
 
   revalidatePath("/");
   redirect("/inicio");

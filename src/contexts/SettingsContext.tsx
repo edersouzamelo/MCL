@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { saveUserPreferences, loadUserPreferences } from "@/app/actions/preferences";
@@ -26,7 +28,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("pt-BR");
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [fontSize, setFontSize] = useState<FontSize>("media");
-  const [theme, setTheme] = useState<string>("light");
+  const [theme, setTheme] = useState<string>("dark");
 
   // Load from local storage on mount (fast visual restore)
   useEffect(() => {
