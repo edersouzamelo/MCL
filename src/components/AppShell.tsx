@@ -43,11 +43,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       {/* Background Image Layer for dark theme only */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none hidden dark:block">
         <div 
-          className="absolute inset-[-20px] bg-cover bg-center bg-no-repeat blur-sm opacity-25" 
+          className="absolute inset-[-20px] bg-cover bg-center bg-no-repeat blur-sm opacity-45" 
           style={{ backgroundImage: 'url(/bg.png)' }} 
         />
         {/* Dark overlay to ensure high contrast */}
-        <div className="absolute inset-0 bg-zinc-950/70" />
+        <div className="absolute inset-0 bg-zinc-950/50" />
       </div>
 
       <div className="relative z-10 flex flex-col flex-1">
