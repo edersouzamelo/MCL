@@ -102,8 +102,10 @@ export const prisma = new Proxy({} as PrismaClient, {
         log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
       } as any);
 
-      // Roda o seed em background
-      ensureDatabaseSeeded(globalForPrisma.prisma);
+      // Roda o seed em background apenas sob condições explicitas de desenvolvimento
+      if (process.env.NODE_ENV === "development" && process.env.ENABLE_AUTO_SEED === "true") {
+        ensureDatabaseSeeded(globalForPrisma.prisma);
+      }
     }
     return Reflect.get(globalForPrisma.prisma, prop, receiver);
   },
