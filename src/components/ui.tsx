@@ -12,18 +12,36 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">{title}</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">{description}</p>
+    <div className="mb-8 border-b border-zinc-200 dark:border-zinc-800 pb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">{title}</h1>
+        <p className="max-w-3xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{description}</p>
       </div>
-      {action}
+      {action && <div className="shrink-0 flex items-center">{action}</div>}
     </div>
   );
 }
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <section className={clsx("rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm", className)}>{children}</section>;
+  return (
+    <section className={clsx(
+      "rounded-xl border border-zinc-200/80 dark:border-zinc-850 bg-white dark:bg-zinc-900/60 p-5 shadow-sm hover:shadow-md transition-all duration-200",
+      className
+    )}>
+      {children}
+    </section>
+  );
+}
+
+export function OperationalSurface({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={clsx(
+      "rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/40 backdrop-blur-md p-6 shadow-md shadow-zinc-100/50 dark:shadow-none",
+      className
+    )}>
+      {children}
+    </div>
+  );
 }
 
 export function MetricCard({
@@ -39,15 +57,15 @@ export function MetricCard({
 }) {
   const color = {
     neutral: "border-zinc-200 dark:border-zinc-800",
-    good: "border-emerald-500",
-    warn: "border-amber-500",
-    bad: "border-rose-500",
+    good: "border-emerald-500/80 dark:border-emerald-500/55",
+    warn: "border-amber-500/80 dark:border-amber-500/55",
+    bad: "border-rose-500/80 dark:border-rose-500/55",
   }[tone];
 
   return (
     <Card className={clsx("border-l-4", color)}>
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-zinc-950 dark:text-zinc-50">{value}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p className="mt-2 text-3xl font-extrabold text-zinc-950 dark:text-zinc-50">{value}</p>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{detail}</p>
     </Card>
   );
@@ -55,18 +73,18 @@ export function MetricCard({
 
 export function Badge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "good" | "warn" | "bad" | "info" }) {
   const color = {
-    neutral: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-    good: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-    warn: "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-400",
-    bad: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400",
-    info: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400",
+    neutral: "bg-zinc-100/80 text-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300 border-zinc-200/60 dark:border-zinc-750",
+    good: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20 dark:border-emerald-500/10",
+    warn: "bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/10",
+    bad: "bg-rose-500/10 text-rose-800 dark:text-rose-455 border-rose-500/20 dark:border-rose-500/10",
+    info: "bg-sky-500/10 text-sky-800 dark:text-sky-400 border-sky-500/20 dark:border-sky-500/10",
   }[tone];
-  return <span className={clsx("inline-flex rounded px-2 py-1 text-xs font-semibold", color)}>{children}</span>;
+  return <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border", color)}>{children}</span>;
 }
 
 export function SourceStamp({ source }: { source: SourceMetadata }) {
   return (
-    <dl className="grid gap-2 rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-xs text-zinc-600 dark:text-zinc-400 sm:grid-cols-3">
+    <dl className="grid gap-2 rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-xs text-zinc-650 dark:text-zinc-400 sm:grid-cols-3">
       <div>
         <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Fonte</dt>
         <dd>{source.sourceSystem}</dd>
@@ -76,11 +94,11 @@ export function SourceStamp({ source }: { source: SourceMetadata }) {
         <dd>{source.sourceRecordId}</dd>
       </div>
       <div>
-        <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Confianca</dt>
+        <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Confiança</dt>
         <dd>{Math.round(source.confidence * 100)}%</dd>
       </div>
       <div>
-        <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Ocorrencia</dt>
+        <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Ocorrência</dt>
         <dd>{formatDateTime(source.occurredAt)}</dd>
       </div>
       <div>
@@ -99,18 +117,18 @@ export function Timeline({ events }: { events: LogisticsEvent[] }) {
   return (
     <ol className="space-y-3">
       {events.map((event) => (
-        <li key={event.id} className="rounded border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+        <li key={event.id} className="rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-4 shadow-sm">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="font-semibold text-zinc-900 dark:text-zinc-100">{event.eventType.replaceAll("_", " ")}</p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">{event.persistentCode}</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{event.persistentCode}</p>
             </div>
             <Badge tone={event.dataNature === "divergente" ? "bad" : "info"}>{event.dataNature}</Badge>
           </div>
-          <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-            {formatDateTime(event.occurredAt)} - fonte {event.sourceSystem}, confianca {Math.round(event.confidence * 100)}%
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+            {formatDateTime(event.occurredAt)} - fonte {event.sourceSystem}, confiança {Math.round(event.confidence * 100)}%
           </p>
-          {event.condition ? <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Condicao: {event.condition}</p> : null}
+          {event.condition ? <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Condição: {event.condition}</p> : null}
         </li>
       ))}
     </ol>
