@@ -269,6 +269,23 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       ],
       observation: "Permitido apenas quando explicitamente marcado como local/manual/derivado."
     },
+    // k) Scanner QR de Recebimento do MCL
+    {
+      id: "mcl-qr-recebimento",
+      name: "Aplicativo MCL / Scanner QR de Recebimento",
+      domain: "Recebimento",
+      authority: "SINTETICA",
+      nature: "SINTETICA_DEMONSTRATIVA",
+      integrationMethod: "ENTRADA_HUMANA_VALIDADA",
+      maturity: "DEMONSTRATIVO",
+      status: "SAUDAVEL",
+      limitations: [
+        "Registra apenas evento físico demonstrativo no MCL.",
+        "Não comprova recebimento documental, patrimonial, fiscal ou financeiro oficial.",
+        "Não deve receber dados reais sem autorização institucional."
+      ],
+      observation: "Interface nativa do MCL para registrar evento físico de recebimento no piloto. Não substitui SIAFI, SISCOFIS-WEB ou sistemas oficiais."
+    },
     
     // Add the active simulator connectors to keep existing test/demo data mapped cleanly
     {
