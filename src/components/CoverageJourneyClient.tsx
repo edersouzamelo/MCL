@@ -71,12 +71,16 @@ type QueryTrace = {
   errorMessage?: string;
   requestId?: string;
   totalRegistros?: number;
+  totalRegistrosApi?: number;
   totalPaginas?: number;
   paginasRestantes?: number;
   pagesConsulted?: number;
   durationMs?: number;
   timeoutMs?: number;
   persistenceMode?: string;
+  catmatCode?: string;
+  dateStart?: string;
+  dateEnd?: string;
 };
 
 type ApiResult<T> = T & { error?: string };
@@ -129,12 +133,25 @@ function number(value?: number) {
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(value);
 }
 
-function todayYearRange() {
+function todayIso() {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
-  return { start: "2024-01-01", end: `${year}-${month}-${day}` };
+  return `${year}-${month}-${day}`;
+}
+
+function sixMonthsAgoIso() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 6);
+  return d.toISOString().slice(0, 10);
+}
+
+function todayYearRange() {
+  // Janela ampla diagnóstica: início 2020-01-01.
+  // RISCO: pode causar timeout (>45 s) na API Compras.gov.br.
+  // Reduza para "2024-01-01" em produção se houver timeouts recorrentes.
+  return { start: "2020-01-01", end: todayIso() };
 }
 
 export function CoverageJourneyClient({
@@ -281,20 +298,24 @@ export function CoverageJourneyClient({
     });
   }
 
-  async function searchAtas() {
+  // searchAtas aceita override de datas para evitar dependência de estado possivelmente desatualizado
+  async function searchAtas(dateOverride?: { start: string; end: string }) {
     if (!mapping) {
       setAtaQueryStatus("ERROR");
       setError("Confirme um CATMAT antes de consultar atas.");
       return;
     }
 
+    const effectiveDateStart = dateOverride?.start ?? dateStart;
+    const effectiveDateEnd = dateOverride?.end ?? dateEnd;
+
     const requestId = crypto.randomUUID();
     const payload = buildArpSearchPayload({
       needId: need.id,
       analysisId: initialAnalysisId,
       mapping,
-      dateStart,
-      dateEnd,
+      dateStart: effectiveDateStart,
+      dateEnd: effectiveDateEnd,
       requestId,
     });
 
@@ -303,12 +324,14 @@ export function CoverageJourneyClient({
       needId: need.id,
       analysisId: payload.analysisId,
       catmatCode: payload.catmatCode,
+      dateStart: effectiveDateStart,
+      dateEnd: effectiveDateEnd,
       stage: "ARP_SEARCH_REQUESTED",
       status: "CLICKED",
     });
 
     setAtaQueryStatus("SEARCHING_ARPS");
-    setMessage(`Consultando atas relacionadas ao CATMAT ${mapping.externalItemCode}...`);
+    setMessage(`Consultando atas relacionadas ao CATMAT ${mapping.externalItemCode} (${effectiveDateStart} → ${effectiveDateEnd})...`);
     setError(undefined);
 
     await guarded("atas", async () => {
@@ -318,6 +341,8 @@ export function CoverageJourneyClient({
           needId: need.id,
           analysisId: payload.analysisId,
           catmatCode: payload.catmatCode,
+          dateStart: effectiveDateStart,
+          dateEnd: effectiveDateEnd,
           stage: "ARP_SEARCH_SENT",
           status: "PENDING",
         });
@@ -339,9 +364,13 @@ export function CoverageJourneyClient({
           needId: need.id,
           analysisId: payload.analysisId,
           catmatCode: payload.catmatCode,
+          dateStart: effectiveDateStart,
+          dateEnd: effectiveDateEnd,
           stage: result.body.stage,
           durationMs: (outcome.trace as { durationMs?: number } | undefined)?.durationMs,
           count: outcome.entries.length,
+          totalRegistros: (outcome.trace as QueryTrace | undefined)?.totalRegistros,
+          totalRegistrosApi: (outcome.trace as QueryTrace | undefined)?.totalRegistrosApi,
           status: outcome.status,
         });
       } catch (err) {
@@ -390,28 +419,38 @@ export function CoverageJourneyClient({
     });
   }
 
-  const steps = [
-    ["1", "Necessidade", true],
-    ["2", "Deficit", true],
-    ["3", "CATMAT", candidates.length > 0 || Boolean(mapping)],
-    ["4", "Confirmacao", Boolean(mapping)],
-    ["5", "Atas", entries.length > 0],
-    ["6", "Ata", Boolean(selectedEntry)],
-    ["7", "Unidades", unitRecords.length > 0],
-    ["8", "Sintese", Boolean(synthesis)],
-    ["9", "Registro", false],
-    ["10", "Painel", false],
-  ] as const;
+  // Determina label e "done" da etapa Atas considerando resultado vazio como estado válido
+  const atasWasQueried = ataQueryStatus === "EMPTY" || ataQueryStatus === "COMPLETED" || ataQueryStatus === "ERROR" || ataQueryStatus === "TIMEOUT";
+  const atasStepDone = entries.length > 0 || atasWasQueried;
+  const atasStepLabel = entries.length > 0 ? "pronto" : atasWasQueried ? "consultado" : "pendente";
+
+  const steps: Array<[string, string, boolean, string]> = [
+    ["1", "Necessidade", true, "pronto"],
+    ["2", "Deficit", true, "pronto"],
+    ["3", "CATMAT", candidates.length > 0 || Boolean(mapping), candidates.length > 0 || Boolean(mapping) ? "pronto" : "pendente"],
+    ["4", "Confirmacao", Boolean(mapping), Boolean(mapping) ? "pronto" : "pendente"],
+    ["5", "Atas", atasStepDone, atasStepLabel],
+    ["6", "Ata", Boolean(selectedEntry), Boolean(selectedEntry) ? "pronto" : "pendente"],
+    ["7", "Unidades", unitRecords.length > 0, unitRecords.length > 0 ? "pronto" : "pendente"],
+    ["8", "Sintese", Boolean(synthesis), Boolean(synthesis) ? (ataQueryStatus === "EMPTY" ? "sem ata" : "pronto") : "pendente"],
+    ["9", "Registro", false, "pendente"],
+    ["10", "Painel", false, "pendente"],
+  ];
 
   return (
     <div className="space-y-4">
       <Card>
         <div className="grid gap-2 sm:grid-cols-5 lg:grid-cols-10">
-          {steps.map(([numberLabel, label, done]) => (
+          {steps.map(([numberLabel, label, , statusLabel]) => (
             <div key={numberLabel} className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-2 text-xs">
               <span className="font-semibold text-zinc-500 dark:text-zinc-400">{numberLabel}</span>
-              <p className="mt-1 font-semibold text-zinc-900">{label}</p>
-              <p className={done ? "text-emerald-700 font-semibold" : "text-zinc-500 dark:text-zinc-400"}>{done ? "pronto" : "pendente"}</p>
+              <p className="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{label}</p>
+              <p className={
+                statusLabel === "pronto" ? "text-emerald-700 dark:text-emerald-400 font-semibold" :
+                statusLabel === "consultado" ? "text-amber-700 dark:text-amber-400 font-semibold" :
+                statusLabel === "sem ata" ? "text-amber-600 dark:text-amber-400 font-semibold" :
+                "text-zinc-500 dark:text-zinc-400"
+              }>{statusLabel}</p>
             </div>
           ))}
         </div>
@@ -534,14 +573,14 @@ export function CoverageJourneyClient({
                   </div>
                   <Badge tone={candidate.statusItem ? "good" : "warn"}>{candidate.statusItem ? "ativo" : "inativo"}</Badge>
                 </div>
-                <p className="mt-2 line-clamp-4 text-zinc-700">{candidate.externalDescription}</p>
-                <dl className="mt-3 grid grid-cols-3 gap-2 text-xs text-zinc-600">
-                  <div><dt>Grupo</dt><dd className="font-semibold">{candidate.groupCode ?? "-"}</dd></div>
-                  <div><dt>Classe</dt><dd className="font-semibold">{candidate.classCode ?? "-"}</dd></div>
-                  <div><dt>PDM</dt><dd className="font-semibold">{candidate.pdmCode ?? "-"}</dd></div>
+                <p className="mt-2 line-clamp-4 text-zinc-800 dark:text-zinc-200 text-xs leading-relaxed">{candidate.externalDescription}</p>
+                <dl className="mt-3 grid grid-cols-3 gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+                  <div><dt className="text-zinc-500 dark:text-zinc-400">Grupo</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{candidate.groupCode ?? "-"}</dd></div>
+                  <div><dt className="text-zinc-500 dark:text-zinc-400">Classe</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{candidate.classCode ?? "-"}</dd></div>
+                  <div><dt className="text-zinc-500 dark:text-zinc-400">PDM</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{candidate.pdmCode ?? "-"}</dd></div>
                 </dl>
-                <p className="mt-3 text-xs text-zinc-600">Similaridade {Math.round(candidate.similarityScore * 100)}% - {candidate.similarityExplanation}</p>
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Origem {candidate.sourceSystem} - {candidate.sourceUpdatedAt ? formatDateTime(candidate.sourceUpdatedAt) : "sem atualizacao"}</p>
+                <p className="mt-3 text-xs text-zinc-700 dark:text-zinc-300">Similaridade {Math.round(candidate.similarityScore * 100)}% — {candidate.similarityExplanation}</p>
+                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">Origem: <span className="font-medium">{candidate.sourceSystem}</span>{candidate.sourceUpdatedAt ? ` · ${formatDateTime(candidate.sourceUpdatedAt)}` : ""}</p>
               </button>
             ))}
           </div>
@@ -577,45 +616,131 @@ export function CoverageJourneyClient({
               <Landmark aria-hidden className="h-5 w-5 text-emerald-700" />
               <h2 className="text-lg font-semibold">Atas relacionadas</h2>
             </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+
+            {/* Presets de período */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-semibold text-zinc-600 dark:text-zinc-400">Período:</span>
+              {([
+                { label: "Últ. 6 meses", start: sixMonthsAgoIso(), end: todayIso() },
+                { label: "Desde 2024",   start: "2024-01-01",       end: todayIso() },
+                { label: "Desde 2020",   start: "2020-01-01",       end: todayIso() },
+              ] as const).map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => { setDateStart(preset.start); setDateEnd(preset.end); }}
+                  className={`rounded border px-2.5 py-1 font-semibold transition-colors ${
+                    dateStart === preset.start && dateEnd === preset.end
+                      ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300"
+                      : "border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              <span className="text-zinc-400 dark:text-zinc-600">|</span>
+              <span className="font-medium text-zinc-500 dark:text-zinc-400">Manual:</span>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-3 text-sm">
               <label>
-                <span className="font-semibold text-zinc-700">Inicio</span>
-                <input type="date" value={dateStart} onChange={(event) => setDateStart(event.target.value)} className="mt-1 block rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2" />
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">Início</span>
+                <input type="date" value={dateStart} onChange={(event) => setDateStart(event.target.value)} className="mt-1 block rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2" />
               </label>
               <label>
-                <span className="font-semibold text-zinc-700">Fim</span>
-                <input type="date" value={dateEnd} onChange={(event) => setDateEnd(event.target.value)} className="mt-1 block rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2" />
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">Fim</span>
+                <input type="date" value={dateEnd} onChange={(event) => setDateEnd(event.target.value)} className="mt-1 block rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2" />
               </label>
             </div>
-            <p className="mt-2 text-xs text-zinc-500">
-              A busca usa intervalo de início de vigência; atas iniciadas em anos anteriores podem continuar vigentes.
+            <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+              ⚠ Filtro por <strong>data de início de vigência</strong>. Atas iniciadas antes da janela selecionada não aparecem, mesmo vigentes. Janelas desde 2020 aumentam o risco de timeout.
             </p>
           </div>
           <button
             type="button"
-            onClick={searchAtas}
+            onClick={() => searchAtas()}
             disabled={!mapping || pending === "atas"}
             className="inline-flex items-center gap-2 rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-zinc-400"
           >
             <ClipboardList aria-hidden className="h-4 w-4" />
-            {pending === "atas" ? "Consultando" : "Consultar atas"}
+            {pending === "atas" ? "Consultando..." : "Consultar atas"}
           </button>
         </div>
 
         {ataQueryStatus === "SEARCHING_ARPS" ? (
-          <p className="mt-3 text-sm text-zinc-600 animate-pulse">
-            Consultando atas relacionadas ao CATMAT {mapping?.externalItemCode}...
+          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 animate-pulse">
+            Consultando atas — CATMAT {mapping?.externalItemCode} ({dateStart} → {dateEnd})...
           </p>
         ) : ataQueryStatus === "EMPTY" ? (
-          <p className="mt-3 text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
-            Nenhuma ata relacionada ao CATMAT {mapping?.externalItemCode} foi encontrada no período consultado.
-          </p>
+          // Painel de diagnóstico para resultado vazio — diferencia totalRegistros=0 vs schema-filtrado
+          <div className="mt-3 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-3">
+            <p className="font-semibold text-amber-900 dark:text-amber-300 text-sm">
+              Consulta executada sem atas retornadas
+            </p>
+            <dl className="grid gap-2 sm:grid-cols-2 text-xs text-amber-900 dark:text-amber-200 font-mono">
+              <div><dt className="font-bold">CATMAT consultado</dt><dd>{queryTrace?.catmatCode ?? mapping?.externalItemCode}</dd></div>
+              <div><dt className="font-bold">Período</dt><dd>{queryTrace?.dateStart ?? dateStart} → {queryTrace?.dateEnd ?? dateEnd}</dd></div>
+              <div><dt className="font-bold">totalRegistros (API)</dt>
+                <dd className={`font-bold ${
+                  (queryTrace?.totalRegistros ?? 0) === 0
+                    ? "text-rose-700 dark:text-rose-400"
+                    : "text-amber-700 dark:text-amber-400"
+                }`}>
+                  {queryTrace?.totalRegistros ?? "—"}
+                </dd>
+              </div>
+              <div><dt className="font-bold">totalRegistrosApi (bruto)</dt><dd>{queryTrace?.totalRegistrosApi ?? "—"}</dd></div>
+              <div><dt className="font-bold">Endpoint</dt><dd>{queryTrace?.endpoint ?? "—"}</dd></div>
+              <div><dt className="font-bold">Duração</dt><dd>{queryTrace?.durationMs != null ? `${queryTrace.durationMs} ms` : "—"}</dd></div>
+            </dl>
+
+            {/* Diagnóstico diferenciado */}
+            {(queryTrace?.totalRegistros ?? 0) === 0 ? (
+              <p className="text-xs text-amber-800 dark:text-amber-300 border-t border-amber-200 dark:border-amber-700 pt-2">
+                <strong>Causa provável:</strong> A API retornou <code>totalRegistros=0</code> para este CATMAT e período. Nenhum registro chegou ao servidor — não houve filtragem interna.
+              </p>
+            ) : (
+              <p className="text-xs text-amber-800 dark:text-amber-300 border-t border-amber-200 dark:border-amber-700 pt-2">
+                <strong>Atenção:</strong> A API retornou <strong>{queryTrace?.totalRegistros} registro(s)</strong>, mas todos foram descartados por divergência de <code>codigoItem</code> ou falha de validação de schema. Verifique os parâmetros.
+              </p>
+            )}
+
+            {/* Botão de reteste com janela ampla — monta payload diretamente sem depender de state */}
+            {dateStart !== "2020-01-01" && (
+              <button
+                type="button"
+                disabled={pending === "atas"}
+                onClick={() => {
+                  const wideStart = "2020-01-01";
+                  const wideEnd = todayIso();
+                  setDateStart(wideStart);
+                  setDateEnd(wideEnd);
+                  // Passa override direto — não depende do setState acima ter sido aplicado
+                  searchAtas({ start: wideStart, end: wideEnd });
+                }}
+                className="inline-flex items-center gap-2 rounded bg-amber-700 dark:bg-amber-800 px-3 py-2 text-xs font-bold text-white hover:bg-amber-800 disabled:bg-zinc-400"
+              >
+                Tentar janela ampla desde 2020
+              </button>
+            )}
+
+            {/* Detalhes técnicos */}
+            <details className="text-xs">
+              <summary className="cursor-pointer font-semibold text-amber-800 dark:text-amber-400 select-none">Parâmetros e URL consultada</summary>
+              <div className="mt-2 space-y-1.5 font-mono">
+                {queryTrace?.sourceUrl && (
+                  <p className="break-all"><span className="font-bold">URL:</span> <a href={queryTrace.sourceUrl} target="_blank" rel="noreferrer" className="text-indigo-700 dark:text-indigo-400 underline">{queryTrace.sourceUrl}</a></p>
+                )}
+                <pre className="bg-amber-100 dark:bg-amber-950/40 p-2 rounded overflow-x-auto text-[10px] text-amber-900 dark:text-amber-200">{JSON.stringify(queryTrace?.params, null, 2)}</pre>
+              </div>
+            </details>
+          </div>
         ) : ataQueryStatus === "TIMEOUT" ? (
-          <p className="mt-3 text-sm text-rose-700 bg-rose-50 p-3 rounded border border-rose-200">
-            A consulta de atas excedeu o tempo limite.
+          <p className="mt-3 text-sm text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 p-3 rounded border border-rose-200 dark:border-rose-800">
+            A consulta de atas excedeu o tempo limite. Tente uma janela menor (ex: Desde 2024) ou tente novamente.
           </p>
         ) : ataQueryStatus === "ERROR" ? (
-          <p className="mt-3 text-sm text-rose-700 bg-rose-50 p-3 rounded border border-rose-200">
+          <p className="mt-3 text-sm text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/20 p-3 rounded border border-rose-200 dark:border-rose-800">
             {error || "Não foi possível concluir a consulta de atas."}
           </p>
         ) : entries.length ? (
@@ -709,20 +834,25 @@ export function CoverageJourneyClient({
           </div>
           {synthesis ? (
             <div className="mt-4 space-y-3">
+              {ataQueryStatus === "EMPTY" && (
+                <p className="rounded border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 font-semibold">
+                  ⚠ Síntese calculada sem ata retornada — valores baseados em cobertura zero.
+                </p>
+              )}
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit</dt><dd className="font-semibold">{number(synthesis.deficit)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial</dt><dd className="font-semibold">{number(synthesis.potentialQuantity)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Atas vigentes</dt><dd className="font-semibold">{synthesis.currentAtaCount}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Confianca</dt><dd className="font-semibold text-indigo-700">{Math.round(synthesis.confidence * 100)}%</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor</dt><dd className="font-semibold">{money(synthesis.minUnitValue)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor</dt><dd className="font-semibold">{money(synthesis.maxUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.deficit)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.potentialQuantity)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Atas vigentes</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{synthesis.currentAtaCount}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Confianca</dt><dd className="font-semibold text-indigo-700 dark:text-indigo-400">{Math.round(synthesis.confidence * 100)}%</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.maxUnitValue)}</dd></div>
               </dl>
-              <div className="space-y-2 text-sm text-zinc-700">
+              <div className="space-y-2 text-sm text-zinc-800 dark:text-zinc-200">
                 {synthesis.phrases.map((phrase) => (
                   <p key={phrase} className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3">{phrase}</p>
                 ))}
               </div>
-              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-1">
+              <div className="rounded border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-950 dark:text-amber-200 space-y-1">
                 <p className="font-semibold">Observações e Limitações:</p>
                 {synthesis.limitations.map((limitation) => (
                   <p key={limitation}>• {limitation}</p>
@@ -739,7 +869,7 @@ export function CoverageJourneyClient({
               </button>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-zinc-600">A sintese aparece depois da consulta de atas.</p>
+            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">A sintese aparece depois da consulta de atas.</p>
           )}
         </Card>
       </div>
@@ -751,39 +881,42 @@ export function CoverageJourneyClient({
             <span className="text-xs text-zinc-500 dark:text-zinc-400 group-open:hidden border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5">expandir</span>
             <span className="text-xs text-zinc-500 dark:text-zinc-400 hidden group-open:inline border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5">recolher</span>
           </summary>
-          <div className="mt-4 text-xs text-zinc-600 space-y-3 font-mono border-t border-zinc-200 dark:border-zinc-800/60 pt-4">
+          <div className="mt-4 text-xs text-zinc-700 dark:text-zinc-300 space-y-3 font-mono border-t border-zinc-200 dark:border-zinc-800/60 pt-4">
             {queryTrace ? (
               <div className="grid gap-4 sm:grid-cols-2 bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded border border-zinc-200 dark:border-zinc-800">
                 <div className="space-y-1.5">
-                  <p><span className="font-semibold text-zinc-800">Endpoint:</span> {queryTrace.endpoint}</p>
-                  <p><span className="font-semibold text-zinc-800">Tipo/Ação:</span> {queryTrace.kind}</p>
-                  <p><span className="font-semibold text-zinc-800">Status da Resposta:</span> {queryTrace.status}</p>
-                  <p><span className="font-semibold text-zinc-800">Registros Recebidos:</span> {queryTrace.recordsRead}</p>
-                  {queryTrace.requestId ? <p><span className="font-semibold text-zinc-800">Request ID:</span> {queryTrace.requestId}</p> : null}
-                  {queryTrace.persistenceMode ? <p><span className="font-semibold text-zinc-800">Persistencia:</span> {queryTrace.persistenceMode}</p> : null}
-                  {queryTrace.pagesConsulted ? <p><span className="font-semibold text-zinc-800">Paginas consultadas:</span> {queryTrace.pagesConsulted}</p> : null}
-                  {queryTrace.totalRegistros !== undefined ? <p><span className="font-semibold text-zinc-800">Total da fonte:</span> {queryTrace.totalRegistros}</p> : null}
-                  {queryTrace.timeoutMs ? <p><span className="font-semibold text-zinc-800">Timeout:</span> {queryTrace.timeoutMs} ms</p> : null}
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Endpoint:</span> {queryTrace.endpoint}</p>
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Tipo/Ação:</span> {queryTrace.kind}</p>
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Status da Resposta:</span> {queryTrace.status}</p>
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Registros Recebidos:</span> {queryTrace.recordsRead}</p>
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Total fonte (totalRegistros):</span> {queryTrace.totalRegistros ?? "—"}</p>
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Total bruto (totalRegistrosApi):</span> {queryTrace.totalRegistrosApi ?? "—"}</p>
+                  {queryTrace.dateStart && <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Período consultado:</span> {queryTrace.dateStart} → {queryTrace.dateEnd}</p>}
+                  {queryTrace.requestId ? <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Request ID:</span> {queryTrace.requestId}</p> : null}
+                  {queryTrace.persistenceMode ? <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Persistencia:</span> {queryTrace.persistenceMode}</p> : null}
+                  {queryTrace.pagesConsulted ? <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Paginas consultadas:</span> {queryTrace.pagesConsulted}</p> : null}
+                  {queryTrace.timeoutMs ? <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Timeout configurado:</span> {queryTrace.timeoutMs} ms</p> : null}
+                  {queryTrace.durationMs != null ? <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Duração real:</span> {queryTrace.durationMs} ms</p> : null}
                   {queryTrace.sourceUrl && (
                     <p className="break-all">
-                      <span className="font-semibold text-zinc-800">Origem (URL consultada):</span>{" "}
-                      <a href={queryTrace.sourceUrl} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-700 underline">
+                      <span className="font-semibold text-zinc-900 dark:text-zinc-100">URL consultada:</span>{" "}
+                      <a href={queryTrace.sourceUrl} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 underline">
                         {queryTrace.sourceUrl}
                       </a>
                     </p>
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <p><span className="font-semibold text-zinc-800">Horário Inicial:</span> {queryTrace.startedAt ? formatDateTime(queryTrace.startedAt) : "-"}</p>
-                  <p><span className="font-semibold text-zinc-800">Horário Final:</span> {queryTrace.finishedAt ? formatDateTime(queryTrace.finishedAt) : "-"}</p>
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Horário Inicial:</span> {queryTrace.startedAt ? formatDateTime(queryTrace.startedAt) : "-"}</p>
+                  <p><span className="font-semibold text-zinc-900 dark:text-zinc-100">Horário Final:</span> {queryTrace.finishedAt ? formatDateTime(queryTrace.finishedAt) : "-"}</p>
                   <div>
-                    <span className="font-semibold text-zinc-800">Parâmetros Enviados:</span>
-                    <pre className="mt-1 bg-zinc-100 p-2 rounded text-[10px] text-zinc-700 overflow-x-auto">
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100">Parâmetros Enviados:</span>
+                    <pre className="mt-1 bg-zinc-100 dark:bg-zinc-900 p-2 rounded text-[10px] text-zinc-800 dark:text-zinc-200 overflow-x-auto">
                       {JSON.stringify(queryTrace.params, null, 2)}
                     </pre>
                   </div>
                   {queryTrace.errorMessage && (
-                    <p className="text-rose-600 font-semibold mt-1">Erro da fonte: {queryTrace.errorMessage}</p>
+                    <p className="text-rose-600 dark:text-rose-400 font-semibold mt-1">Erro da fonte: {queryTrace.errorMessage}</p>
                   )}
                 </div>
               </div>

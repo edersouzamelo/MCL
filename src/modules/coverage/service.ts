@@ -225,8 +225,14 @@ function defaultDateRange() {
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, '0');
   const day = String(now.getUTCDate()).padStart(2, '0');
+  // ATENÇÃO: "2020-01-01" é janela ampla para fins diagnósticos.
+  // Atas com dataVigenciaInicialMin antes de 2024 podem estar ativas mas
+  // eram invisíveis com a janela anterior (2024-01-01).
+  // RISCO: janelas muito amplas podem exceder o timeout de 45 s da API
+  // do Compras.gov.br. Ajuste para "2024-01-01" em produção se houver
+  // problemas recorrentes de timeout.
   return {
-    start: "2024-01-01",
+    start: "2020-01-01",
     end: `${year}-${month}-${day}`,
   };
 }

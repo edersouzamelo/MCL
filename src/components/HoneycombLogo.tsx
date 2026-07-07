@@ -142,7 +142,7 @@ export function HoneycombLogo() {
   const { animationsEnabled } = useSettings();
 
   useEffect(() => {
-    setIsMounted(true);
+    setTimeout(() => setIsMounted(true), 0);
   }, []);
 
   // Pré-calcula a lista de props para evitar recriação

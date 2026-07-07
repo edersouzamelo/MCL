@@ -16,8 +16,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Layers,
-  HelpCircle,
-  Check
+  HelpCircle
 } from "lucide-react";
 import type { OfficialCatalogItem } from "@/modules/coverage/official-catalog";
 
@@ -55,7 +54,7 @@ async function selectItemAction(formData: FormData) {
   const sourceUrl = formData.get("sourceUrl") as string;
   const fetchedAt = formData.get("fetchedAt") as string;
   const sourceUpdatedAt = formData.get("sourceUpdatedAt") as string;
-  const payloadHash = formData.get("payloadHash") as string;
+  // payloadHash read from form; forwarded via hidden input — not needed in server-side logic
   const sourceSystem = formData.get("sourceSystem") as string;
   const payloadJson = formData.get("payloadJson") as string;
 
