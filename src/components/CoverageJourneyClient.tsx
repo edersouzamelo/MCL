@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -177,6 +177,36 @@ export function CoverageJourneyClient({
   const [pending, setPending] = useState<string>();
   const [queryTrace, setQueryTrace] = useState<QueryTrace>();
   const [ataQueryStatus, setAtaQueryStatus] = useState<AtaQueryStatus>("IDLE");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const candidateIdParam = urlParams.get("candidateId");
+      if (candidateIdParam) {
+        setTimeout(() => {
+          setPending("loading-candidate");
+        }, 0);
+        postJson<{ candidate: CatalogSearchCandidate }>("/api/coverage/catalog/search", {
+          action: "getCandidate",
+          candidateId: candidateIdParam,
+        })
+          .then((res) => {
+            if (res?.candidate) {
+              setCandidates([res.candidate]);
+              setSelectedCandidateId(res.candidate.id);
+              setMessage("Candidato selecionado do Catálogo Oficial carregado com sucesso. Preencha a justificativa e confirme o vínculo abaixo.");
+            }
+          })
+          .catch((err) => {
+            console.error("Erro ao carregar candidato do catalogo:", err);
+            setError("Não foi possível carregar o candidato selecionado do Catálogo Oficial.");
+          })
+          .finally(() => {
+            setPending(undefined);
+          });
+      }
+    }
+  }, []);
 
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId);
 
@@ -426,17 +456,27 @@ export function CoverageJourneyClient({
               <input
                 value={terms}
                 onChange={(event) => setTerms(event.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-800"
+                placeholder="Ex: 123456 ou coturno"
+                className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 bg-white dark:bg-zinc-950/70 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               />
             </label>
-            <button
-              type="button"
-              onClick={searchCatmat}
-              disabled={pending === "catmat"}
-              className="self-end rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-zinc-400"
-            >
-              {pending === "catmat" ? "Buscando" : "Buscar CATMAT"}
-            </button>
+            <div className="self-end flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={searchCatmat}
+                disabled={pending === "catmat" || pending === "loading-candidate"}
+                className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-zinc-400"
+              >
+                {pending === "catmat" ? "Buscando" : "Buscar CATMAT"}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/catalogo?needId=${need.id}`)}
+                className="rounded border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 dark:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-zinc-800"
+              >
+                Buscar no Catálogo Oficial
+              </button>
+            </div>
           </div>
 
           {mapping ? (
@@ -515,7 +555,7 @@ export function CoverageJourneyClient({
               <input
                 value={justification}
                 onChange={(event) => setJustification(event.target.value)}
-                className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-850"
+                className="mt-1 w-full rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 bg-white dark:bg-zinc-950/70 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               />
             </label>
             <button

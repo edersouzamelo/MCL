@@ -75,3 +75,36 @@ Cada `ExternalRecord` preserva:
 ## Observacao sobre banco
 
 O Prisma ja contem os modelos para PostgreSQL, mas o runtime atual usa store em memoria ate `DATABASE_URL` e migracoes estarem configuradas.
+
+## Endpoints do Catálogo Oficial Facade (V1)
+
+O MCL oferece novas rotas locais para expor e auditar o catálogo unificado de materiais e serviços:
+
+### 1. Pesquisa / Seleção
+- **Endpoint**: `POST /api/coverage/catalog/search`
+- **Ações suportadas**:
+  - `search`: Busca materiais (CATMAT) na API de dados abertos governamentais ou retorna que serviços (CATSER) não são suportados (when supported by the current integration).
+  - `saveCandidate`: Registra um item de catálogo selecionado como candidato de auditoria (`CatalogSearchCandidate`) e gera uma query correspondente (`CoverageQuery`) sem efetivar o mapeamento diretamente.
+  - `getCandidate`: Retorna os dados completos do candidato salvo.
+
+### 2. Validação Direta
+- **Endpoint**: `POST /api/coverage/catalog/validate`
+- **Ação**: Valida códigos CATMAT na API de dados abertos do Compras.gov.br (retornando erro explícito se não localizado ou se a API falhar) ou reporta que CATSER não é suportado no momento.
+
+### Formato do Objeto de Auditoria (OfficialCatalogItem)
+Toda resposta unificada retorna a estrutura:
+```typescript
+interface OfficialCatalogItem {
+  catalogType: "CATMAT" | "CATSER";
+  externalCode: string;
+  description: string;
+  sourceSystem: string;
+  sourceUrl: string;
+  fetchedAt: string;
+  sourceUpdatedAt?: string;
+  payloadHash: string;
+  payload: Record<string, any>;
+  status: "LIVE_OK" | "LIVE_FAILED" | "CACHE_HIT" | "EMPTY" | "STALE" | "UNSUPPORTED";
+  error?: string;
+}
+```

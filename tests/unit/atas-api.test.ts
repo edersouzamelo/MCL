@@ -202,4 +202,44 @@ describe("API Route - /api/coverage/atas/search", () => {
     expect(body.retryable).toBe(true);
     expect(getDemoState().coverageQueries[0].status).toBe("FAILED");
   });
+
+  it("normaliza mappingSnapshot com Date em confirmedAt e realiza a busca com sucesso", async () => {
+    session();
+    vi.mocked(fetch).mockResolvedValue(
+      responseJson({ resultado: [], totalRegistros: 0, totalPaginas: 0, paginasRestantes: 0 }),
+    );
+
+    const snapshotWithDate = {
+      id: "mapping-calca-120-default",
+      mclItemId: "item-calca-120",
+      needId: "need-calca-120",
+      externalCatalog: "CATMAT",
+      externalItemCode: "452757",
+      externalDescription: "Calca",
+      confirmedBy: "user-demo-admin",
+      confirmedAt: new Date("2026-03-25T00:00:00.000Z"),
+      status: "ACTIVE",
+      confidence: 1,
+      mappingVersion: 1,
+    };
+
+    const response = await POST(request(payload({ mappingSnapshot: snapshotWithDate })));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.stage).toBe("ARP_SEARCH_EMPTY");
+  });
+
+  it("retorna INTERNAL_PAYLOAD_VALIDATION quando ocorre erro de validacao interna (ex: dataStart invalida)", async () => {
+    session();
+
+    const response = await POST(request(payload({ dateStart: "data-invalida" })));
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.code).toBe("INTERNAL_PAYLOAD_VALIDATION");
+    expect(body.message).toContain("Erro de validacao dos dados");
+  });
 });

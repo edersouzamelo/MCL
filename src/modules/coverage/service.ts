@@ -81,7 +81,22 @@ const mappingSnapshotSchema = z.object({
   classCode: z.string().trim().optional(),
   pdmCode: z.string().trim().optional(),
   confirmedBy: z.string().trim().optional(),
-  confirmedAt: z.string().trim().optional(),
+  confirmedAt: z.preprocess((val) => {
+    if (val instanceof Date) return val.toISOString();
+    if (val && typeof val === "object") {
+      if (typeof (val as any).toISOString === "function") {
+        return (val as any).toISOString();
+      }
+      const strVal = String(val);
+      const parsed = new Date(strVal);
+      return !isNaN(parsed.getTime()) ? parsed.toISOString() : undefined;
+    }
+    if (typeof val === "string") {
+      const parsed = new Date(val);
+      return !isNaN(parsed.getTime()) ? parsed.toISOString() : val;
+    }
+    return undefined;
+  }, z.string().trim().optional()),
   justification: z.string().trim().optional(),
   status: z.enum(["ACTIVE", "REVOKED", "SUPERSEDED"]).optional(),
   confidence: z.coerce.number().min(0).max(1).optional(),

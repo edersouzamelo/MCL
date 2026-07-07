@@ -57,6 +57,64 @@ type BuildPayloadInput = {
   requestId: string;
 };
 
+export function sanitizeMappingSnapshot(mapping: any): any {
+  if (!mapping) return undefined;
+
+  const allowedKeys = [
+    "id",
+    "mclItemId",
+    "mclVariantId",
+    "needId",
+    "externalCatalog",
+    "externalItemCode",
+    "externalDescription",
+    "groupCode",
+    "classCode",
+    "pdmCode",
+    "confirmedBy",
+    "confirmedAt",
+    "revokedAt",
+    "justification",
+    "status",
+    "confidence",
+    "mappingVersion",
+    "replacesMappingId",
+    "sourceCandidateId",
+  ];
+
+  const sanitized: any = {};
+
+  for (const key of allowedKeys) {
+    let value = mapping[key];
+    if (value === null || value === undefined) {
+      continue;
+    }
+
+    if (key === "confirmedAt" || key === "revokedAt") {
+      if (value instanceof Date) {
+        value = value.toISOString();
+      } else if (typeof value === "object" && value !== null) {
+        if (typeof (value as any).toISOString === "function") {
+          value = (value as any).toISOString();
+        } else {
+          const dateStr = String(value);
+          const parsed = new Date(dateStr);
+          value = !isNaN(parsed.getTime()) ? parsed.toISOString() : undefined;
+        }
+      } else if (typeof value === "string") {
+        const parsed = new Date(value);
+        value = !isNaN(parsed.getTime()) ? parsed.toISOString() : value;
+      }
+    }
+
+    if (value !== undefined && value !== null) {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
+
 export function buildArpSearchPayload({
   needId,
   analysisId,
@@ -70,7 +128,7 @@ export function buildArpSearchPayload({
     analysisId: analysisId ?? `analysis-${needId}`,
     catalogMappingId: mapping.id,
     catmatCode: mapping.externalItemCode,
-    mappingSnapshot: mapping,
+    mappingSnapshot: sanitizeMappingSnapshot(mapping) as ItemCatalogMapping,
     dateStart,
     dateEnd,
     dataVigenciaInicialMin: dateStart,
@@ -98,6 +156,15 @@ export function classifyArpSearchResponse(
       return {
         status: "ERROR",
         error: result.message,
+        entries: [],
+        trace: result.trace,
+      };
+    }
+
+    if (result.ok === false && result.code === "INTERNAL_PAYLOAD_VALIDATION") {
+      return {
+        status: "ERROR",
+        error: `Erro de validação interna do payload (a requisição não foi enviada ao Compras.gov): ${result.message}`,
         entries: [],
         trace: result.trace,
       };

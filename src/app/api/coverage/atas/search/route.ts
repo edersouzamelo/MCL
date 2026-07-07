@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { demoMemoryFallbackAllowed, getRouteActor } from "@/modules/auth/route-actor";
 import {
   activeCatalogMappingForNeed,
@@ -36,6 +37,57 @@ function stripNulls(value: unknown): unknown {
     if (entry !== null) output[key] = stripNulls(entry);
   }
   return output;
+}
+
+function normalizeBackendMapping(mapping: any): any {
+  if (!mapping) return mapping;
+  const result = { ...mapping };
+
+  if (result.confirmedAt !== undefined && result.confirmedAt !== null) {
+    if (result.confirmedAt instanceof Date) {
+      result.confirmedAt = result.confirmedAt.toISOString();
+    } else if (typeof result.confirmedAt === "object") {
+      if (typeof (result.confirmedAt as any).toISOString === "function") {
+        result.confirmedAt = (result.confirmedAt as any).toISOString();
+      } else {
+        const parsed = new Date(String(result.confirmedAt));
+        if (!isNaN(parsed.getTime())) {
+          result.confirmedAt = parsed.toISOString();
+        } else {
+          delete result.confirmedAt;
+        }
+      }
+    } else if (typeof result.confirmedAt === "string") {
+      const parsed = new Date(result.confirmedAt);
+      if (!isNaN(parsed.getTime())) {
+        result.confirmedAt = parsed.toISOString();
+      }
+    }
+  }
+
+  if (result.revokedAt !== undefined && result.revokedAt !== null) {
+    if (result.revokedAt instanceof Date) {
+      result.revokedAt = result.revokedAt.toISOString();
+    } else if (typeof result.revokedAt === "object") {
+      if (typeof (result.revokedAt as any).toISOString === "function") {
+        result.revokedAt = (result.revokedAt as any).toISOString();
+      } else {
+        const parsed = new Date(String(result.revokedAt));
+        if (!isNaN(parsed.getTime())) {
+          result.revokedAt = parsed.toISOString();
+        } else {
+          delete result.revokedAt;
+        }
+      }
+    } else if (typeof result.revokedAt === "string") {
+      const parsed = new Date(result.revokedAt);
+      if (!isNaN(parsed.getTime())) {
+        result.revokedAt = parsed.toISOString();
+      }
+    }
+  }
+
+  return result;
 }
 
 function routeLog(event: string, fields: Record<string, unknown>) {
@@ -96,7 +148,10 @@ export async function POST(request: Request) {
 
   try {
     body = (await request.json()) as ArpRequestBody;
-    if (body.mappingSnapshot) body.mappingSnapshot = stripNulls(body.mappingSnapshot);
+    if (body.mappingSnapshot) {
+      body.mappingSnapshot = stripNulls(body.mappingSnapshot);
+      body.mappingSnapshot = normalizeBackendMapping(body.mappingSnapshot);
+    }
     requestId = safeText(body.requestId) ?? requestId;
   } catch {
     return failure(400, requestId, "INVALID_REQUEST", "JSON invalido.", false, { durationMs: Date.now() - routeStartedAt });
@@ -137,7 +192,7 @@ export async function POST(request: Request) {
       state,
       {
         ...body,
-        mappingSnapshot: stripNulls(mapping) as any,
+        mappingSnapshot: stripNulls(normalizeBackendMapping(mapping)) as any,
         needId,
         analysisId,
         catalogMappingId,
@@ -226,7 +281,12 @@ export async function POST(request: Request) {
       trace,
     });
   } catch (error) {
+    const isZodError = error instanceof z.ZodError || (error instanceof Error && error.name === "ZodError");
     const message = error instanceof Error ? error.message : "Falha ao consultar atas.";
+    if (isZodError) {
+      routeLog("ARP_VALIDATION_FAILED", { requestId, needId, analysisId, catmatCode, stage: "ARP_SEARCH_FAILED", durationMs: Date.now() - routeStartedAt, count: 0, status: "INTERNAL_PAYLOAD_VALIDATION" });
+      return failure(400, requestId, "INTERNAL_PAYLOAD_VALIDATION", `Erro de validacao dos dados: ${message}`, false, { requestId, needId, analysisId, catalogMappingId, catmatCode, persistenceMode: mode, durationMs: Date.now() - routeStartedAt });
+    }
     const isTimeout = message.toLowerCase().includes("tempo limite") || message.toLowerCase().includes("timeout") || message.toLowerCase().includes("abort");
     routeLog("ARP_EXTERNAL_FAILED", { requestId, needId, analysisId, catmatCode, stage: "ARP_SEARCH_FAILED", durationMs: Date.now() - routeStartedAt, count: 0, status: isTimeout ? "TIMEOUT" : "QUERY_ERROR" });
     return failure(400, requestId, isTimeout ? "TIMEOUT" : "QUERY_ERROR", message, true, { requestId, needId, analysisId, catalogMappingId, catmatCode, persistenceMode: mode, durationMs: Date.now() - routeStartedAt });
