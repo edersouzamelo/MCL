@@ -46,3 +46,58 @@ textarea {
   animation: menuFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Efeito de brilho dinâmico (shimmer) para botões */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-20deg);
+  animation: btnShineSweep 5s infinite ease-in-out;
+}
+
+@keyframes btnShineSweep {
+  0% {
+    left: -150%;
+  }
+  30% {
+    left: 150%;
+  }
+  100% {
+    left: 150%;
+  }
+}
+
+/* Estilização em azul manga (azul do print) */
+.btn-shine-blue {
+  background-color: #007cc9;
+  color: #ffffff;
+  box-shadow: 0 4px 14px 0 rgba(0, 124, 201, 0.3);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-shine-blue:hover {
+  background-color: #008be2;
+  box-shadow: 0 6px 20px 0 rgba(0, 124, 201, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-shine-blue:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px 0 rgba(0, 124, 201, 0.3);
+}
+
+

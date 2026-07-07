@@ -1,9 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Boxes, Database, Route, ShieldCheck } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
-import { BrandLogo } from "@/components/BrandLogo";
+import { HoneycombLogo } from "@/components/HoneycombLogo";
+import { useSettings } from "@/contexts/SettingsContext";
+import { motion } from "framer-motion";
 
 export default function Home() {
+  const { animationsEnabled } = useSettings();
+
   return (
     <PageTransition>
       <div className="relative flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden">
@@ -22,17 +28,17 @@ export default function Home() {
         
         <section className="grid w-full items-center gap-10 lg:grid-cols-2">
           {/* Logo on the left */}
-          <div className="flex justify-center lg:justify-start">
-            <BrandLogo
-              tone="light"
-              priority
-              className="h-auto w-[min(70vw,360px)] drop-shadow-[0_20px_55px_rgba(255,255,255,0.16)] lg:w-[460px]"
-              sizes="(max-width: 640px) 70vw, (max-width: 1024px) 360px, 460px"
-            />
+          <div className="relative flex justify-center lg:justify-start z-0">
+            <HoneycombLogo />
           </div>
 
           {/* Text and Icons on the right, with dark translucent veil */}
-          <div className="flex flex-col rounded-3xl bg-black/60 p-8 backdrop-blur-xl border border-white/10 shadow-2xl">
+          <motion.div
+            initial={animationsEnabled ? { opacity: 0, y: 50, scale: 0.98 } : {}}
+            animate={animationsEnabled ? { opacity: 1, y: 0, scale: 1 } : {}}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="relative z-10 flex flex-col rounded-3xl bg-black/60 p-8 backdrop-blur-xl border border-white/10 shadow-2xl"
+          >
             <h1 className="text-3xl font-semibold text-zinc-100 sm:text-4xl">
               Modelo de Continuidade Logística
             </h1>
@@ -40,10 +46,10 @@ export default function Home() {
               Interface demonstrativa para acompanhar necessidade, aquisição, crédito, estoque, unidade logística,
               remessa e entrega em uma única cadeia informacional.
             </p>
-            <div className="mt-8 mb-8 flex flex-wrap gap-3">
+            <div className="mt-8 mb-8 flex flex-wrap justify-center gap-3">
               <Link
                 href="/entrar"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded bg-emerald-500 px-6 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded px-6 py-3 font-semibold text-white transition btn-shine btn-shine-blue"
               >
                 Acessar Plataforma
                 <ArrowRight aria-hidden className="h-4 w-4" />
@@ -76,7 +82,7 @@ export default function Home() {
                 <span>Auditoria e preservação da origem do dado</span>
               </div>
             </div>
-          </div>
+          </motion.div>
         </section>
 
       </main>
@@ -84,3 +90,4 @@ export default function Home() {
     </PageTransition>
   );
 }
+
