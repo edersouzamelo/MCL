@@ -7,7 +7,9 @@ export function TechnicalFooter() {
         </a>
         <span>&bull;</span>
         <a 
-          href="#" 
+          href="https://github.com/edersouzamelo/MCL" 
+          target="_blank" 
+          rel="noopener noreferrer"
           className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
         >
           Código Aberto (GitHub)
