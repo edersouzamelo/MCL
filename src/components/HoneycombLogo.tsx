@@ -63,9 +63,12 @@ const allCoords = [...ring1, ...ring2];
  *    diagonal (r): metade do horizontal + vertical √3/2
  */
 function hexToPercent(q: number, r: number) {
-  const S = 95;                          // espaçamento base em % da largura
+  // S = espaçamento em % da LARGURA do container entre centros dos tiles.
+  // O hexágono visível ocupa ~85-88% do PNG (o resto é padding transparente),
+  // portanto S > 100 é necessário para ter gap. 110 dá gap ≈ espessura das arestas.
+  const S = 110;
   const AR = 961 / 1152;                 // aspect-ratio do container (< 1, mais alto)
-  const xPct = q * S + r * (S * 0.5);   // hex flat-top: coluna pura = S, diagonal = S/2
+  const xPct = q * S + r * (S * 0.5);   // flat-top hex: coluna pura = S, diagonal = S/2
   const yPct = (r * S * 0.866) * AR;    // √3/2 ≈ 0.866; corrigido pela aspect-ratio
   return { x: xPct, y: yPct };
 }
