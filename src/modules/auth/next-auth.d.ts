@@ -3,6 +3,8 @@ import "next-auth";
 declare module "next-auth" {
   interface User {
     id: string;
+    roles?: string[];
+    organizationId?: string;
   }
 
   interface Session {
@@ -12,7 +14,7 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       roles: string[];
-      organizationId: string;
+      organizationId?: string;
     };
   }
 }

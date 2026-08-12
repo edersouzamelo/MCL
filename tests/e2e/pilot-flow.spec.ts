@@ -1,8 +1,15 @@
 import { expect, test } from "@playwright/test";
 
 test("fluxo demonstrativo ponta a ponta", async ({ page }) => {
+  const demoPassword = process.env.E2E_DEMO_USER_PASSWORD;
+  if (!demoPassword) {
+    throw new Error("E2E_DEMO_USER_PASSWORD nao configurada.");
+  }
+
   await page.goto("/");
   await page.getByRole("link", { name: /^Entre$/i }).first().click();
+  await page.getByLabel(/email/i).fill("operador.demo@mcl.invalid");
+  await page.getByLabel(/senha/i).fill(demoPassword);
   await page.getByRole("button", { name: /^Entrar$/i }).click();
   await expect(page.getByRole("heading", { name: /Situacao geral da cadeia/i })).toBeVisible();
 
