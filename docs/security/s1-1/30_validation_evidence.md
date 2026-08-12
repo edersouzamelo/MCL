@@ -31,8 +31,15 @@ no preview da Vercel e não será simulado.
 
 ## Evidência ainda exigida
 
-1. CI do PR verde.
-2. Preview com provedor demonstrativo presente somente quando configurado.
-3. Login demonstrativo bem-sucedido com credencial não versionada.
-4. Sessão contendo apenas papéis do vínculo local.
-5. Smoke da busca CATMAT sem erro de autenticação ou autorização.
+1. Preview com provedor demonstrativo presente somente quando configurado.
+2. Login demonstrativo bem-sucedido com credencial não versionada.
+3. Sessão contendo apenas papéis do vínculo local.
+4. Smoke da busca CATMAT sem erro de autenticação ou autorização.
+
+CI do PR: **aprovado no run 152**.
+
+O preview foi construído com sucesso, mas permanece protegido pela autenticação
+da Vercel. A conexão de automação deste Work não possui permissão para gerar um
+link temporário de acesso e recebeu `403` ao listar o deployment. O bloqueio foi
+preservado; a validação deve ser feita por uma sessão autorizada ou após ajuste
+deliberado da política de proteção do preview.
