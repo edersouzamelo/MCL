@@ -46,10 +46,19 @@ competência administrativa.
 - [x] Nenhuma sessão recebe quatro papéis universais.
 - [x] Identidade sem vínculo local é negada.
 - [x] Rota representativa prova `401`, `403` e sucesso autorizado.
-- [x] Typecheck, lint, 68 testes e build passam localmente.
+- [x] Typecheck, lint, 70 testes e build passam localmente.
 - [ ] Preview confirma que as variáveis exigidas existem no ambiente.
 - [ ] Login e smoke HTTP autenticado passam no preview.
-- [ ] CI do PR verde e lote integrado na `main`.
+- [x] CI do PR verde.
+- [ ] Lote integrado na `main`.
+
+## Situação do preview
+
+- CI do PR: aprovado.
+- Build Vercel: `READY`.
+- Smoke HTTP: bloqueado pela proteção de acesso do preview. A conexão de
+  automação deste Work recebeu `403` ao tentar obter autorização temporária;
+  nenhuma proteção foi removida para contornar o bloqueio.
 
 ## Gate de ambiente antes do merge
 
