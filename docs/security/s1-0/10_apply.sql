@@ -1,5 +1,6 @@
 -- S1-0 / MCL
--- ATENCAO: lote de segurança preparado, ainda não aprovado para execução.
+-- Lote executado e verificado em 12 AGO 2026. Não reaplicar sem novo snapshot
+-- e nova revisão das pré-condições.
 -- Altera somente privilégios. Não altera schema, RLS ou dados.
 
 begin;
