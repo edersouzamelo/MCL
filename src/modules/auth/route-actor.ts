@@ -1,39 +1,28 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
+import { getAuthRuntimeConfiguration } from "@/modules/auth/config";
 import type { Role } from "@/modules/domain/types";
 
 export type RouteActor = {
   id: string;
   organizationId?: string;
   roles: Role[];
-  demoFallback: boolean;
 };
-
-const demoActor: RouteActor = {
-  id: "user-demo-admin",
-  organizationId: "org-provedor-alfa",
-  roles: ["ADMIN", "LOGISTICS_MANAGER", "WAREHOUSE_OPERATOR", "AUDITOR"],
-  demoFallback: true,
-};
-
-function canUseDemoActor() {
-  return !process.env.DATABASE_URL && process.env.DEMO_AUTH_ENABLED !== "false" && process.env.NODE_ENV !== "test";
-}
 
 export async function getRouteActor(): Promise<RouteActor | undefined> {
   const session = await getServerSession(authOptions);
-  if (session?.user) {
-    return {
-      id: session.user.id,
-      organizationId: session.user.organizationId,
-      roles: (session.user.roles ?? ["READ_ONLY"]) as Role[],
-      demoFallback: false,
-    };
+  const roles = (session?.user?.roles ?? []) as Role[];
+  if (!session?.user?.id || !session.user.organizationId || roles.length === 0) {
+    return undefined;
   }
 
-  return canUseDemoActor() ? demoActor : undefined;
+  return {
+    id: session.user.id,
+    organizationId: session.user.organizationId,
+    roles,
+  };
 }
 
 export function demoMemoryFallbackAllowed() {
-  return canUseDemoActor();
+  return getAuthRuntimeConfiguration().demo.configured;
 }

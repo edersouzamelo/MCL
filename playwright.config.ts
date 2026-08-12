@@ -1,5 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const e2eAuthSecret = process.env.E2E_AUTH_SECRET;
+const e2eDemoPassword = process.env.E2E_DEMO_USER_PASSWORD;
+
+if (!e2eAuthSecret || !e2eDemoPassword) {
+  throw new Error("Defina E2E_AUTH_SECRET e E2E_DEMO_USER_PASSWORD antes de executar os testes E2E.");
+}
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60_000,
@@ -13,10 +20,9 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 120_000,
     env: {
-      AUTH_SECRET: "playwright-secret",
+      AUTH_SECRET: e2eAuthSecret,
       DEMO_AUTH_ENABLED: "true",
-      DEMO_ACCESS_CODE: "MCL-DEMO-2026",
-      DEMO_USER_PASSWORD: "MCL-DEMO-2026",
+      DEMO_USER_PASSWORD: e2eDemoPassword,
       NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3010",
       NEXTAUTH_URL: "http://127.0.0.1:3010",
     },
