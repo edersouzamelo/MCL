@@ -49,10 +49,16 @@ export function UserSettingsMenu() {
       {/* Trigger Button */}
       <div className="flex items-center gap-3">
         <div className="hidden md:flex flex-col items-end text-xs leading-tight">
-          <span className="font-extrabold text-white dark:text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+          <span 
+            className="font-extrabold text-white" 
+            style={{ color: "#ffffff", textShadow: "0 1px 4px rgba(0,0,0,0.95)" }}
+          >
             {session?.user?.name || "Maj Souza Melo"}
           </span>
-          <span className="text-[11px] font-bold text-emerald-400 dark:text-emerald-400 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+          <span 
+            className="text-[11px] font-bold text-emerald-400" 
+            style={{ color: "#34d399", textShadow: "0 1px 4px rgba(0,0,0,0.95)" }}
+          >
             Cmdo 9º Gpt Log (UASG 160136)
           </span>
         </div>
