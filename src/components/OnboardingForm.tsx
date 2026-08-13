@@ -43,8 +43,9 @@ export default function OnboardingForm({ initialName }: { initialName: string })
       .catch((err) => console.error("Failed to load OMs", err));
   }, []);
 
-  const filteredOms = oms.filter((om) =>
-    om.name.toLowerCase().includes(omSearch.toLowerCase())
+  const filteredOms = oms.filter((om: any) =>
+    om.name.toLowerCase().includes(omSearch.toLowerCase()) ||
+    (om.uasg && om.uasg.includes(omSearch))
   );
 
   return (
@@ -128,19 +129,27 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               {filteredOms.length === 0 ? (
                 <div className="px-4 py-2 text-zinc-500">Nenhuma OM encontrada</div>
               ) : (
-                filteredOms.map((om) => (
-                  <div
-                    key={om.id}
-                    className="cursor-pointer select-none relative py-2.5 pl-3 pr-9 hover:bg-emerald-600/20 hover:text-emerald-600 dark:hover:text-emerald-400 text-zinc-900 dark:text-zinc-100 font-medium transition-colors"
-                    onClick={() => {
-                      setSelectedOm(om.name);
-                      setOmSearch(om.name);
-                      setShowOmDropdown(false);
-                    }}
-                  >
-                    {om.name}
-                  </div>
-                ))
+                filteredOms.map((om: any) => {
+                  const omLabel = om.uasg ? `${om.name} (UASG ${om.uasg})` : om.name;
+                  return (
+                    <div
+                      key={om.id}
+                      className="cursor-pointer select-none relative py-2.5 pl-3 pr-9 hover:bg-emerald-600/20 hover:text-emerald-600 dark:hover:text-emerald-400 text-zinc-900 dark:text-zinc-100 font-medium transition-colors flex items-center justify-between gap-2"
+                      onClick={() => {
+                        setSelectedOm(omLabel);
+                        setOmSearch(omLabel);
+                        setShowOmDropdown(false);
+                      }}
+                    >
+                      <span className="truncate">{om.name}</span>
+                      {om.uasg && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 shrink-0">
+                          UASG {om.uasg}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}

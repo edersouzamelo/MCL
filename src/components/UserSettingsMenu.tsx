@@ -53,7 +53,7 @@ export function UserSettingsMenu() {
             {session?.user?.name || "Maj Souza Melo"}
           </span>
           <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            9º Gpt Log (UASG 160136)
+            {session?.user?.email === "edersouzamelo@gmail.com" ? "Cmdo 9º Gpt Log (UASG 160136)" : "Cmdo 9º Gpt Log (UASG 160136)"}
           </span>
         </div>
         <button 
