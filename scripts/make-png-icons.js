@@ -117,8 +117,6 @@ const png512 = generateHighContrastPng(512, 512);
 const png192 = generateHighContrastPng(192, 192);
 
 fs.writeFileSync(path.join(iconsDir, 'icon-512.png'), png512);
-fs.writeFileSync(path.join(iconsDir, 'mcl-logo.png'), png512);
-fs.writeFileSync(path.join(iconsDir, 'mcl-logo-light.png'), png512);
 fs.writeFileSync(path.join(iconsDir, 'icon-192.png'), png192);
 fs.writeFileSync(path.join(iconsDir, 'apple-touch-icon.png'), png192);
 fs.writeFileSync(path.join(publicDir, 'favicon.ico'), png192);
