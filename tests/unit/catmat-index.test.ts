@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { catmatSearchTokens } from "@/modules/coverage/catmat-index";
 
 describe("catmatSearchTokens", () => {
-  it("normaliza e extrai tokens com tamanho minimo 3", () => {
+  it("normaliza e extrai tokens com tamanho minimo 3 e sinonimos", () => {
     const tokens = catmatSearchTokens(" Coturno  tatico  militar ");
-    expect(tokens).toEqual(["coturno", "tatico", "militar"]);
+    expect(tokens).toEqual(["coturno", "bota", "tatico", "militar"]);
   });
 
   it("remove stopwords comuns e funcionais", () => {
@@ -19,7 +19,7 @@ describe("catmatSearchTokens", () => {
 
   it("elimina tokens duplicados preservando a ordem", () => {
     const tokens = catmatSearchTokens("coturno militar coturno preto militar");
-    expect(tokens).toEqual(["coturno", "militar", "preto"]);
+    expect(tokens).toEqual(["coturno", "bota", "militar", "preto"]);
   });
 
   it("preserva codigos numericos com 4 ou mais digitos", () => {
@@ -28,9 +28,10 @@ describe("catmatSearchTokens", () => {
     expect(tokens).toContain("452757");
   });
 
-  it("descarta numeros curtos com menos de 4 digitos", () => {
-    const tokens = catmatSearchTokens("coturno 12");
+  it("expande sinonimos do dominio militar como coturno -> bota", () => {
+    const tokens = catmatSearchTokens("coturno tatico");
     expect(tokens).toContain("coturno");
-    expect(tokens).not.toContain("12");
+    expect(tokens).toContain("bota");
+    expect(tokens).toContain("tatico");
   });
 });

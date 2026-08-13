@@ -57,10 +57,26 @@ export function catmatSearchTokens(value: string) {
     "tipo", "item", "operacional", "tamanho", "cor", "uso",
     "sob", "ate", "nao", "que", "sua", "seu",
   ]);
+  const synonyms: Record<string, string[]> = {
+    coturno: ["coturno", "bota"],
+    gandola: ["gandola", "camisa", "blusao"],
+    fardamento: ["fardamento", "uniforme"],
+  };
+
+  const normalized = normalizeCatmatText(value);
+  const rawTokens = normalized.split(/\s+/).filter((t) => t.length >= 3 || /^\d{4,}$/.test(t));
+  const expanded: string[] = [];
+
+  for (const token of rawTokens) {
+    if (synonyms[token]) {
+      expanded.push(...synonyms[token]);
+    } else {
+      expanded.push(token);
+    }
+  }
+
   const seen = new Set<string>();
-  return normalizeCatmatText(value)
-    .split(/\s+/)
-    .filter((token) => token.length >= 3 || /^\d{4,}$/.test(token))
+  return expanded
     .filter((token) => !ignored.has(token))
     .filter((token) => {
       if (seen.has(token)) return false;
