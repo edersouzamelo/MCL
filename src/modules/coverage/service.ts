@@ -2014,6 +2014,7 @@ export function buildCoverageSynthesis(
     limitations: [
       "A confirmacao CATMAT e humana e nao classifica automaticamente todos os registros publicos como Classe II.",
       "Atas, quantidades e saldos sao lidos da API publica do Compras.gov.br no momento da consulta.",
+      "Lei 14.133/2021 (Art. 86 §§ 4º e 5º): Adesão individual limitada a 50% do item homologado; teto global de todas as caronas limitado a 200% (dobro) do quantitativo da ata.",
       "O MCL nao recalcula saldo oficial quando a fonte nao fornece campo especifico.",
       "Esta sintese indica cobertura potencial e nao substitui decisao administrativa, juridica ou financeira.",
     ],

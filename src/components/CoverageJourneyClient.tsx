@@ -612,7 +612,8 @@ export function CoverageJourneyClient({
         ) : null}
       </Card>
 
-      <Card>
+      <div id="sec-atas-relacionadas">
+        <Card>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -781,6 +782,7 @@ export function CoverageJourneyClient({
           <p className="mt-3 text-sm text-zinc-600">Nenhuma ata consultada nesta sessao.</p>
         )}
       </Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
@@ -844,7 +846,7 @@ export function CoverageJourneyClient({
               )}
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.deficit)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial (Ata)</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.potentialQuantity)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial ({entries.length} {entries.length === 1 ? "Ata" : "Atas"})</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.potentialQuantity)}</dd></div>
                 <div className="rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 p-3">
                   <dt className="text-emerald-800 dark:text-emerald-400 font-semibold">Saldo Adesões (UGs)</dt>
                   <dd className="font-extrabold text-emerald-900 dark:text-emerald-300">
@@ -854,6 +856,35 @@ export function CoverageJourneyClient({
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Confianca</dt><dd className="font-semibold text-indigo-700 dark:text-indigo-400">{Math.round(synthesis.confidence * 100)}%</dd></div>
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)}</dd></div>
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.maxUnitValue)}</dd></div>
+                {entries.length > 0 && (
+                  <div className="col-span-2 rounded bg-zinc-100/80 dark:bg-zinc-800/60 p-3 border border-zinc-200/80 dark:border-zinc-700/60 text-xs">
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">
+                      Composição da Quantidade Potencial (Clique para selecionar a Ata):
+                    </span>
+                    <ul className="space-y-1.5">
+                      {entries.map((entry, idx) => (
+                        <li key={entry.instrument.id || idx}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedEntry(entry);
+                              const el = document.getElementById("sec-atas-relacionadas");
+                              if (el) el.scrollIntoView({ behavior: "smooth" });
+                            }}
+                            className={`text-left flex items-center justify-between w-full px-2 py-1 rounded transition-colors ${
+                              selectedEntry?.instrument.id === entry.instrument.id
+                                ? "bg-emerald-600/20 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-500/30"
+                                : "text-emerald-700 dark:text-emerald-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-700/50 font-medium"
+                            }`}
+                          >
+                            <span>• Ata nº {entry.instrument.reference || entry.unitQuery.numeroAta} (UG {entry.unitQuery.unidadeGerenciadora})</span>
+                            <span className="font-extrabold">{number(entry.instrument.capacity || entry.instrument.quantity || 0)} un</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {synthesis.estimatedMinTotalCost !== undefined && (
                   <div className="col-span-2 rounded bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/40 p-3">
                     <dt className="text-indigo-800 dark:text-indigo-400 font-semibold">Estimativa Financeira Atendimento Déficit ({synthesis.deficit} un)</dt>

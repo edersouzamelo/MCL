@@ -131,7 +131,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
                 filteredOms.map((om) => (
                   <div
                     key={om.id}
-                    className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-emerald-600/20 hover:text-emerald-400 text-zinc-850 dark:text-zinc-200 transition-colors"
+                    className="cursor-pointer select-none relative py-2.5 pl-3 pr-9 hover:bg-emerald-600/20 hover:text-emerald-600 dark:hover:text-emerald-400 text-zinc-900 dark:text-zinc-100 font-medium transition-colors"
                     onClick={() => {
                       setSelectedOm(om.name);
                       setOmSearch(om.name);

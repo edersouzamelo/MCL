@@ -151,44 +151,44 @@ export default async function InicioPage() {
           <div className="absolute inset-0 bg-zinc-950/70" />
         </div>
 
-        <main className="relative z-10 mx-auto flex h-screen w-full max-w-7xl flex-col items-center justify-center px-5 sm:px-8 py-10">
+        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col items-center justify-between px-4 sm:px-8 py-6 sm:py-8">
           
-          <div className="flex flex-col items-center text-center mb-16">
+          <div className="flex flex-col items-center text-center mb-6 sm:mb-8 mt-2">
             <BrandLogo
               tone="light"
               priority
-              className="h-28 w-28 sm:h-36 sm:w-36 drop-shadow-[0_10px_25px_rgba(255,255,255,0.1)] mb-8"
+              className="h-20 w-20 sm:h-24 sm:w-24 drop-shadow-[0_10px_25px_rgba(255,255,255,0.1)] mb-4"
             />
-            <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white drop-shadow-lg">
+            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white drop-shadow-lg">
               MCL
             </h1>
-            <p className="mt-4 text-lg text-zinc-300 max-w-2xl drop-shadow-md">
+            <p className="mt-2 text-sm sm:text-base text-zinc-300 max-w-2xl drop-shadow-md">
               Acompanhe necessidade, aquisição, crédito, estoque, remessa e entrega em uma única cadeia informacional contínua.
             </p>
           </div>
 
-          <div className="w-full min-h-[580px] md:min-h-[420px] xl:min-h-[280px] flex justify-center items-start">
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 w-full items-start">
+          <div className="w-full flex justify-center items-start my-auto">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-5 w-full items-start">
             {metaNav.map((item, i) => {
               const domainSystems = diagnosis.systems.filter((sys) => sys.domain === item.domain);
               const summary = getDomainSummary(domainSystems);
 
               return (
                 <div key={i} className="group relative w-full">
-                  <div className={`relative flex flex-col items-center p-5 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 hover:bg-zinc-800/90 transition-all duration-300 shadow-xl hover:shadow-2xl hover:-translate-y-4 ${item.border} ${item.shadow}`}>
+                  <div className={`relative flex flex-col items-center p-4 sm:p-5 rounded-2xl bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 hover:bg-zinc-800/90 transition-all duration-300 shadow-xl hover:shadow-2xl hover:-translate-y-2 ${item.border} ${item.shadow}`}>
                     
                     {/* Status Badge in corner */}
-                    <div className="absolute top-3 right-3">
+                    <div className="absolute top-2.5 right-2.5">
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border tracking-wider ${summary.color}`}>
                         {summary.label.toUpperCase()}
                       </span>
                     </div>
 
                     <Link href={item.href} className="flex flex-col items-center w-full">
-                      <div className={`h-14 w-14 sm:h-16 sm:w-16 rounded-full flex items-center justify-center mb-4 ${item.bg} ${item.color} group-hover:scale-110 transition-transform duration-300`}>
-                        <item.icon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={1.5} />
+                      <div className={`h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center mb-3 ${item.bg} ${item.color} group-hover:scale-110 transition-transform duration-300`}>
+                        <item.icon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={1.5} />
                       </div>
-                      <span className="text-sm sm:text-base font-semibold text-zinc-200 group-hover:text-white transition-colors">
+                      <span className="text-xs sm:text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors">
                         {item.label}
                       </span>
                     </Link>
@@ -198,13 +198,13 @@ export default async function InicioPage() {
 
                     <div className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] transition-[grid-template-rows] duration-300 w-full">
                       <div className="overflow-hidden w-full flex flex-col opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">
-                        <div className="h-px w-full bg-zinc-700/50 my-4" />
-                        <div className="flex flex-col w-full gap-1.5">
+                        <div className="h-px w-full bg-zinc-700/50 my-3" />
+                        <div className="flex flex-col w-full gap-1">
                           {item.submenus.map((sub, j) => (
                             <Link 
                               key={j} 
                               href={sub.href}
-                              className="text-xs text-center text-zinc-400 hover:text-white transition-colors py-1.5 px-2 hover:bg-zinc-700/40 rounded-md truncate"
+                              className="text-[11px] text-center text-zinc-400 hover:text-white transition-colors py-1 px-2 hover:bg-zinc-700/40 rounded-md truncate"
                             >
                               {sub.label}
                             </Link>
@@ -219,13 +219,13 @@ export default async function InicioPage() {
           </div>
           </div>
 
-          <div className="mt-16">
+          <div className="mt-6 mb-2">
             <Link
               href="/painel"
-              className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-emerald-600 px-8 font-semibold text-white transition hover:bg-emerald-500 shadow-lg hover:shadow-emerald-600/30"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-600 px-6 text-sm font-semibold text-white transition hover:bg-emerald-500 shadow-lg hover:shadow-emerald-600/30"
             >
               Acessar Situação Geral
-              <ArrowRight aria-hidden className="h-5 w-5" />
+              <ArrowRight aria-hidden className="h-4 w-4" />
             </Link>
           </div>
           
