@@ -137,7 +137,7 @@ export default async function InicioPage() {
       <div className="relative flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden">
         
         {/* Floating User Menu */}
-        <div className="absolute top-6 right-6 z-50">
+        <div className="absolute top-6 right-6 z-50 dark">
           <UserSettingsMenu />
         </div>
 
