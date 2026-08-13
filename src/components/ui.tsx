@@ -82,12 +82,16 @@ export function Badge({ children, tone = "neutral" }: { children: React.ReactNod
   return <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border", color)}>{children}</span>;
 }
 
-export function SourceStamp({ source }: { source: SourceMetadata }) {
+export function SourceStamp({ source }: { source: SourceMetadata & { authorityLevel?: string } }) {
+  const isSynthetic = source.sourceSystem.startsWith("SIM-") || source.authorityLevel === "DEMONSTRATIVO" || source.dataNature === "informado";
   return (
     <dl className="grid gap-2 rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 text-xs text-zinc-600 dark:text-zinc-400 sm:grid-cols-3">
       <div>
         <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Fonte</dt>
-        <dd>{source.sourceSystem}</dd>
+        <dd className="flex items-center gap-1.5">
+          <span>{source.sourceSystem}</span>
+          {isSynthetic ? <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-400 border border-amber-500/20">SINTÉTICO</span> : null}
+        </dd>
       </div>
       <div>
         <dt className="font-semibold text-zinc-800 dark:text-zinc-200">Registro</dt>

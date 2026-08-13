@@ -472,7 +472,10 @@ export function CoverageJourneyClient({
               <h2 className="mt-1 text-lg font-semibold">{item.name}</h2>
               <p className="text-sm text-zinc-600">{variant.label}</p>
             </div>
-            <Badge tone={need.priority === "ALTA" ? "warn" : "neutral"}>{need.status}</Badge>
+            <div className="flex flex-col items-end gap-1">
+              <Badge tone={need.priority === "ALTA" ? "warn" : "neutral"}>{need.status}</Badge>
+              <Badge tone="neutral">SINTÉTICO / DEMONSTRATIVO</Badge>
+            </div>
           </div>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Organizacao</dt><dd className="font-semibold">{organizationName}</dd></div>
