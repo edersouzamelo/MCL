@@ -844,11 +844,24 @@ export function CoverageJourneyClient({
               )}
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.deficit)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.potentialQuantity)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Atas vigentes</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{synthesis.currentAtaCount}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial (Ata)</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.potentialQuantity)}</dd></div>
+                <div className="rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 p-3">
+                  <dt className="text-emerald-800 dark:text-emerald-400 font-semibold">Saldo Adesões (UGs)</dt>
+                  <dd className="font-extrabold text-emerald-900 dark:text-emerald-300">
+                    {synthesis.totalAdhesionBalance !== undefined ? number(synthesis.totalAdhesionBalance) : "Aguardando consulta UGs"}
+                  </dd>
+                </div>
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Confianca</dt><dd className="font-semibold text-indigo-700 dark:text-indigo-400">{Math.round(synthesis.confidence * 100)}%</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.maxUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.maxUnitValue)}</dd></div>
+                {synthesis.estimatedMinTotalCost !== undefined && (
+                  <div className="col-span-2 rounded bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/40 p-3">
+                    <dt className="text-indigo-800 dark:text-indigo-400 font-semibold">Estimativa Financeira Atendimento Déficit ({synthesis.deficit} un)</dt>
+                    <dd className="font-bold text-indigo-950 dark:text-indigo-200 text-xs mt-0.5">
+                      {money(synthesis.estimatedMinTotalCost)} até {money(synthesis.estimatedMaxTotalCost)}
+                    </dd>
+                  </div>
+                )}
               </dl>
               <div className="space-y-2 text-sm text-zinc-800 dark:text-zinc-200">
                 {synthesis.phrases.map((phrase) => (

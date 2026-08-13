@@ -169,6 +169,11 @@ export type CoverageSynthesis = {
   expiringSoonCount: number;
   minUnitValue?: number;
   maxUnitValue?: number;
+  totalAdhesionBalance?: number;
+  totalRemanejamentoBalance?: number;
+  estimatedMinTotalCost?: number;
+  estimatedMaxTotalCost?: number;
+  unitCountQueried?: number;
   balanceStatus: "CONSULTABLE" | "ABSENT" | "NOT_QUERIED";
   missingFinancialInfo: number;
   divergences: string[];
@@ -1914,6 +1919,20 @@ export function buildCoverageSynthesis(
   });
   const potentialQuantity = sum(currentAtas.map((instrument) => instrument.capacity || Number(instrument.quantity || 0)));
   const unitValues = currentAtas.map((instrument) => instrument.unitValue).filter((value): value is number => typeof value === "number");
+  const minUnitValue = unitValues.length ? Math.min(...unitValues) : undefined;
+  const maxUnitValue = unitValues.length ? Math.max(...unitValues) : undefined;
+
+  const totalAdhesionBalance = unitRecords.length > 0
+    ? sum(unitRecords.map((r) => r.saldoAdesoes ?? 0))
+    : undefined;
+
+  const totalRemanejamentoBalance = unitRecords.length > 0
+    ? sum(unitRecords.map((r) => r.saldoRemanejamentoEmpenho ?? 0))
+    : undefined;
+
+  const estimatedMinTotalCost = minUnitValue !== undefined ? minUnitValue * deficit : undefined;
+  const estimatedMaxTotalCost = maxUnitValue !== undefined ? maxUnitValue * deficit : undefined;
+
   const expiringSoonCount = currentAtas.filter((instrument) => new Date(instrument.validUntil).getTime() <= inThirtyDays).length;
   const balanceConsultable = unitRecords.some(
     (record) => record.saldoAdesoes !== undefined || record.saldoRemanejamentoEmpenho !== undefined,
@@ -1946,20 +1965,33 @@ export function buildCoverageSynthesis(
   );
   const balanceStatus: CoverageSynthesis["balanceStatus"] =
     unitRecords.length === 0 ? "NOT_QUERIED" : balanceConsultable ? "CONSULTABLE" : "ABSENT";
+  
   const phrases = [
     `Para a necessidade de ${need.quantityRequested} unidades, ha ${stockCovered} cobertas por estoque registrado e deficit estimado de ${deficit}.`,
-    currentAtas.length
-      ? `Foram encontradas ${currentAtas.length} atas vigentes relacionadas ao CATMAT confirmado, com quantidade potencial agregada de ${potentialQuantity}.`
-      : "Nenhuma ata vigente foi localizada para o CATMAT confirmado no intervalo consultado.",
-    potentialQuantity >= deficit && deficit > 0
-      ? "A quantidade potencial retornada pela fonte e igual ou superior ao deficit, exigindo avaliacao humana e etapa administrativa propria."
-      : "A quantidade potencial retornada pela fonte nao cobre integralmente o deficit ou ainda nao foi consultada.",
-    balanceStatus === "CONSULTABLE"
-      ? "A fonte retornou campos de saldo/limite para a ata selecionada; o MCL apenas os reproduz sem recalculo informal."
-      : balanceStatus === "ABSENT"
-        ? "A consulta de unidades nao retornou saldo consultavel para a ata selecionada."
-        : "Unidades e saldos ainda nao foram consultados para uma ata selecionada.",
   ];
+
+  if (currentAtas.length > 0) {
+    phrases.push(`Foram encontradas ${currentAtas.length} atas vigentes relacionadas ao CATMAT confirmado, com quantidade potencial agregada de ${potentialQuantity}.`);
+  } else {
+    phrases.push(`Nenhuma ata vigente localizada para o CATMAT confirmado no período consultado.`);
+  }
+
+  if (unitRecords.length > 0 && totalAdhesionBalance !== undefined) {
+    if (totalAdhesionBalance >= deficit) {
+      phrases.push(`A consulta de UGs retornou ${totalAdhesionBalance} unidades de saldo para carona/adesão, COBRINDO INTEGRALMENTE o déficit de ${deficit} unidades.`);
+    } else if (totalAdhesionBalance > 0) {
+      phrases.push(`A consulta de UGs retornou ${totalAdhesionBalance} unidades de saldo para carona/adesão, cobrindo parcialmente o déficit de ${deficit} unidades.`);
+    } else {
+      phrases.push(`A consulta de UGs não identificou saldo disponível para adesão nas UGs consultadas.`);
+    }
+  } else {
+    phrases.push(`A quantidade potencial retornada pela fonte nao cobre integralmente o deficit ou ainda nao foi consultada.`);
+  }
+
+  if (balanceConsultable) {
+    phrases.push(`A fonte retornou campos de saldo/limite para a ata selecionada; o MCL consolida deterministicamente os saldos da API oficial.`);
+  }
+
   return {
     quantityRequested: need.quantityRequested,
     stockCovered,
@@ -1967,8 +1999,13 @@ export function buildCoverageSynthesis(
     potentialQuantity,
     currentAtaCount: currentAtas.length,
     expiringSoonCount,
-    minUnitValue: unitValues.length ? Math.min(...unitValues) : undefined,
-    maxUnitValue: unitValues.length ? Math.max(...unitValues) : undefined,
+    minUnitValue,
+    maxUnitValue,
+    totalAdhesionBalance,
+    totalRemanejamentoBalance,
+    estimatedMinTotalCost,
+    estimatedMaxTotalCost,
+    unitCountQueried: unitRecords.length,
     balanceStatus,
     missingFinancialInfo,
     divergences,
@@ -1980,7 +2017,7 @@ export function buildCoverageSynthesis(
       "O MCL nao recalcula saldo oficial quando a fonte nao fornece campo especifico.",
       "Esta sintese indica cobertura potencial e nao substitui decisao administrativa, juridica ou financeira.",
     ],
-    sourceDate: new Date().toISOString(),
+    sourceDate: new Date().toISOString().slice(0, 10),
   };
 }
 
