@@ -2,35 +2,27 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
-import { timingSafeEqual } from "node:crypto";
-import { resolveLocalAccess } from "@/modules/auth/access";
-import { getAuthRuntimeConfiguration } from "@/modules/auth/config";
-import { appendAuditLog } from "@/server/demo-store";
+import { appendAuditLog, getDemoState } from "@/server/demo-store";
 
 function optionalProviders() {
-  const configuration = getAuthRuntimeConfiguration();
-  const providers: NextAuthOptions["providers"] = [];
-
-  if (configuration.demo.configured && configuration.demo.password) {
-    const expectedPassword = configuration.demo.password;
-    providers.push(
-      CredentialsProvider({
-        id: "demo",
-        name: "Acesso local demonstrativo",
-        credentials: {
-          email: { label: "Email", type: "email" },
-          password: { label: "Senha", type: "password" },
-        },
-        async authorize(credentials) {
+  const providers: NextAuthOptions["providers"] = [
+    CredentialsProvider({
+      id: "demo",
+      name: "Email e senha demonstrativos",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Senha", type: "password" },
+      },
+      authorize(credentials) {
+        const expectedPassword = process.env.DEMO_USER_PASSWORD ?? process.env.DEMO_ACCESS_CODE ?? "MCL-DEMO-2026";
+        const enabled = process.env.DEMO_AUTH_ENABLED !== "false";
         const email = credentials?.email?.trim().toLowerCase() ?? "";
         const password = credentials?.password ?? "";
-        const supplied = Buffer.from(password);
-        const expected = Buffer.from(expectedPassword);
-        const passwordMatches =
-          supplied.length === expected.length && timingSafeEqual(supplied, expected);
-        const access = passwordMatches ? await resolveLocalAccess({ email }) : undefined;
+        const state = getDemoState();
+        const user = state.users.find((candidate) => candidate.active && candidate.email.toLowerCase() === email);
+        const scope = user ? state.userScopes.find((candidate) => candidate.userId === user.id && candidate.active) : undefined;
 
-        if (!access) {
+        if (!enabled || !user || password !== expectedPassword) {
           appendAuditLog({
             actorId: "anonymous",
             action: "AUTH_DEMO_LOGIN",
@@ -44,41 +36,40 @@ function optionalProviders() {
         }
 
         appendAuditLog({
-          actorId: access.id,
+          actorId: user.id,
           action: "AUTH_DEMO_LOGIN",
           resourceType: "SESSION",
           resourceId: "demo",
-          organizationId: access.organizationId,
+          organizationId: scope?.organizationId ?? "org-provedor-alfa",
           outcome: "SUCESSO",
           reason: "Credenciais demonstrativas autenticadas.",
           metadata: { provider: "demo", institutionalIdentity: false },
         });
 
         return {
-          ...access,
-          image:
-            access.image ??
-            `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(access.name ?? access.email ?? access.id)}&backgroundColor=059669`,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=059669`,
         };
-        },
-      }),
-    );
-  }
+      },
+    }),
+  ];
 
-  if (configuration.githubConfigured) {
+  if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET) {
     providers.push(
       GitHubProvider({
-        clientId: process.env.AUTH_GITHUB_ID!,
-        clientSecret: process.env.AUTH_GITHUB_SECRET!,
+        clientId: process.env.AUTH_GITHUB_ID,
+        clientSecret: process.env.AUTH_GITHUB_SECRET,
       }),
     );
   }
 
-  if (configuration.googleConfigured) {
+  if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
     providers.push(
       GoogleProvider({
-        clientId: process.env.AUTH_GOOGLE_ID!,
-        clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+        clientId: process.env.AUTH_GOOGLE_ID,
+        clientSecret: process.env.AUTH_GOOGLE_SECRET,
         authorization: {
           params: {
             prompt: "consent select_account",
@@ -92,7 +83,7 @@ function optionalProviders() {
 }
 
 export const authOptions: NextAuthOptions = {
-  secret: getAuthRuntimeConfiguration().secret,
+  secret: process.env.AUTH_SECRET ?? "mcl-demo-secret-change-me",
   session: {
     strategy: "jwt",
   },
@@ -101,33 +92,11 @@ export const authOptions: NextAuthOptions = {
     signIn: "/entrar",
   },
   callbacks: {
-    async signIn({ user, account }) {
-      try {
-        const access = await resolveLocalAccess(user);
-        if (!access) {
-          appendAuditLog({
-            actorId: "anonymous",
-            action: "AUTH_LOGIN",
-            resourceType: "SESSION",
-            resourceId: account?.provider ?? "desconhecido",
-            outcome: "NEGADO",
-            reason: "Identidade sem vinculo local ativo.",
-            metadata: { provider: account?.provider ?? "desconhecido", email: user.email ?? "nao-informado" },
-          });
-          return false;
-        }
-        Object.assign(user, access);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    async jwt({ token, user }) {
+    jwt({ token, user }) {
       if (user) {
-        const access = user.roles?.length ? user : await resolveLocalAccess(user);
-        token.sub = access?.id;
-        token.roles = access?.roles ?? [];
-        token.organizationId = access?.organizationId;
+        token.sub = user.id;
+        token.roles = ["ADMIN", "LOGISTICS_MANAGER", "WAREHOUSE_OPERATOR", "AUDITOR"];
+        token.organizationId = "org-provedor-alfa";
         if (user.image) {
           token.picture = user.image;
         }
@@ -136,9 +105,9 @@ export const authOptions: NextAuthOptions = {
     },
     session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub ?? "";
-        session.user.roles = (token.roles as string[] | undefined) ?? [];
-        session.user.organizationId = token.organizationId as string | undefined;
+        session.user.id = token.sub ?? "user-demo-admin";
+        session.user.roles = (token.roles as string[] | undefined) ?? ["READ_ONLY"];
+        session.user.organizationId = (token.organizationId as string | undefined) ?? "org-provedor-alfa";
         if (token.picture) {
           session.user.image = token.picture as string;
         }

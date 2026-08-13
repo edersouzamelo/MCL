@@ -10,11 +10,7 @@ vi.mock("next-auth", () => ({
 
 function session() {
   vi.mocked(getServerSession).mockResolvedValue({
-    user: {
-      id: "user-demo-admin",
-      organizationId: "org-provedor-alfa",
-      roles: ["LOGISTICS_MANAGER"],
-    },
+    user: { id: "user-demo-admin", organizationId: "org-provedor-alfa" },
   });
 }
 

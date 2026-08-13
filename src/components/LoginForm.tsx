@@ -99,7 +99,6 @@ export function LoginForm() {
       <form className="space-y-3" onSubmit={handleLogin}>
         <div className="flex min-h-11 items-center rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 focus-within:border-emerald-600">
           <Mail aria-hidden className="mr-2 h-4 w-4 shrink-0 text-zinc-400" />
-          <label className="sr-only" htmlFor="login-email">Email</label>
           <input
             id="login-email"
             type="email"
@@ -114,7 +113,6 @@ export function LoginForm() {
 
         <div className="flex min-h-11 items-center rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 focus-within:border-emerald-600">
           <KeyRound aria-hidden className="mr-2 h-4 w-4 shrink-0 text-zinc-400" />
-          <label className="sr-only" htmlFor="login-password">Senha</label>
           <input
             id="login-password"
             type="password"

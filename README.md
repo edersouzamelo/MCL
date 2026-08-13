@@ -48,9 +48,7 @@ ou:
 npm.cmd run dev -- -p 3010
 ```
 
-Acesse `http://localhost:3000`, clique em `Entre` e use o email
-`operador.demo@mcl.invalid` com a senha exclusiva definida localmente em
-`DEMO_USER_PASSWORD`. Depois, abra o scanner manual com:
+Acesse `http://localhost:3000`, clique em `Entre`, use o email `operador.demo@mcl.invalid` com a senha demonstrativa `MCL-DEMO-2026` e abra o scanner manual com:
 
 ```text
 MCL:UL:ul-coturno-caixa-001
@@ -108,14 +106,12 @@ AUTH_GITHUB_SECRET=
 AUTH_GOOGLE_ID=
 AUTH_GOOGLE_SECRET=
 DEMO_AUTH_ENABLED=true
-DEMO_USER_PASSWORD=
+DEMO_ACCESS_CODE=MCL-DEMO-2026
+DEMO_USER_PASSWORD=MCL-DEMO-2026
 NEXTAUTH_URL=http://localhost:3000
 ```
 
-`DEMO_AUTH_ENABLED` somente ativa o provedor quando `AUTH_SECRET` e uma senha
-de pelo menos 12 caracteres também estiverem configurados. A conta recebe
-somente os papéis de seus vínculos locais ativos. Login social não equivale a
-identidade institucional e identidades sem vínculo local são negadas.
+Login social não equivale a identidade institucional. Em eventual implantação institucional, o provedor demonstrativo deverá ser substituído ou integrado a um provedor autorizado.
 
 ## Testes e qualidade
 

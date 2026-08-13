@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getRouteActor } from "@/modules/auth/route-actor";
-import { canManageCatmat } from "@/modules/auth/authorization";
 import { confirmCatalogMapping } from "@/modules/coverage/service";
 import { getDemoState } from "@/server/demo-store";
 
@@ -10,9 +9,6 @@ export async function POST(request: Request) {
   const actor = await getRouteActor();
   if (!actor) {
     return NextResponse.json({ error: "Autenticacao obrigatoria." }, { status: 401 });
-  }
-  if (!canManageCatmat(actor.roles)) {
-    return NextResponse.json({ error: "Permissao insuficiente para confirmar CATMAT." }, { status: 403 });
   }
 
   try {

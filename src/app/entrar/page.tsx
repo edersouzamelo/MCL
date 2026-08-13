@@ -40,7 +40,7 @@ export default function LoginPage() {
                     </div>
                   </div>
                   <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                    Autenticação local do protótipo, sem vínculo com a identidade corporativa do Exército Brasileiro. Os perfis controlam somente funções demonstrativas e não atribuem competência administrativa.
+                    Entre com e-mail e senha.
                   </p>
                 </div>
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">

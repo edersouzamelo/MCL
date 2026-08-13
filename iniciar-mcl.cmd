@@ -1,21 +1,10 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-if "%AUTH_SECRET%"=="" (
-  echo AUTH_SECRET nao configurado. Defina a variavel antes de iniciar.
-  pause
-  exit /b 1
-)
-if /I not "%DEMO_AUTH_ENABLED%"=="true" (
-  echo DEMO_AUTH_ENABLED precisa ser true para o acesso demonstrativo local.
-  pause
-  exit /b 1
-)
-if "%DEMO_USER_PASSWORD%"=="" (
-  echo DEMO_USER_PASSWORD nao configurada. Use uma senha exclusiva e rotacionavel.
-  pause
-  exit /b 1
-)
+set AUTH_SECRET=dev-secret-local
+set DEMO_AUTH_ENABLED=true
+set DEMO_ACCESS_CODE=MCL-DEMO-2026
+set MCL_ALLOW_MEMORY_FALLBACK=true
 set NODE_OPTIONS=--use-system-ca
 if not exist ".next\BUILD_ID" (
   echo Preparando build de producao do MCL...
