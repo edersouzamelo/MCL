@@ -48,9 +48,17 @@ export function UserSettingsMenu() {
     <div className="relative" ref={menuRef}>
       {/* Trigger Button */}
       <div className="flex items-center gap-3">
+        <div className="hidden md:flex flex-col items-end text-xs leading-tight">
+          <span className="font-bold text-zinc-900 dark:text-white drop-shadow-sm">
+            {session?.user?.name || "Maj Souza Melo"}
+          </span>
+          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            9º Gpt Log (UASG 160545)
+          </span>
+        </div>
         <button 
           onClick={() => setIsOpen(!isOpen)}
-          className="h-10 w-10 rounded-full overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 hover:border-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="h-10 w-10 shrink-0 rounded-full overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 hover:border-emerald-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           {session?.user?.image && !imageError ? (
             <img 

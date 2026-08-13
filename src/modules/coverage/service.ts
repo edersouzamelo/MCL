@@ -171,6 +171,7 @@ export type CoverageSynthesis = {
   maxUnitValue?: number;
   totalAdhesionBalance?: number;
   totalRemanejamentoBalance?: number;
+  maxIndividualAdhesionLimit?: number;
   estimatedMinTotalCost?: number;
   estimatedMaxTotalCost?: number;
   unitCountQueried?: number;
@@ -1926,6 +1927,10 @@ export function buildCoverageSynthesis(
     ? sum(unitRecords.map((r) => r.saldoAdesoes ?? 0))
     : undefined;
 
+  const maxIndividualAdhesionLimit = unitRecords.length > 0 && potentialQuantity > 0
+    ? Math.min(totalAdhesionBalance ?? 0, Math.floor(0.5 * potentialQuantity))
+    : undefined;
+
   const totalRemanejamentoBalance = unitRecords.length > 0
     ? sum(unitRecords.map((r) => r.saldoRemanejamentoEmpenho ?? 0))
     : undefined;
@@ -1965,7 +1970,7 @@ export function buildCoverageSynthesis(
   );
   const balanceStatus: CoverageSynthesis["balanceStatus"] =
     unitRecords.length === 0 ? "NOT_QUERIED" : balanceConsultable ? "CONSULTABLE" : "ABSENT";
-  
+
   const phrases = [
     `Para a necessidade de ${need.quantityRequested} unidades, ha ${stockCovered} cobertas por estoque registrado e deficit estimado de ${deficit}.`,
   ];
@@ -1976,11 +1981,11 @@ export function buildCoverageSynthesis(
     phrases.push(`Nenhuma ata vigente localizada para o CATMAT confirmado no período consultado.`);
   }
 
-  if (unitRecords.length > 0 && totalAdhesionBalance !== undefined) {
-    if (totalAdhesionBalance >= deficit) {
-      phrases.push(`A consulta de UGs retornou ${totalAdhesionBalance} unidades de saldo para carona/adesão, COBRINDO INTEGRALMENTE o déficit de ${deficit} unidades.`);
-    } else if (totalAdhesionBalance > 0) {
-      phrases.push(`A consulta de UGs retornou ${totalAdhesionBalance} unidades de saldo para carona/adesão, cobrindo parcialmente o déficit de ${deficit} unidades.`);
+  if (unitRecords.length > 0 && maxIndividualAdhesionLimit !== undefined) {
+    if (maxIndividualAdhesionLimit >= deficit) {
+      phrases.push(`A consulta de UGs retornou ${maxIndividualAdhesionLimit} unidades de limite máximo de adesão para a sua OM (50% por item - Art. 86 § 4º da Lei 14.133/2021), COBRINDO INTEGRALMENTE o déficit de ${deficit} unidades.`);
+    } else if (maxIndividualAdhesionLimit > 0) {
+      phrases.push(`A consulta de UGs retornou ${maxIndividualAdhesionLimit} unidades de limite máximo de adesão para a sua OM (50% por item - Art. 86 § 4º da Lei 14.133/2021), cobrindo parcialmente o déficit de ${deficit} unidades (Saldo global acumulado na ata: ${totalAdhesionBalance}).`);
     } else {
       phrases.push(`A consulta de UGs não identificou saldo disponível para adesão nas UGs consultadas.`);
     }
@@ -2003,6 +2008,7 @@ export function buildCoverageSynthesis(
     maxUnitValue,
     totalAdhesionBalance,
     totalRemanejamentoBalance,
+    maxIndividualAdhesionLimit,
     estimatedMinTotalCost,
     estimatedMaxTotalCost,
     unitCountQueried: unitRecords.length,
@@ -2014,7 +2020,7 @@ export function buildCoverageSynthesis(
     limitations: [
       "A confirmacao CATMAT e humana e nao classifica automaticamente todos os registros publicos como Classe II.",
       "Atas, quantidades e saldos sao lidos da API publica do Compras.gov.br no momento da consulta.",
-      "Lei 14.133/2021 (Art. 86 §§ 4º e 5º): Adesão individual limitada a 50% do item homologado; teto global de todas as caronas limitado a 200% (dobro) do quantitativo da ata.",
+      "Lei 14.133/2021 (Art. 86 §§ 4º e 5º): Adesão individual por órgão não participante limitada a 50% da quantidade da ata; limite teto global acumulado de todas as caronas limitado a 200% (dobro) da ata.",
       "O MCL nao recalcula saldo oficial quando a fonte nao fornece campo especifico.",
       "Esta sintese indica cobertura potencial e nao substitui decisao administrativa, juridica ou financeira.",
     ],

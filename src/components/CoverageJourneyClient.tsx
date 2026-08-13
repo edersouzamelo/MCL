@@ -845,17 +845,26 @@ export function CoverageJourneyClient({
                 </p>
               )}
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.deficit)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Deficit da OM</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.deficit)}</dd></div>
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial ({entries.length} {entries.length === 1 ? "Ata" : "Atas"})</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.potentialQuantity)}</dd></div>
-                <div className="rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 p-3">
-                  <dt className="text-emerald-800 dark:text-emerald-400 font-semibold">Saldo Adesões (UGs)</dt>
-                  <dd className="font-extrabold text-emerald-900 dark:text-emerald-300">
-                    {synthesis.totalAdhesionBalance !== undefined ? number(synthesis.totalAdhesionBalance) : "Aguardando consulta UGs"}
-                  </dd>
+                <div className="col-span-2 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 p-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <dt className="text-emerald-800 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider">Máx Adesão p/ Sua OM (50% Item - Art. 86 § 4º)</dt>
+                      <dd className="font-extrabold text-emerald-900 dark:text-emerald-300 text-lg">
+                        {synthesis.maxIndividualAdhesionLimit !== undefined ? `${number(synthesis.maxIndividualAdhesionLimit)} un` : "Aguardando consulta UGs"}
+                      </dd>
+                    </div>
+                    <div className="text-right sm:border-l sm:border-emerald-300 dark:sm:border-emerald-800 sm:pl-4">
+                      <dt className="text-zinc-600 dark:text-zinc-400 text-xs">Saldo Global Acumulado (Todas UGs)</dt>
+                      <dd className="font-bold text-zinc-800 dark:text-zinc-200 text-sm">
+                        {synthesis.totalAdhesionBalance !== undefined ? `${number(synthesis.totalAdhesionBalance)} un` : "—"}
+                      </dd>
+                    </div>
+                  </div>
                 </div>
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Confianca</dt><dd className="font-semibold text-indigo-700 dark:text-indigo-400">{Math.round(synthesis.confidence * 100)}%</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.maxUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Faixa de Valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)} ~ {money(synthesis.maxUnitValue)}</dd></div>
                 {entries.length > 0 && (
                   <div className="col-span-2 rounded bg-zinc-100/80 dark:bg-zinc-800/60 p-3 border border-zinc-200/80 dark:border-zinc-700/60 text-xs">
                     <span className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">
