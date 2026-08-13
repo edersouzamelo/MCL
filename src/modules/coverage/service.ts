@@ -1322,7 +1322,6 @@ export async function searchArpsForConfirmedCatmat(
       dataVigenciaInicialMax: range.end,
       tipoItem: "Material",
       codigoItem: Number(mapping.externalItemCode),
-      codigoUnidadeGerenciadora: input.codigoUnidadeGerenciadora,
       codigoModalidadeCompra: input.codigoModalidadeCompra,
       codigoPdm: input.codigoPdm ? Number(input.codigoPdm) : undefined,
       niFornecedor: input.niFornecedor,
@@ -1384,7 +1383,7 @@ export async function searchArpsForConfirmedCatmat(
       const entries: ArpSearchEntry[] = [];
       for (const raw of data.resultado) {
         const parsed = comprasGovArpItemSchema.safeParse(raw);
-        if (!parsed.success || String(parsed.data.codigoItem) !== mapping.externalItemCode) {
+        if (!parsed.success || Number(parsed.data.codigoItem) !== Number(mapping.externalItemCode)) {
           continue;
         }
         const normalized = normalizeArpItem(parsed.data, url, fetchedAt);

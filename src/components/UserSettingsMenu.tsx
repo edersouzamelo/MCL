@@ -49,11 +49,11 @@ export function UserSettingsMenu() {
       {/* Trigger Button */}
       <div className="flex items-center gap-3">
         <div className="hidden md:flex flex-col items-end text-xs leading-tight">
-          <span className="font-bold text-zinc-900 dark:text-white drop-shadow-sm">
+          <span className="font-extrabold text-white dark:text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
             {session?.user?.name || "Maj Souza Melo"}
           </span>
-          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            {session?.user?.email === "edersouzamelo@gmail.com" ? "Cmdo 9º Gpt Log (UASG 160136)" : "Cmdo 9º Gpt Log (UASG 160136)"}
+          <span className="text-[11px] font-bold text-emerald-400 dark:text-emerald-400 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+            Cmdo 9º Gpt Log (UASG 160136)
           </span>
         </div>
         <button 

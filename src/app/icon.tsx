@@ -14,13 +14,14 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#3b82f6", // tailwind blue-500
-          borderRadius: "64px",
-          color: "white",
+          backgroundColor: "#059669",
+          border: "12px solid #ffffff",
+          borderRadius: "56px",
+          color: "#ffffff",
           fontWeight: 900,
-          fontSize: 90,
+          fontSize: 100,
           fontFamily: "system-ui, sans-serif",
-          letterSpacing: "-2px",
+          letterSpacing: "-3px",
         }}
       >
         MCL
