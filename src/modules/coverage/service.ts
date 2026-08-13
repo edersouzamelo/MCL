@@ -551,7 +551,47 @@ export async function searchCatmatCandidates(
       const cleanTerm = normalizeText(input.terms.trim());
       const mockItems: Array<{ code: string; desc: string; classCode?: string }> = [];
 
-      if (/copo/.test(cleanTerm)) {
+      if (/tijolo/.test(cleanTerm)) {
+        mockItems.push(
+          { code: "447814", desc: "TIJOLO CERÂMICO MACIÇO, MATERIAL: BARRO COZIDO, DIMENSÕES: 5 X 10 X 20 CM, TIPO: MACIÇO 6 FUROS", classCode: "5620" },
+          { code: "447815", desc: "TIJOLO CERÂMICO VAZADO (TIJOLO BAIANO 8 FUROS), DIMENSÕES: 9 X 19 X 19 CM, USO: ALVENARIA VEDAÇÃO", classCode: "5620" },
+          { code: "447816", desc: "TIJOLO REFRATÁRIO, ESPESSURA: 63 MM, RESISTÊNCIA TÉRMICA: ALTA TEMPERATURA", classCode: "5620" },
+          { code: "447817", desc: "TIJOLO ECOLÓGICO DE CONCRETO / SOLO CIMENTO, MÓDULO INTERTRAVADO, DIMENSÕES: 12.5 X 25 CM", classCode: "5620" },
+          { code: "11479", desc: "TIJOLO - BARRO COZIDO, MODELO: PADRÃO CONSTRUÇÃO CIVIL", classCode: "5620" }
+        );
+      } else if (/refrigerante/.test(cleanTerm)) {
+        mockItems.push(
+          { code: "463991", desc: "REFRIGERANTE, SABOR: GUARANÁ, EMBALAGEM: LATA 350 ML", classCode: "8960" },
+          { code: "463992", desc: "REFRIGERANTE, SABOR: COLA, EMBALAGEM: GARRAFA PET 2 LITROS", classCode: "8960" },
+          { code: "463993", desc: "REFRIGERANTE, SABOR: LARANJA / LIMÃO, ZERO AÇÚCAR, LATA 350 ML", classCode: "8960" }
+        );
+      } else if (/apontador/.test(cleanTerm)) {
+        mockItems.push(
+          { code: "208745", desc: "APONTADOR DE LÁPIS, COM DEPÓSITO DE RESÍDUOS, MATERIAL: PLÁSTICO / LÂMINA AÇO TEMPERADO", classCode: "7510" },
+          { code: "208746", desc: "APONTADOR DE LÁPIS DUPLO, MATERIAL: METAL ZAMAC, SEM DEPÓSITO", classCode: "7510" }
+        );
+      } else if (/mouse/.test(cleanTerm)) {
+        mockItems.push(
+          { code: "436152", desc: "MOUSE ÓPTICO, CONEXÃO: USB, RESOLUÇÃO: 1000 DPI, COR: PRETO, 3 BOTÕES COM SCROLL", classCode: "7025" },
+          { code: "436153", desc: "MOUSE SEM FIO (WIRELESS 2.4GHZ), SENSOR ÓPTICO, PILHA AA INCLUSA", classCode: "7025" }
+        );
+      } else if (/computador|desktop/.test(cleanTerm)) {
+        mockItems.push(
+          { code: "445839", desc: "MICROCOMPUTADOR DESKTOP, PROCESSADOR: INTEL CORE I7, MEMÓRIA RAM: 16 GB, SSD: 512 GB, MONITOR 23.8 IN", classCode: "7010" },
+          { code: "445840", desc: "MICROCOMPUTADOR DESKTOP CORPORATIVO, PROCESSADOR: INTEL CORE I5, MEMÓRIA: 8 GB, SSD: 256 GB", classCode: "7010" }
+        );
+      } else if (/mesa/.test(cleanTerm)) {
+        mockItems.push(
+          { code: "446102", desc: "MESA DE ESCRITÓRIO REVOLVING, ESTRUTURA METÁLICA, TAMPO MDF 25MM, LARGURA: 120 CM, PROFUNDIDADE: 60 CM", classCode: "7110" },
+          { code: "446103", desc: "MESA PARA REUNIÃO OVAL, CAPACIDADE: 8 LUGARES, TAMPO MDF, COMPRIMENTO: 240 CM", classCode: "7110" }
+        );
+      } else if (/papel|sulfite|a4/.test(cleanTerm)) {
+        mockItems.push(
+          { code: "203554", desc: "PAPEL SULFITE A4 BRANCO 75G/M², FORMATO: 210 X 297 MM, CAIXA COM 10 REAMAS (5.000 FOLHAS)", classCode: "7530" },
+          { code: "452757", desc: "PAPEL ALCALINO A4 75G/M² BRANCO, FORMATO: 210 X 297 MM, REAMA COM 500 FOLHAS", classCode: "7530" },
+          { code: "203550", desc: "PAPEL RECICLADO A4 75G/M², COR: NATURAL, REAMA COM 500 FOLHAS", classCode: "7530" }
+        );
+      } else if (/copo/.test(cleanTerm)) {
         mockItems.push(
           { code: "328003", desc: "COPO DESCARTÁVEL, MATERIAL: PLÁSTICO, CAPACIDADE: 200 ML, USO: BEBIDAS QUENTES/FRIAS", classCode: "7350" },
           { code: "464213", desc: "COPO DESCARTÁVEL, MATERIAL: PAPEL BIODEGRADÁVEL, CAPACIDADE: 180 ML, ECOLÓGICO", classCode: "7350" },

@@ -61,6 +61,9 @@ export function catmatSearchTokens(value: string) {
     coturno: ["coturno", "bota"],
     gandola: ["gandola", "camisa", "blusao"],
     fardamento: ["fardamento", "uniforme"],
+    tijolo: ["tijolo", "bloco", "ceramico", "baiano", "barro", "cozido", "447814", "447815", "11479"],
+    refrigerante: ["refrigerante", "guarana", "coca", "lata", "463991", "463992"],
+    apontador: ["apontador", "deposito", "lapis", "208745"],
     papel: ["papel", "sulfite", "alcalino", "203554", "452757", "203550"],
     a4: ["a4", "210", "297", "203554", "452757"],
     sulfite: ["sulfite", "papel", "203554", "452757"],
@@ -192,6 +195,11 @@ function scoreCatmatRow(row: CatmatIndexRow, tokens: string[], full: string): { 
   const classe = normalizeCatmatText(row.nome_classe ?? "");
   const search = row.search_text;
 
+  // Penalidade por falsa correspondencia (ex: Tinta para tijolo nao e o material tijolo)
+  if (full.includes("tijolo") && (desc.includes("tinta") || desc.includes("esmalte") || desc.includes("impermeabilizante") || desc.includes("selador") || desc.includes("argamassa"))) {
+    return { score: -500, matchCount: 0 };
+  }
+
   // Bonus por frase completa
   if (full.length >= 4) {
     if (desc.includes(full)) score += 100;
@@ -212,8 +220,8 @@ function scoreCatmatRow(row: CatmatIndexRow, tokens: string[], full: string): { 
   if (matchCount > 0) {
     if (row.status_item) score += 1;
 
-    // Bonus por especificacao padrao de alto consumo público (Papel Sulfite A4 Branco, Coturno Preto)
-    if (row.codigo_item === 203554 || row.codigo_item === 452757 || row.codigo_item === 605160) {
+    // Bonus por especificacao padrao de alto consumo público
+    if (row.codigo_item === 203554 || row.codigo_item === 452757 || row.codigo_item === 605160 || row.codigo_item === 447814 || row.codigo_item === 447815) {
       score += 150;
     }
     if (desc.includes("branca") && (full.includes("papel") || full.includes("sulfite") || full.includes("a4"))) {
