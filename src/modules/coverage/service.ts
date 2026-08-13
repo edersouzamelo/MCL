@@ -1921,12 +1921,8 @@ export function buildCoverageSynthesis(
     if (instrument.status === "EXCLUIDO_NA_FONTE" || instrument.status === "EXPIRADO" || instrument.status === "INATIVO") {
       return false;
     }
-    const validFrom = instrument.validFrom ? new Date(instrument.validFrom).getTime() : 0;
     const validUntil = instrument.validUntil ? new Date(instrument.validUntil).getTime() : Infinity;
     if (!isNaN(validUntil) && validUntil < now) {
-      return false;
-    }
-    if (!isNaN(validFrom) && validFrom > now) {
       return false;
     }
     return true;

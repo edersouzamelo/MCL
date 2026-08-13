@@ -863,6 +863,11 @@ export function CoverageJourneyClient({
                   ⚠ Síntese calculada sem ata retornada — valores baseados em cobertura zero.
                 </p>
               )}
+              {entries.length > 0 && synthesis.currentAtaCount === 0 && (
+                <p className="rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-900 dark:text-blue-200">
+                  ℹ <strong>Nota de Vigência:</strong> Foram localizadas {entries.length} ata(s) no Compras.gov.br na janela consultada, porém suas vigências de 1 ano já expiraram antes da data de hoje ({new Date().toLocaleDateString("pt-BR")}). Para atas vigentes hoje, altere o filtro de período acima para <strong>"Últ. 6 meses"</strong>.
+                </p>
+              )}
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 group relative cursor-help" title="Cálculo do Déficit: Quantidade Solicitada pela sua OM (200 un) menos o Estoque em Almoxarifado (120 un) = 80 un a adquirir.">
                   <dt className="text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
