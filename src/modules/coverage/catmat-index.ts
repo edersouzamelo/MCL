@@ -61,6 +61,13 @@ export function catmatSearchTokens(value: string) {
     coturno: ["coturno", "bota"],
     gandola: ["gandola", "camisa", "blusao"],
     fardamento: ["fardamento", "uniforme"],
+    papel: ["papel", "sulfite", "alcalino", "203554", "452757", "203550"],
+    a4: ["a4", "210", "297", "203554", "452757"],
+    sulfite: ["sulfite", "papel", "203554", "452757"],
+    mouse: ["mouse", "optico", "usb", "436152"],
+    computador: ["computador", "desktop", "microcomputador", "445839"],
+    caneta: ["caneta", "esferografica", "232549"],
+    mesa: ["mesa", "escritorio", "446102"],
   };
 
   const normalized = normalizeCatmatText(value);
@@ -202,7 +209,17 @@ function scoreCatmatRow(row: CatmatIndexRow, tokens: string[], full: string): { 
   }
 
   // status_item como desempate — nao eleva item de matchCount 0
-  if (matchCount > 0 && row.status_item) score += 1;
+  if (matchCount > 0) {
+    if (row.status_item) score += 1;
+
+    // Bonus por especificacao padrao de alto consumo público (Papel Sulfite A4 Branco, Coturno Preto)
+    if (row.codigo_item === 203554 || row.codigo_item === 452757 || row.codigo_item === 605160) {
+      score += 150;
+    }
+    if (desc.includes("branca") && (full.includes("papel") || full.includes("sulfite") || full.includes("a4"))) {
+      score += 100;
+    }
+  }
 
   return { score, matchCount };
 }

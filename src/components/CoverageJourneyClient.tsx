@@ -700,9 +700,16 @@ export function CoverageJourneyClient({
 
             {/* Diagnóstico diferenciado */}
             {(queryTrace?.totalRegistros ?? 0) === 0 ? (
-              <p className="text-xs text-amber-800 dark:text-amber-300 border-t border-amber-200 dark:border-amber-700 pt-2">
-                <strong>Causa provável:</strong> A API retornou <code>totalRegistros=0</code> para este CATMAT e período. Nenhum registro chegou ao servidor — não houve filtragem interna.
-              </p>
+              <div className="border-t border-amber-200 dark:border-amber-700 pt-2 space-y-1 text-xs text-amber-800 dark:text-amber-300">
+                <p>
+                  <strong>Causa provável:</strong> A API retornou <code>totalRegistros=0</code> para este CATMAT e período. Nenhum registro chegou ao servidor.
+                </p>
+                {mapping?.externalItemCode === "203589" || (mapping?.externalDescription && /azul|rosa|amarel|especial/i.test(mapping.externalDescription)) ? (
+                  <p className="rounded bg-amber-100 dark:bg-amber-900/40 p-2 font-semibold text-amber-950 dark:text-amber-200">
+                    💡 <strong>Dica de Pesquisa:</strong> O CATMAT confirmado ({mapping?.externalItemCode}) possui especificação restrita (ex: Papel Azul). Licitações públicas volumosas de papel A4 utilizam o CATMAT <strong>203554</strong> (Papel Sulfite A4 Branco 75g/m²). Revogue o CATMAT acima e selecione o CATMAT 203554.
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <p className="text-xs text-amber-800 dark:text-amber-300 border-t border-amber-200 dark:border-amber-700 pt-2">
                 <strong>Atenção:</strong> A API retornou <strong>{queryTrace?.totalRegistros} registro(s)</strong>, mas todos foram descartados por divergência de <code>codigoItem</code> ou falha de validação de schema. Verifique os parâmetros.
