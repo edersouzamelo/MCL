@@ -1,8 +1,8 @@
 import Image from "next/image";
 import { clsx } from "clsx";
 
-export const MCL_LOGO_SRC = "/icons/mcl-logo.png";
-export const MCL_LOGO_LIGHT_SRC = "/icons/mcl-logo-light.png";
+export const MCL_LOGO_SRC = "/icons/mcl-logo.png?v=3";
+export const MCL_LOGO_LIGHT_SRC = "/icons/mcl-logo-light.png?v=3";
 
 export function BrandLogo({
   className,
@@ -22,6 +22,7 @@ export function BrandLogo({
       width={961}
       height={1152}
       priority={priority}
+      unoptimized
       className={clsx("object-contain", className)}
       sizes={sizes}
     />
