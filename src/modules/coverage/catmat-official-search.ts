@@ -124,7 +124,11 @@ export async function searchOfficialCatmatCandidates(state: DemoState, rawInput:
       throw new Error(query.errorMessage);
     }
 
-    const candidates = search.rows.map((row) => candidateFromIndexRow(row, query, input.needId, queryText));
+    const allCandidates = search.rows.map((row) => candidateFromIndexRow(row, query, input.needId, queryText));
+    const candidates = search.isCodeSearch
+      ? allCandidates
+      : allCandidates.filter((c) => c.similarityScore > 0);
+
     query.recordsRead = search.rows.length;
     query.status = candidates.length ? "SUCCESS" : "NO_RESULTS";
     query.sourceUrl = "LOCAL_CATMAT_INDEX_FROM_COMPRAS_GOV";
@@ -145,11 +149,11 @@ export async function searchOfficialCatmatCandidates(state: DemoState, rawInput:
         userAgent: options.userAgent ?? "mcl-web",
         outcome: candidates.length ? "SUCESSO" : "SEM_RESULTADO",
         reason: candidates.length ? "Candidatos CATMAT retornados do indice local." : "Nenhum candidato CATMAT encontrado no indice local.",
-        metadata: { queryId: query.id, params: query.params, candidates: candidates.length, indexSize: search.total } as any,
+        metadata: { queryId: query.id, params: query.params, candidates: candidates.length, indexSize: search.total, diagnostic: search.diagnostic } as any,
       },
     });
 
-    return { query, candidates };
+    return { query, candidates, diagnostic: search.diagnostic };
   } catch (error) {
     query.status = "FAILED";
     query.errorMessage = error instanceof Error ? error.message : "Falha ao pesquisar CATMAT no indice local.";
@@ -158,3 +162,4 @@ export async function searchOfficialCatmatCandidates(state: DemoState, rawInput:
     throw error;
   }
 }
+

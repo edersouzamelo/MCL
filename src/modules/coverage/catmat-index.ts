@@ -41,12 +41,26 @@ export function normalizeCatmatText(value: string) {
     .trim();
 }
 
+export type CatmatSearchDiagnostic = {
+  queryText: string;
+  tokens: string[];
+  isCodeSearch: boolean;
+  totalIndexSize: number;
+  rowsBeforeFilter: number;
+  rowsAfterFilter: number;
+  rowsAfterScoreFilter: number;
+};
+
 export function catmatSearchTokens(value: string) {
-  const ignored = new Set(["para", "com", "sem", "dos", "das", "uma", "uns", "por", "tipo", "item", "operacional", "tamanho"]);
+  const ignored = new Set([
+    "para", "com", "sem", "dos", "das", "uma", "uns", "por",
+    "tipo", "item", "operacional", "tamanho", "cor", "uso",
+    "sob", "ate", "nao", "que", "sua", "seu",
+  ]);
   const seen = new Set<string>();
   return normalizeCatmatText(value)
     .split(/\s+/)
-    .filter((token) => token.length >= 3 || /^\d+$/.test(token))
+    .filter((token) => token.length >= 3 || /^\d{4,}$/.test(token))
     .filter((token) => !ignored.has(token))
     .filter((token) => {
       if (seen.has(token)) return false;
@@ -138,28 +152,49 @@ export async function upsertCatmatIndexItems(items: CatmatSourceItem[]) {
   }
 }
 
-function scoreCatmatRow(row: CatmatIndexRow, tokens: string[], full: string) {
+/**
+ * Calcula score de relevancia textual real.
+ *
+ * REGRAS:
+ * - matchCount: numero de tokens da query encontrados nos campos do candidato.
+ * - status_item NAO torna o item relevante — e apenas desempate de ultima ordem.
+ * - Score 0 + matchCount 0 = item deve ser descartado.
+ */
+function scoreCatmatRow(row: CatmatIndexRow, tokens: string[], full: string): { score: number; matchCount: number } {
   let score = 0;
-  const search = row.search_text;
+  let matchCount = 0;
+
   const desc = normalizeCatmatText(row.descricao_item ?? "");
   const pdm = normalizeCatmatText(row.nome_pdm ?? "");
   const classe = normalizeCatmatText(row.nome_classe ?? "");
-  if (desc.includes(full)) score += 80;
-  if (pdm.includes(full)) score += 60;
-  for (const token of tokens) {
-    if (pdm.includes(token)) score += 16;
-    if (classe.includes(token)) score += 8;
-    if (desc.includes(token)) score += 5;
-    if (search.includes(token)) score += 2;
+  const search = row.search_text;
+
+  // Bonus por frase completa
+  if (full.length >= 4) {
+    if (desc.includes(full)) score += 100;
+    else if (pdm.includes(full)) score += 80;
   }
-  if (row.status_item) score += 3;
-  return score;
+
+  // Match por token individual
+  for (const token of tokens) {
+    let tokenHit = false;
+    if (desc.includes(token)) { score += 20; tokenHit = true; }
+    if (pdm.includes(token)) { score += 15; tokenHit = true; }
+    if (classe.includes(token)) { score += 8; tokenHit = true; }
+    if (search.includes(token) && !tokenHit) { score += 3; tokenHit = true; }
+    if (tokenHit) matchCount++;
+  }
+
+  // status_item como desempate — nao eleva item de matchCount 0
+  if (matchCount > 0 && row.status_item) score += 1;
+
+  return { score, matchCount };
 }
 
 async function queryRows(tokens: string[], mode: "AND" | "OR", limit: number) {
   const patterns = tokens.map((token) => `%${token}%`);
   const joiner = mode === "AND" ? " AND " : " OR ";
-  const where = tokens.map((_, index) => `search_text LIKE $${index + 1}`).join(joiner);
+  const where = tokens.map((_, index) => `search_text ILIKE $${index + 1}`).join(joiner);
   return prisma.$queryRawUnsafe<CatmatIndexRow[]>(
     `SELECT * FROM catmat_items WHERE ${where} ORDER BY codigo_item ASC LIMIT $${tokens.length + 1}`,
     ...patterns,
@@ -167,29 +202,104 @@ async function queryRows(tokens: string[], mode: "AND" | "OR", limit: number) {
   );
 }
 
-export async function searchCatmatIndex(terms: string, limit = 20) {
+async function queryByCode(code: string) {
+  const parsed = parseInt(code, 10);
+  if (isNaN(parsed)) return [];
+  return prisma.$queryRawUnsafe<CatmatIndexRow[]>(
+    `SELECT * FROM catmat_items WHERE codigo_item = $1`,
+    parsed,
+  );
+}
+
+export async function searchCatmatIndex(terms: string, limit = 20): Promise<{
+  total: number;
+  rows: CatmatIndexRow[];
+  tokens: string[];
+  empty: boolean;
+  isCodeSearch: boolean;
+  diagnostic: CatmatSearchDiagnostic;
+}> {
   await ensureCatmatIndexTable();
   const total = await catmatIndexCount();
-  if (!total) return { total, rows: [], tokens: catmatSearchTokens(terms), empty: true };
-
   const tokens = catmatSearchTokens(terms);
-  if (!tokens.length) return { total, rows: [], tokens, empty: false };
+  const isCodeSearch = /^\d{5,9}$/.test(terms.trim());
+
+  const emptyDiag: CatmatSearchDiagnostic = {
+    queryText: terms,
+    tokens,
+    isCodeSearch,
+    totalIndexSize: total,
+    rowsBeforeFilter: 0,
+    rowsAfterFilter: 0,
+    rowsAfterScoreFilter: 0,
+  };
+
+  if (!total) return { total, rows: [], tokens, empty: true, isCodeSearch, diagnostic: emptyDiag };
+  if (!tokens.length && !isCodeSearch) return { total, rows: [], tokens, empty: false, isCodeSearch, diagnostic: emptyDiag };
+
+  // Busca por codigo exato
+  if (isCodeSearch) {
+    const codeRows = await queryByCode(terms.trim());
+    if (codeRows.length) {
+      return {
+        total,
+        rows: codeRows,
+        tokens,
+        empty: false,
+        isCodeSearch: true,
+        diagnostic: {
+          queryText: terms,
+          tokens,
+          isCodeSearch: true,
+          totalIndexSize: total,
+          rowsBeforeFilter: 1,
+          rowsAfterFilter: 1,
+          rowsAfterScoreFilter: 1,
+        },
+      };
+    }
+  }
 
   const seen = new Map<number, CatmatIndexRow>();
-  const andRows = await queryRows(tokens, "AND", 250);
+  const andRows = await queryRows(tokens, "AND", 300);
   for (const row of andRows) seen.set(row.codigo_item, row);
-  if (seen.size < limit && tokens.length > 1) {
+
+  // Expansao OR apenas quando AND retorna poucos e ha mais de 1 token
+  if (seen.size < Math.min(limit, 5) && tokens.length > 1) {
     const orRows = await queryRows(tokens, "OR", 500);
     for (const row of orRows) seen.set(row.codigo_item, row);
   }
 
+  const rowsBeforeFilter = seen.size;
   const full = normalizeCatmatText(terms);
-  const rows = Array.from(seen.values())
-    .map((row) => ({ row, score: scoreCatmatRow(row, tokens, full) }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || a.row.codigo_item - b.row.codigo_item)
+
+  const scored = Array.from(seen.values())
+    .map((row) => ({ row, ...scoreCatmatRow(row, tokens, full) }));
+
+  // FILTRO OBRIGATORIO: matchCount > 0
+  const withMatch = scored.filter((entry) => entry.matchCount > 0);
+  const rowsAfterFilter = withMatch.length;
+
+  const rows = withMatch
+    .sort((a, b) => b.score - a.score || (b.row.status_item ? 1 : 0) - (a.row.status_item ? 1 : 0) || a.row.codigo_item - b.row.codigo_item)
     .slice(0, limit)
     .map((entry) => entry.row);
 
-  return { total, rows, tokens, empty: false };
+  return {
+    total,
+    rows,
+    tokens,
+    empty: false,
+    isCodeSearch,
+    diagnostic: {
+      queryText: terms,
+      tokens,
+      isCodeSearch,
+      totalIndexSize: total,
+      rowsBeforeFilter,
+      rowsAfterFilter,
+      rowsAfterScoreFilter: rows.length,
+    },
+  };
 }
+
