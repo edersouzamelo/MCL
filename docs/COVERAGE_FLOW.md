@@ -44,7 +44,8 @@ Variaveis esperadas:
 ```bash
 DATABASE_URL="postgresql://..."
 AUTH_SECRET="..."
-DEMO_ACCESS_CODE="MCL-DEMO-2026"
+DEMO_AUTH_ENABLED="true"
+DEMO_USER_PASSWORD="..."
 COMPRAS_GOV_API_BASE_URL="https://dadosabertos.compras.gov.br"
 ```
 
