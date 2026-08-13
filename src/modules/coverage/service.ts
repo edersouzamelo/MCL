@@ -1918,11 +1918,22 @@ export function buildCoverageSynthesis(
   const now = Date.now();
   const inThirtyDays = now + 30 * 24 * 60 * 60 * 1000;
   const currentAtas = instruments.filter((instrument) => {
-    const validFrom = new Date(instrument.validFrom).getTime();
-    const validUntil = new Date(instrument.validUntil).getTime();
-    return validFrom <= now && validUntil >= now && instrument.status !== "EXCLUIDO_NA_FONTE";
+    if (instrument.status === "EXCLUIDO_NA_FONTE" || instrument.status === "EXPIRADO" || instrument.status === "INATIVO") {
+      return false;
+    }
+    const validFrom = instrument.validFrom ? new Date(instrument.validFrom).getTime() : 0;
+    const validUntil = instrument.validUntil ? new Date(instrument.validUntil).getTime() : Infinity;
+    if (!isNaN(validUntil) && validUntil < now) {
+      return false;
+    }
+    if (!isNaN(validFrom) && validFrom > now) {
+      return false;
+    }
+    return true;
   });
-  const potentialQuantity = sum(currentAtas.map((instrument) => instrument.capacity || Number(instrument.quantity || 0)));
+  const potentialQuantity = currentAtas.length > 0
+    ? sum(currentAtas.map((instrument) => instrument.capacity || Number(instrument.quantity || 0)))
+    : (unitRecords.length > 0 ? sum(unitRecords.map((r) => Number(r.quantidadeRegistrada || 0))) : 0);
   const unitValues = currentAtas.map((instrument) => instrument.unitValue).filter((value): value is number => typeof value === "number");
   const minUnitValue = unitValues.length ? Math.min(...unitValues) : undefined;
   const maxUnitValue = unitValues.length ? Math.max(...unitValues) : undefined;
