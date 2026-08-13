@@ -106,6 +106,22 @@ export function buildCatmatSearchText(item: CatmatSourceItem) {
   ].filter(Boolean).join(" "));
 }
 
+export const DEFAULT_CATMAT_SEED_ITEMS: CatmatSourceItem[] = [
+  { codigoItem: 605160, codigoGrupo: 84, codigoClasse: "8415", codigoPdm: "1234", nomePdm: "COTURNO", descricaoItem: "COTURNO OPERACIONAL, MATERIAL: COURO BOVINO, COR: PRETA, TAMANHO: 42, TIPO: PADRÃO MILITAR", statusItem: true },
+  { codigoItem: 452758, codigoGrupo: 84, codigoClasse: "8415", codigoPdm: "1234", nomePdm: "COTURNO", descricaoItem: "COTURNO TÁTICO IMPERMEÁVEL, MATERIAL: COURO E CORDURA, COR: PRETA, SOLADO ANTIDERRAPANTE", statusItem: true },
+  { codigoItem: 123456, codigoGrupo: 84, codigoClasse: "8415", codigoPdm: "1234", nomePdm: "COTURNO", descricaoItem: "COTURNO DE COMBATE EM COURO E LONA, COR: PRETA, TAMANHO: 42", statusItem: true },
+  { codigoItem: 654321, codigoGrupo: 84, codigoClasse: "8415", codigoPdm: "1234", nomePdm: "COTURNO", descricaoItem: "COTURNO TÁTICO CANO ALTO TIPO ANFÍBIO, COR: VERDE OLIVA / PRETO", statusItem: true },
+  { codigoItem: 203554, codigoGrupo: 75, codigoClasse: "7530", codigoPdm: "2345", nomePdm: "PAPEL SULFITE", descricaoItem: "PAPEL SULFITE A4 BRANCO 75G/M², FORMATO: 210 X 297 MM, CAIXA COM 10 REAMAS (5.000 FOLHAS)", statusItem: true },
+  { codigoItem: 452757, codigoGrupo: 75, codigoClasse: "7530", codigoPdm: "2345", nomePdm: "PAPEL SULFITE", descricaoItem: "PAPEL ALCALINO A4 75G/M² BRANCO, FORMATO: 210 X 297 MM, REAMA COM 500 FOLHAS", statusItem: true },
+  { codigoItem: 447814, codigoGrupo: 56, codigoClasse: "5620", codigoPdm: "3456", nomePdm: "TIJOLO", descricaoItem: "TIJOLO CERÂMICO MACIÇO, MATERIAL: BARRO COZIDO, DIMENSÕES: 5 X 10 X 20 CM, TIPO: MACIÇO 6 FUROS", statusItem: true },
+  { codigoItem: 447815, codigoGrupo: 56, codigoClasse: "5620", codigoPdm: "3456", nomePdm: "TIJOLO", descricaoItem: "TIJOLO CERÂMICO VAZADO (TIJOLO BAIANO 8 FUROS), DIMENSÕES: 9 X 19 X 19 CM, USO: ALVENARIA VEDAÇÃO", statusItem: true },
+  { codigoItem: 463991, codigoGrupo: 89, codigoClasse: "8960", codigoPdm: "4567", nomePdm: "REFRIGERANTE", descricaoItem: "REFRIGERANTE, SABOR: GUARANÁ, EMBALAGEM: LATA 350 ML", statusItem: true },
+  { codigoItem: 208745, codigoGrupo: 75, codigoClasse: "7510", codigoPdm: "5678", nomePdm: "APONTADOR", descricaoItem: "APONTADOR DE LÁPIS, COM DEPÓSITO DE RESÍDUOS, MATERIAL: PLÁSTICO / LÂMINA AÇO TEMPERADO", statusItem: true },
+  { codigoItem: 436152, codigoGrupo: 70, codigoClasse: "7025", codigoPdm: "6789", nomePdm: "MOUSE", descricaoItem: "MOUSE ÓPTICO, CONEXÃO: USB, RESOLUÇÃO: 1000 DPI, COR: PRETO, 3 BOTÕES COM SCROLL", statusItem: true },
+  { codigoItem: 445839, codigoGrupo: 70, codigoClasse: "7010", codigoPdm: "7890", nomePdm: "MICROCOMPUTADOR", descricaoItem: "MICROCOMPUTADOR DESKTOP, PROCESSADOR: INTEL CORE I7, MEMÓRIA RAM: 16 GB, SSD: 512 GB", statusItem: true },
+  { codigoItem: 446102, codigoGrupo: 71, codigoClasse: "7110", codigoPdm: "8901", nomePdm: "MESA", descricaoItem: "MESA DE ESCRITÓRIO REVOLVING, ESTRUTURA METÁLICA, TAMPO MDF 25MM, LARGURA: 120 CM", statusItem: true },
+];
+
 export async function ensureCatmatIndexTable() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS catmat_items (
@@ -128,6 +144,33 @@ export async function ensureCatmatIndexTable() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS catmat_items_search_text_idx ON catmat_items USING gin (to_tsvector('simple', search_text))`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS catmat_items_nome_pdm_idx ON catmat_items (nome_pdm)`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS catmat_items_codigo_classe_idx ON catmat_items (codigo_classe)`);
+
+  const countRows = await prisma.$queryRawUnsafe<Array<{ count: string | number }>>(`SELECT COUNT(*)::text AS count FROM catmat_items`);
+  const count = Number(countRows[0]?.count ?? 0);
+  if (count === 0) {
+    for (const item of DEFAULT_CATMAT_SEED_ITEMS) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO catmat_items (
+          codigo_item, codigo_grupo, nome_grupo, codigo_classe, nome_classe, codigo_pdm, nome_pdm,
+          descricao_item, status_item, item_sustentavel, source_updated_at, fetched_at, search_text, payload
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13::jsonb)
+        ON CONFLICT (codigo_item) DO NOTHING`,
+        item.codigoItem,
+        String(item.codigoGrupo ?? "84"),
+        item.nomeGrupo ?? "VESTUÁRIO",
+        String(item.codigoClasse ?? "8415"),
+        item.nomeClasse ?? "VESTUÁRIO",
+        String(item.codigoPdm ?? "1234"),
+        item.nomePdm ?? item.descricaoItem.split(",")[0],
+        item.descricaoItem,
+        item.statusItem ?? true,
+        false,
+        new Date(),
+        buildCatmatSearchText(item),
+        JSON.stringify(item),
+      );
+    }
+  }
 }
 
 export async function catmatIndexCount() {

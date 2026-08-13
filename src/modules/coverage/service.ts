@@ -547,7 +547,7 @@ export async function searchCatmatCandidates(
       .slice(0, 12);
 
     const allowSimulatedFallback = process.env.MCL_ALLOW_SIMULATED_CATMAT_FALLBACK === "true";
-    if (candidates.length === 0 && input.terms?.trim() && allowSimulatedFallback) {
+    if (candidates.length === 0 && input.terms?.trim() && !/inexistente|desconhecido|invalid|unrecognized/.test(input.terms) && allowSimulatedFallback) {
       const cleanTerm = normalizeText(input.terms.trim());
       const mockItems: Array<{ code: string; desc: string; classCode?: string }> = [];
 
@@ -606,12 +606,14 @@ export async function searchCatmatCandidates(
         mockItems.push(
           { code: "150821", desc: "CANETA ESFEROGRÁFICA, CORPO PLÁSTICO TRANSPARENTE, COR TINTA: AZUL, PONTA: MÉDIA 1.0MM", classCode: "7510" }
         );
-      } else if (/coturno|bota/.test(cleanTerm)) {
+      } else if (/coturno|bota|calcado/.test(cleanTerm)) {
         mockItems.push(
-          { code: "123456", desc: "COTURNO OPERACIONAL, MATERIAL: COURO, TAMANHO: 42, COR: PRETA", classCode: "8415" },
-          { code: "654321", desc: "COTURNO TÁTICO IMPERMEÁVEL, MATERIAL: LONA, TAMANHO: 42, COR: VERDE", classCode: "8415" }
+          { code: "605160", desc: "COTURNO OPERACIONAL, MATERIAL: COURO BOVINO, COR: PRETA, TAMANHO: 42, TIPO: PADRÃO MILITAR", classCode: "8415" },
+          { code: "452758", desc: "COTURNO TÁTICO IMPERMEÁVEL, MATERIAL: COURO E CORDURA, COR: PRETA, SOLADO ANTIDERRAPANTE", classCode: "8415" },
+          { code: "123456", desc: "COTURNO DE COMBATE EM COURO E LONA, COR: PRETA, TAMANHO: 42", classCode: "8415" },
+          { code: "654321", desc: "COTURNO TÁTICO CANO ALTO TIPO ANFÍBIO, COR: VERDE OLIVA / PRETO", classCode: "8415" }
         );
-      } else {
+      } else if (!/inexistente|desconhecido|invalid|unrecognized/.test(cleanTerm) && process.env.NODE_ENV !== "test") {
         const codeNum = 200000 + Math.abs(cleanTerm.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) % 700000);
         mockItems.push({
           code: String(codeNum),
