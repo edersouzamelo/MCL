@@ -53,7 +53,7 @@ export function UserSettingsMenu() {
             {session?.user?.name || "Maj Souza Melo"}
           </span>
           <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-            9º Gpt Log (UASG 160545)
+            9º Gpt Log (UASG 160136)
           </span>
         </div>
         <button 

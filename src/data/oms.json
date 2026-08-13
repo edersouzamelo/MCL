@@ -7,7 +7,7 @@
   { "id": "6", "name": "6º Grupo de Mísseis e Foguetes" },
   { "id": "7", "name": "7º Regimento de Cavalaria Mecanizado" },
   { "id": "8", "name": "8º Batalhão de Comunicações" },
-  { "id": "9", "name": "9º Grupamento Logístico" },
+  { "id": "9", "name": "9º Grupamento Logístico", "uasg": "160136" },
   { "id": "10", "name": "10º Batalhão de Suprimento" },
   { "id": "11", "name": "11º Batalhão de Polícia do Exército" },
   { "id": "12", "name": "12º Esquadrão de Cavalaria Mecanizado" },

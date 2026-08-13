@@ -1873,8 +1873,13 @@ export async function consultArpUnits(state: DemoState, rawInput: ArpUnitsInput,
         metadata: { queryId: query.id, params: query.params, records: records.length },
       });
       const relatedInstruments = state.acquisitionInstruments.filter(
-        (candidate) => candidate.sourceSystem === COMPRAS_GOV_SOURCE_SYSTEM || candidate.sourceSystem === "MCL_SIMULADO" && candidate.itemCode === instrument.itemCode,
+        (candidate) =>
+          candidate.id === instrument.id ||
+          (candidate.itemCode && instrument.itemCode && candidate.itemCode === instrument.itemCode),
       );
+      if (!relatedInstruments.some((inst) => inst.id === instrument.id)) {
+        relatedInstruments.push(instrument);
+      }
       return {
         query,
         records,
@@ -1927,8 +1932,15 @@ export function buildCoverageSynthesis(
     ? sum(unitRecords.map((r) => r.saldoAdesoes ?? 0))
     : undefined;
 
-  const maxIndividualAdhesionLimit = unitRecords.length > 0 && potentialQuantity > 0
-    ? Math.min(totalAdhesionBalance ?? 0, Math.floor(0.5 * potentialQuantity))
+  const maxIndividualAdhesionLimit = unitRecords.length > 0
+    ? sum(
+        unitRecords.map((r) => {
+          const homologated = Number(r.quantidadeRegistrada ?? 0);
+          const cap50 = Math.floor(0.5 * homologated);
+          const rawBalance = Number(r.saldoAdesoes ?? 0);
+          return Math.min(rawBalance, cap50);
+        }),
+      )
     : undefined;
 
   const totalRemanejamentoBalance = unitRecords.length > 0
