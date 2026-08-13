@@ -822,13 +822,25 @@ export function CoverageJourneyClient({
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {unitRecords.map((record) => (
-                    <tr key={record.id} className="hover:bg-zinc-50 dark:bg-zinc-800/50/50">
-                      <td className="py-3 px-3 font-medium text-zinc-950">{record.codigoUnidade} - {record.nomeUnidade}</td>
-                      <td className="text-zinc-600">{record.tipoUnidade ?? "-"}</td>
-                      <td className="font-semibold text-zinc-900">{number(record.quantidadeRegistrada)}</td>
-                      <td className="font-semibold text-emerald-700">{number(record.saldoAdesoes)}</td>
-                      <td className="font-semibold text-indigo-700">{number(record.saldoRemanejamentoEmpenho)}</td>
-                      <td className="px-3 text-zinc-600">{record.aceitaAdesao ? "sim" : "nao"}</td>
+                    <tr key={record.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                      <td className="py-3 px-3 font-medium text-zinc-950 dark:text-zinc-100">{record.codigoUnidade} - {record.nomeUnidade}</td>
+                      <td className="text-zinc-600 dark:text-zinc-300">{record.tipoUnidade ?? "-"}</td>
+                      <td className="font-semibold text-zinc-900 dark:text-zinc-100" title="Quantidade original de itens homologados no edital da licitação.">{number(record.quantidadeRegistrada)}</td>
+                      <td 
+                        className="font-semibold text-emerald-700 dark:text-emerald-400 cursor-help" 
+                        title={!record.aceitaAdesao ? "MOTIVO DO SALDO ZERO: A UG Gerenciadora registrou no edital que NÃO concede adesões (caronas) para outros órgãos." : "Saldo global restante acumulado de caronas disponíveis no Brasil inteiro para este item."}
+                      >
+                        {number(record.saldoAdesoes)}
+                      </td>
+                      <td className="font-semibold text-indigo-700 dark:text-indigo-400" title="Saldo de remanejamento/empenho entre unidades participantes da própria Ata.">{number(record.saldoRemanejamentoEmpenho)}</td>
+                      <td 
+                        className="px-3 font-semibold cursor-help"
+                        title={!record.aceitaAdesao ? "A UG optou por vedar adesões externas no edital da licitação." : "A UG autoriza caronas externas conforme limites da Lei 14.133/2021."}
+                      >
+                        <span className={record.aceitaAdesao ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400 font-bold"}>
+                          {record.aceitaAdesao ? "sim" : "não (vedada)"}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -852,26 +864,79 @@ export function CoverageJourneyClient({
                 </p>
               )}
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Déficit da OM</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.deficit)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Qtd. potencial ({entries.length} {entries.length === 1 ? "Ata" : "Atas"})</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.potentialQuantity)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Atas Vigentes</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{synthesis.currentAtaCount}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Confiança</dt><dd className="font-semibold text-indigo-700 dark:text-indigo-400">{Math.round(synthesis.confidence * 100)}%</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Menor valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)}</dd></div>
-                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Maior valor un.</dt><dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.maxUnitValue)}</dd></div>
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 group relative cursor-help" title="Cálculo do Déficit: Quantidade Solicitada pela sua OM (200 un) menos o Estoque em Almoxarifado (120 un) = 80 un a adquirir.">
+                  <dt className="text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                    <span>Déficit da OM</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">ⓘ</span>
+                  </dt>
+                  <dd className="font-semibold text-zinc-900 dark:text-zinc-100">{number(synthesis.deficit)}</dd>
+                </div>
+
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 group relative cursor-help" title={selectedEntry ? `Capacidade da Ata selecionada (${selectedEntry.instrument.externalReference || selectedEntry.instrument.id}): ${number(selectedEntry.instrument.capacity || 0)} un.` : "Soma da quantidade disponível nas Atas de Registro de Preços encontradas no Compras.gov.br."}>
+                  <dt className="text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                    <span>Qtd. potencial ({entries.length} {entries.length === 1 ? "Ata" : "Atas"})</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">ⓘ</span>
+                  </dt>
+                  <dd className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    {selectedEntry ? number(selectedEntry.instrument.capacity || synthesis.potentialQuantity) : number(synthesis.potentialQuantity)}
+                  </dd>
+                </div>
+
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 group relative cursor-help" title="Quantidade de Atas de Registro de Preços localizadas no Compras.gov.br com período de vigência válido na data de hoje.">
+                  <dt className="text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                    <span>Atas Vigentes</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">ⓘ</span>
+                  </dt>
+                  <dd className="font-semibold text-zinc-900 dark:text-zinc-100">{synthesis.currentAtaCount}</dd>
+                </div>
+
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 group relative cursor-help" title="Índice sintético de integridade (combina código CATMAT validado, atualização da API oficial e consistência das UGs).">
+                  <dt className="text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                    <span>Confiança</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">ⓘ</span>
+                  </dt>
+                  <dd className="font-semibold text-indigo-700 dark:text-indigo-400">{Math.round(synthesis.confidence * 100)}%</dd>
+                </div>
+
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 group relative cursor-help" title="Menor valor unitário de item encontrado entre as Atas pesquisadas.">
+                  <dt className="text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                    <span>Menor valor un.</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">ⓘ</span>
+                  </dt>
+                  <dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.minUnitValue)}</dd>
+                </div>
+
+                <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3 group relative cursor-help" title="Maior valor unitário de item encontrado entre as Atas pesquisadas.">
+                  <dt className="text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                    <span>Maior valor un.</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">ⓘ</span>
+                  </dt>
+                  <dd className="font-semibold text-zinc-900 dark:text-zinc-100">{money(synthesis.maxUnitValue)}</dd>
+                </div>
                 
                 {/* Destaque das Limitações de Adesão Legal da Lei 14.133/2021 */}
-                <div className="col-span-2 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 p-3">
+                <div 
+                  className="col-span-2 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 p-3 group relative cursor-help"
+                  title="REGRA DO ART. 86 § 4º DA LEI 14.133/2021: Limite individual por OM carona (sua OM) = máximo de 50% do quantitativo homologado na Ata para a UG Gerenciadora. Se a UG homologou 1.013 un, sua OM pode aderir no máximo a 506 un."
+                >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <dt className="text-emerald-800 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider">
-                        Máx Adesão p/ Sua OM (50% Item - Art. 86 § 4º)
+                      <dt className="text-emerald-800 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1">
+                        <span>Máx Adesão p/ Sua OM (50% Item - Art. 86 § 4º)</span>
+                        <span className="text-[10px] text-emerald-600 font-normal">ⓘ</span>
                       </dt>
                       <dd className="font-extrabold text-emerald-900 dark:text-emerald-300 text-lg">
                         {synthesis.maxIndividualAdhesionLimit !== undefined ? `${number(synthesis.maxIndividualAdhesionLimit)} un` : "Aguardando consulta UGs"}
                       </dd>
                     </div>
-                    <div className="text-right sm:border-l sm:border-emerald-300 dark:sm:border-emerald-800 sm:pl-4">
-                      <dt className="text-zinc-600 dark:text-zinc-400 text-xs">Saldo Global Acumulado (Todas UGs)</dt>
+                    <div 
+                      className="text-right sm:border-l sm:border-emerald-300 dark:sm:border-emerald-800 sm:pl-4"
+                      title="REGRA DO ART. 86 § 5º DA LEI 14.133/2021: Teto global acumulado no Brasil = máximo de 200% (o dobro) do quantitativo homologado pela UG Gerenciadora. Todas as caronas do Brasil somadas não podem ultrapassar este total."
+                    >
+                      <dt className="text-zinc-600 dark:text-zinc-400 text-xs flex items-center justify-end gap-1">
+                        <span>Saldo Global Acumulado (Todas UGs)</span>
+                        <span className="text-[10px] text-zinc-400 font-normal">ⓘ</span>
+                      </dt>
                       <dd className="font-bold text-zinc-800 dark:text-zinc-200 text-sm">
                         {synthesis.totalAdhesionBalance !== undefined ? `${number(synthesis.totalAdhesionBalance)} un` : "—"}
                       </dd>
