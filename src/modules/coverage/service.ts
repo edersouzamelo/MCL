@@ -36,6 +36,7 @@ import type {
 } from "@/modules/domain/types";
 import { appendAuditLogToState } from "@/server/demo-store";
 import { prisma } from "@/server/db";
+import { upsertCatmatIndexItems } from "./catmat-index";
 
 const catalogFilterSchema = z.object({
   codigoItem: z.string().trim().optional(),
@@ -539,6 +540,14 @@ export async function searchCatmatCandidates(
         return parsed.success ? parsed.data : null;
       })
       .filter((item): item is ComprasGovCatalogItem => item !== null);
+
+    if (parsedItems.length > 0) {
+      try {
+        await upsertCatmatIndexItems(parsedItems as any);
+      } catch (cacheErr) {
+        console.warn("Auto-cache de CATMAT falhou silenciosamente:", cacheErr);
+      }
+    }
 
     let candidates = parsedItems
       .map((parsed: any) => candidateFromCatalogItem(parsed, query, input.needId, url, fetchedAt, queryText))
