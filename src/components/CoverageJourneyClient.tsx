@@ -222,6 +222,25 @@ export function CoverageJourneyClient({
           .finally(() => {
             setPending(undefined);
           });
+      } else {
+        // Auto-busca inicial de candidatos CATMAT para popular o grid na abertura
+        postJson<{ candidates: CatalogSearchCandidate[]; query: any }>("/api/coverage/catmat/search", {
+          needId: need.id,
+          terms,
+        })
+          .then((result) => {
+            if (result?.candidates && result.candidates.length > 0) {
+              setCandidates(result.candidates);
+              setQueryTrace(result.query);
+              setSelectedCandidateId(result.candidates[0]?.id);
+              if (!initialMapping) {
+                setMessage(`${result.candidates.length} candidatos CATMAT encontrados e prontos para revisão.`);
+              }
+            }
+          })
+          .catch((err) => {
+            console.error("Erro ao auto-carregar candidatos CATMAT:", err);
+          });
       }
     }
   }, []);
@@ -249,8 +268,13 @@ export function CoverageJourneyClient({
       });
       setCandidates(result.candidates);
       setQueryTrace(result.query);
-      setSelectedCandidateId(result.candidates[0]?.id);
-      setMessage(`${result.candidates.length} candidatos CATMAT preparados para revisao.`);
+      if (result.candidates.length > 0) {
+        setSelectedCandidateId(result.candidates[0]?.id);
+        setMessage(`${result.candidates.length} candidatos CATMAT preparados para revisão.`);
+      } else {
+        setSelectedCandidateId(undefined);
+        setMessage(`Nenhum candidato no índice local para "${terms}". Clique em "Buscar no Catálogo Oficial" para consultar o Compras.gov.br em tempo real.`);
+      }
     });
   }
 
