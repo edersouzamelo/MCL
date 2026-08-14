@@ -25,6 +25,7 @@ import {
   type AtaQueryStatus,
 } from "@/modules/coverage/arp-client";
 import type { ArpSearchEntry, CoverageSynthesis } from "@/modules/coverage/service";
+import { calculateArpMulticriteriaScore } from "@/modules/coverage/multicriteria";
 import { Badge, Card, formatDateTime } from "@/components/ui";
 
 type JourneyNeed = {
@@ -758,30 +759,79 @@ export function CoverageJourneyClient({
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {entries.map((entry) => {
               const selected = selectedEntry?.instrument.id === entry.instrument.id;
+              const unitPrices = entries
+                .map((e) => Number(e.instrument.unitValue))
+                .filter((v) => !isNaN(v) && v > 0);
+              const minPriceInSet = unitPrices.length ? Math.min(...unitPrices) : undefined;
+              const scoreResult = calculateArpMulticriteriaScore(
+                entry.instrument,
+                synthesis?.deficit ?? 0,
+                unitRecords.filter((r) => r.acquisitionInstrumentId === entry.instrument.id || r.numeroAta === entry.instrument.externalReference),
+                minPriceInSet
+              );
+
               return (
-                <button
+                <div
                   key={entry.instrument.id}
-                  type="button"
-                  onClick={() => setSelectedEntry(entry)}
-                  className={`rounded border p-3 text-left text-sm ${selected ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30" : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"}`}
+                  className={`rounded-lg border p-4 text-left text-sm transition-all ${
+                    selected
+                      ? "border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/30 ring-2 ring-emerald-500/30"
+                      : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{entry.instrument.reference}</p>
-                      <p className="text-zinc-600">{entry.instrument.organizationName ?? entry.instrument.organizationCode}</p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEntry(entry)}
+                    className="w-full text-left focus:outline-none"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-extrabold text-base text-zinc-900 dark:text-zinc-50">{entry.instrument.reference}</p>
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">{entry.instrument.organizationName ?? entry.instrument.organizationCode}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-2.5 py-1 text-xs font-extrabold rounded-full border ${scoreResult.tierBadgeColor}`} title="Score MCL (0 a 100 pts) baseado em Preço, Saldo Legal, Vigência e Prioridade de UASG.">
+                          Score MCL: {scoreResult.totalScore}/100
+                        </span>
+                        <Badge tone="info">{entry.instrument.status}</Badge>
+                      </div>
                     </div>
-                    <Badge tone="info">{entry.instrument.status}</Badge>
-                  </div>
-                  <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-                    <div><dt className="text-zinc-500 dark:text-zinc-400">Fornecedor</dt><dd className="font-semibold text-zinc-800">{entry.instrument.supplierName ?? "nao informado"}</dd></div>
-                    <div><dt className="text-zinc-500 dark:text-zinc-400">Vigencia</dt><dd className="font-semibold text-zinc-800">{formatDateTime(entry.instrument.validFrom)} ate {formatDateTime(entry.instrument.validUntil)}</dd></div>
-                    <div><dt className="text-zinc-500 dark:text-zinc-400">Qtd. homologada</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.quantity)}</dd></div>
-                    <div><dt className="text-zinc-500 dark:text-zinc-400">Max. adesao (limite)</dt><dd className="font-semibold text-zinc-800">{number(entry.instrument.capacity)}</dd></div>
-                    <div><dt className="text-zinc-500 dark:text-zinc-400">Valor unitario</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.unitValue)}</dd></div>
-                    <div><dt className="text-zinc-500 dark:text-zinc-400">Valor total</dt><dd className="font-semibold text-zinc-800">{money(entry.instrument.totalValue)}</dd></div>
-                  </dl>
-                  <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">PNCP/referencia: {entry.instrument.externalReference ?? "nao informada"}</p>
-                </button>
+                    <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                      <div><dt className="text-zinc-500 dark:text-zinc-400">Fornecedor</dt><dd className="font-semibold text-zinc-800 dark:text-zinc-200">{entry.instrument.supplierName ?? "não informado"}</dd></div>
+                      <div><dt className="text-zinc-500 dark:text-zinc-400">Vigência</dt><dd className="font-semibold text-zinc-800 dark:text-zinc-200">{formatDateTime(entry.instrument.validFrom)} até {formatDateTime(entry.instrument.validUntil)}</dd></div>
+                      <div><dt className="text-zinc-500 dark:text-zinc-400">Qtd. homologada</dt><dd className="font-semibold text-zinc-800 dark:text-zinc-200">{number(entry.instrument.quantity)}</dd></div>
+                      <div><dt className="text-zinc-500 dark:text-zinc-400">Máx. adesão (limite)</dt><dd className="font-semibold text-zinc-800 dark:text-zinc-200">{number(entry.instrument.capacity)}</dd></div>
+                      <div><dt className="text-zinc-500 dark:text-zinc-400">Valor unitário</dt><dd className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm">{money(entry.instrument.unitValue)}</dd></div>
+                      <div><dt className="text-zinc-500 dark:text-zinc-400">Valor total</dt><dd className="font-semibold text-zinc-800 dark:text-zinc-200">{money(entry.instrument.totalValue)}</dd></div>
+                    </dl>
+                  </button>
+
+                  {/* Popover Explicativo do Score Multicritério */}
+                  <details className="mt-3 text-xs border-t border-zinc-200/80 dark:border-zinc-800 pt-2 text-zinc-600 dark:text-zinc-400">
+                    <summary className="cursor-pointer font-bold text-indigo-700 dark:text-indigo-400 hover:underline select-none flex items-center justify-between">
+                      <span>Memória do Score MCL ({scoreResult.totalScore}/100 pts - {scoreResult.tier.replace(/_/g, " ")})</span>
+                      <span className="text-[10px] text-zinc-400">Clique para expandir</span>
+                    </summary>
+                    <div className="mt-2 space-y-1.5 bg-zinc-50 dark:bg-zinc-850 p-2.5 rounded border border-zinc-200 dark:border-zinc-800 font-sans">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-zinc-900 dark:text-zinc-200 shrink-0">1. Preço ({scoreResult.factors.price.score}/35 pts):</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-right">{scoreResult.factors.price.explanation}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-zinc-900 dark:text-zinc-200 shrink-0">2. Saldo Legal ({scoreResult.factors.balance.score}/30 pts):</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-right">{scoreResult.factors.balance.explanation}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-zinc-900 dark:text-zinc-200 shrink-0">3. Vigência ({scoreResult.factors.validity.score}/20 pts):</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-right">{scoreResult.factors.validity.explanation}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-zinc-900 dark:text-zinc-200 shrink-0">4. UASG ({scoreResult.factors.priority.score}/15 pts):</span>
+                        <span className="text-zinc-600 dark:text-zinc-400 text-right">{scoreResult.factors.priority.explanation}</span>
+                      </div>
+                    </div>
+                  </details>
+                </div>
               );
             })}
           </div>
