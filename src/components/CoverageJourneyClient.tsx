@@ -1217,7 +1217,32 @@ export function CoverageJourneyClient({
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
               <span className="text-xs text-zinc-500">Pronto para cópia rápida e instrução no SEI / NUP</span>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const printWindow = window.open("", "_blank");
+                    if (printWindow) {
+                      printWindow.document.write(`
+                        <html>
+                          <head>
+                            <title>Minuta de Adesão à Ata - MCL</title>
+                            <style>
+                              body { font-family: monospace; font-size: 12px; white-space: pre-wrap; padding: 40px; color: #111; line-height: 1.6; }
+                            </style>
+                          </head>
+                          <body>${docContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                      printWindow.focus();
+                      printWindow.print();
+                    }
+                  }}
+                  className="rounded border border-emerald-700 text-emerald-800 dark:text-emerald-300 font-bold px-3 py-2 text-xs hover:bg-emerald-50 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  🖨️ Imprimir / PDF
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1227,7 +1252,7 @@ export function CoverageJourneyClient({
                   }}
                   className="rounded bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white transition-colors"
                 >
-                  📋 Copiar Texto da Minuta
+                  📋 Copiar Texto
                 </button>
                 <button
                   type="button"

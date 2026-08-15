@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/AppShell";
 import { Badge, Card, InlineLink, MetricCard, PageHeader } from "@/components/ui";
+import { CoverageMetricsDashboard } from "@/components/CoverageMetricsDashboard";
 import { dashboardMetrics, itemForVariant, organizationName } from "@/modules/demo/selectors";
 import { getDemoState } from "@/server/demo-store";
 import { projectNeed } from "@/modules/events/projection";
@@ -61,6 +62,10 @@ export default function DashboardPage() {
         <p className="mt-2 text-sm text-zinc-650 dark:text-zinc-300">
           Necessidade ativa de demonstração: <strong className="font-bold text-zinc-900 dark:text-white">{mainNeed?.persistentCode ?? "sem necessidade ativa"}</strong>. O painel foi estabilizado para não depender de leitura direta do PostgreSQL enquanto a cadeia CATMAT é sincronizada.
         </p>
+      </section>
+
+      <section className="mt-6">
+        <CoverageMetricsDashboard />
       </section>
 
       <section className="mt-6">
