@@ -26,6 +26,7 @@ import {
 } from "@/modules/coverage/arp-client";
 import type { ArpSearchEntry, CoverageSynthesis } from "@/modules/coverage/service";
 import { calculateArpMulticriteriaScore } from "@/modules/coverage/multicriteria";
+import { generateAdhesionDocument } from "@/modules/coverage/synthesis-doc";
 import { Badge, Card, formatDateTime } from "@/components/ui";
 
 type JourneyNeed = {
@@ -195,6 +196,8 @@ export function CoverageJourneyClient({
   const [pending, setPending] = useState<string>();
   const [queryTrace, setQueryTrace] = useState<QueryTrace>();
   const [ataQueryStatus, setAtaQueryStatus] = useState<AtaQueryStatus>("IDLE");
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docContent, setDocContent] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1071,6 +1074,54 @@ export function CoverageJourneyClient({
                   <p key={limitation}>• {limitation}</p>
                 ))}
               </div>
+              {mapping && selectedEntry && (
+                <div className="rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 p-4 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="font-extrabold text-emerald-950 dark:text-emerald-100 text-sm">
+                        📄 Minuta de Solicitação de Adesão (Carona) Pronta
+                      </p>
+                      <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                        Documento oficial fundamentado no Art. 86 da Lei 14.133/2021 pronto para o SEI / NUP.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!mapping || !selectedEntry) return;
+                        const unitPrices = entries.map((e) => Number(e.instrument.unitValue)).filter((v) => !isNaN(v) && v > 0);
+                        const minPriceInSet = unitPrices.length ? Math.min(...unitPrices) : undefined;
+                        const scoreResult = calculateArpMulticriteriaScore(
+                          selectedEntry.instrument,
+                          synthesis?.deficit ?? 0,
+                          unitRecords.filter((r) => r.acquisitionInstrumentId === selectedEntry.instrument.id || r.numeroAta === selectedEntry.instrument.externalReference),
+                          minPriceInSet
+                        );
+                        const doc = generateAdhesionDocument({
+                          needId: need.id,
+                          persistentCode: need.persistentCode,
+                          itemName: item.name,
+                          variantLabel: variant.label,
+                          quantityRequested: need.quantityRequested,
+                          deficit: projection.deficit,
+                          organizationName,
+                          mapping,
+                          instrument: selectedEntry.instrument,
+                          unitRecord: unitRecords.find((r) => r.acquisitionInstrumentId === selectedEntry.instrument.id || r.numeroAta === selectedEntry.instrument.externalReference),
+                          scoreResult,
+                          justification,
+                        });
+                        setDocContent(doc);
+                        setShowDocModal(true);
+                      }}
+                      className="shrink-0 inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3.5 py-2 shadow-sm transition-colors"
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                      Visualizar Minuta de Adesão
+                    </button>
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={registerPossibleCoverage}
@@ -1139,6 +1190,57 @@ export function CoverageJourneyClient({
           </div>
         </details>
       </Card>
+
+      {showDocModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
+              <div>
+                <h3 className="font-extrabold text-lg text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-emerald-600" />
+                  Minuta de Solicitação de Adesão à Ata (Carona)
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Fundamentação: Art. 86, §§ 2º, 3º e 4º da Lei 14.133/2021</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDocModal(false)}
+                className="rounded p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="my-4 flex-1 overflow-y-auto rounded bg-zinc-50 dark:bg-zinc-950 p-4 border border-zinc-200 dark:border-zinc-800 font-mono text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap leading-relaxed select-all">
+              {docContent}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+              <span className="text-xs text-zinc-500">Pronto para cópia rápida e instrução no SEI / NUP</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(docContent);
+                    setMessage("Minuta copiada para a área de transferência com sucesso!");
+                    setShowDocModal(false);
+                  }}
+                  className="rounded bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white transition-colors"
+                >
+                  📋 Copiar Texto da Minuta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDocModal(false)}
+                  className="rounded border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

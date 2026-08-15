@@ -85,6 +85,7 @@ export default function Home() {
             </motion.section>
           </div>
         </section>
+        </section>
       </main>
     </PageTransition>
   );

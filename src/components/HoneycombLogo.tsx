@@ -85,8 +85,9 @@ function GhostHex({ q, r, idx, animationsEnabled }: GhostHexProps) {
   const { x, y } = hexToPercent(q, r);
 
   // Parâmetros determinísticos para fade (evita SSR mismatch)
-  const duration = 5 + (idx % 5) * 1.8;          // 5 – 12.2 s
-  const delay = ((idx * 1.7) % 8);                // 0 – ~8 s
+  // Agilizado em +40% de velocidade (duração e delay divididos por 1.4)
+  const duration = (5 + (idx % 5) * 1.8) / 1.4;   // ~3.57 – 8.71 s
+  const delay = ((idx * 1.7) % 8) / 1.4;          // 0 – ~5.7 s
   const peak = 0.06 + (idx % 4) * 0.02;           // 0.06 – 0.12
 
   const posStyle: React.CSSProperties = {
@@ -159,7 +160,7 @@ export function HoneycombLogo() {
 
   return (
     <div
-      className="relative w-[min(70vw,360px)] lg:w-[460px]"
+      className="relative w-[min(55vw,240px)] lg:w-[310px]"
       style={{ aspectRatio: "961 / 1152" }}
     >
       {/* Logotipos fantasma da colmeia */}
@@ -180,7 +181,7 @@ export function HoneycombLogo() {
           tone="light"
           priority
           className="h-auto w-full drop-shadow-[0_20px_55px_rgba(255,255,255,0.18)]"
-          sizes="(max-width: 640px) 70vw, (max-width: 1024px) 360px, 460px"
+          sizes="(max-width: 640px) 55vw, (max-width: 1024px) 240px, 310px"
         />
       </div>
     </div>
