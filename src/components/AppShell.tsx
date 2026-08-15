@@ -9,6 +9,7 @@ import {
   QrCode,
   Search,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { DemoBanner } from "@/components/DemoBanner";
@@ -20,6 +21,7 @@ import { redirect } from "next/navigation";
 import { getUserProfile } from "@/app/actions/onboarding";
 
 const nav = [
+  { href: "/assistente", label: "Assistente IA", icon: Sparkles },
   { href: "/painel", label: "Painel", icon: Gauge },
   { href: "/necessidades", label: "Necessidades", icon: ClipboardList },
   { href: "/analises/materiais", label: "CATMAT e Atas", icon: Search },
