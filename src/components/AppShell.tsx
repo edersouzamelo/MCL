@@ -10,6 +10,7 @@ import {
   Search,
   ClipboardList,
   Sparkles,
+  Wallet,
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { DemoBanner } from "@/components/DemoBanner";
@@ -26,6 +27,7 @@ const nav = [
   { href: "/necessidades", label: "Necessidades", icon: ClipboardList },
   { href: "/analises/materiais", label: "CATMAT e Atas", icon: Search },
   { href: "/aquisicoes", label: "Aquisicoes", icon: Landmark },
+  { href: "/creditos", label: "Créditos", icon: Wallet },
   { href: "/scanner", label: "Scanner", icon: QrCode },
   { href: "/conectores", label: "Conectores", icon: Activity },
   { href: "/divergencias", label: "Divergencias", icon: AlertTriangle },

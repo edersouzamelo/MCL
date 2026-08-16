@@ -16,9 +16,9 @@ const metaNav = [
     submenus: [ { label: "Registrar Demanda", href: "/necessidades" }, { label: "CATMAT e Atas", href: "/analises/materiais" } ]
   },
   { 
-    href: "/conectores?dominio=orcamento", label: "Crédito", icon: CreditCard, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "group-hover:border-emerald-500/50", shadow: "group-hover:shadow-emerald-500/20",
+    href: "/creditos", label: "Crédito", icon: CreditCard, color: "text-emerald-400", bg: "bg-emerald-400/10", border: "group-hover:border-emerald-500/50", shadow: "group-hover:shadow-emerald-500/20",
     domain: "Orçamento e finanças" as SourceSystemDomain,
-    submenus: [ { label: "Painel Geral", href: "/painel" }, { label: "Execução Orçamentária", href: "/painel" } ]
+    submenus: [ { label: "Gestão de Créditos", href: "/creditos" }, { label: "Tesouro Gerencial", href: "/creditos" } ]
   },
   { 
     href: "/conectores?dominio=aquisicoes", label: "Aquisição", icon: ShoppingCart, color: "text-amber-400", bg: "bg-amber-400/10", border: "group-hover:border-amber-500/50", shadow: "group-hover:shadow-amber-500/20",
