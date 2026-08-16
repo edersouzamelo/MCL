@@ -26,9 +26,9 @@ describe("Motor RAG do Assistente IA MCL", () => {
     expect(res.answer).toContain("15 pts");
   });
 
-  it("retorna introdução e sugestões para saudações ou dúvidas gerais", () => {
+  it("sintetiza resposta em PNL para qualquer pergunta geral ou saudação", () => {
     const res = queryMclRagEngine("Olá, como você pode me ajudar?");
-    expect(res.answer).toContain("Assistente de Inteligência Logística MCL");
+    expect(res.answer).toContain("Resposta da Inteligência Logística MCL");
     expect(res.suggestedQuestions.length).toBe(3);
   });
 });

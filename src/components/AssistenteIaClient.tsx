@@ -19,8 +19,9 @@ export function AssistenteIaClient() {
   const [copied, setCopied] = useState(false);
 
   const handleSearch = async (queryText?: string) => {
-    const q = queryText || prompt;
-    if (!q.trim()) return;
+    const q = (queryText !== undefined ? queryText : prompt).trim();
+    if (!q) return;
+
     setLoading(true);
     setPrompt(q);
 
@@ -32,6 +33,11 @@ export function AssistenteIaClient() {
       });
       const data = await res.json();
       setResponse(data);
+
+      setTimeout(() => {
+        const el = document.getElementById("rag-response-container");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 100);
     } catch {
       setResponse({
         answer: "Erro ao comunicar com o assistente. Por favor, tente novamente.",
@@ -112,7 +118,7 @@ export function AssistenteIaClient() {
 
       {/* Área de Resposta Gerada pelo Motor RAG */}
       {response && (
-        <div className="max-w-3xl mx-auto rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl p-6 sm:p-8 space-y-6 transition-all duration-300">
+        <div id="rag-response-container" className="max-w-3xl mx-auto rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl p-6 sm:p-8 space-y-6 transition-all duration-300">
           <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
