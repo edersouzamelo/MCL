@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { HoneycombLogo } from "@/components/HoneycombLogo";
+import { BrandLogo } from "@/components/BrandLogo";
 import { Sparkles, Search, Send, BookOpen, ExternalLink, Copy, Check, RefreshCw, HelpCircle } from "lucide-react";
 import type { RagResponse } from "@/modules/ai/rag-engine";
 
@@ -45,18 +45,18 @@ export function AssistenteIaClient() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl py-6 sm:py-10 space-y-8">
+    <div className="mx-auto max-w-4xl py-6 sm:py-10 space-y-6 overflow-hidden">
       {/* Topo Centralizado — Logotipo MCL em Proporção Google */}
-      <div className="flex flex-col items-center justify-center text-center space-y-4">
-        <div className="relative w-44 sm:w-56 aspect-[961/1152] transition-transform duration-300 hover:scale-105">
-          <HoneycombLogo />
+      <div className="flex flex-col items-center justify-center text-center space-y-3">
+        <div className="p-3 rounded-2xl bg-white/5 border border-white/10 shadow-lg backdrop-blur-md transition-transform duration-300 hover:scale-105">
+          <BrandLogo tone="light" className="h-14 sm:h-16 w-auto" priority />
         </div>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight flex items-center justify-center gap-2">
-            <Sparkles className="h-6 w-6 text-emerald-500 animate-pulse" />
+          <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight flex items-center justify-center gap-2">
+            <Sparkles className="h-5 w-5 text-emerald-500 animate-pulse" />
             Assistente de Inteligência Logística
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1 max-w-lg">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-md mx-auto">
             RAG com base de conhecimento sobre a Lei nº 14.133/2021, catálogo CATMAT, Atas do Compras.gov.br e dados operacionais da Força.
           </p>
         </div>
