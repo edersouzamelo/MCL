@@ -1,14 +1,23 @@
 import {
   CreditRecord,
   CommitmentRecord,
+  CreditNote,
+  RPNPRecord,
+  SrpProcurement,
+  BudgetGoal,
   BudgetExecutionSummary,
   ExpenseNatureBreakdown,
   ResourceSourceBreakdown,
   CreditFilterOptions,
+  ModuleOwnerType,
 } from "./types";
 import {
   demoCreditRecords,
   demoCommitmentRecords,
+  demoCreditNotes,
+  demoRPNPs,
+  demoSrpProcurements,
+  demoBudgetGoals,
   demoMonthlyExecution,
   demoCoverageFinancialMatrix,
 } from "./demo-data";
@@ -53,8 +62,43 @@ export function getCreditRecords(filters?: CreditFilterOptions): CreditRecord[] 
   return records;
 }
 
-export function getCommitmentRecords(filters?: CreditFilterOptions): CommitmentRecord[] {
+export function getCreditNotes(ownerType: ModuleOwnerType, filters?: CreditFilterOptions): CreditNote[] {
+  let notes = demoCreditNotes.filter((nc) => nc.ownerType === ownerType);
+
+  if (!filters) return notes;
+
+  if (filters.ugCode) {
+    notes = notes.filter((nc) => nc.ugReceiverCode === filters.ugCode || nc.ugIssuerCode === filters.ugCode);
+  }
+
+  if (filters.expenseNature) {
+    notes = notes.filter((nc) => nc.expenseNature === filters.expenseNature);
+  }
+
+  if (filters.resourceSource) {
+    notes = notes.filter((nc) => nc.resourceSource === filters.resourceSource);
+  }
+
+  if (filters.searchQuery) {
+    const q = filters.searchQuery.toLowerCase().trim();
+    notes = notes.filter(
+      (nc) =>
+        nc.ncCode.toLowerCase().includes(q) ||
+        nc.persistentCode.toLowerCase().includes(q) ||
+        nc.ugReceiverName.toLowerCase().includes(q) ||
+        nc.planningCode.toLowerCase().includes(q)
+    );
+  }
+
+  return notes;
+}
+
+export function getCommitmentRecords(filters?: CreditFilterOptions, ownerType?: ModuleOwnerType): CommitmentRecord[] {
   let commitments = [...demoCommitmentRecords];
+
+  if (ownerType) {
+    commitments = commitments.filter((c) => c.ownerType === ownerType);
+  }
 
   if (!filters) return commitments;
 
@@ -83,6 +127,59 @@ export function getCommitmentRecords(filters?: CreditFilterOptions): CommitmentR
   }
 
   return commitments;
+}
+
+export function getRPNPs(ownerType: ModuleOwnerType, filters?: CreditFilterOptions): RPNPRecord[] {
+  let rpnps = demoRPNPs.filter((r) => r.ownerType === ownerType);
+
+  if (!filters) return rpnps;
+
+  if (filters.ugCode) {
+    rpnps = rpnps.filter((r) => r.ugCode === filters.ugCode);
+  }
+
+  if (filters.expenseNature) {
+    rpnps = rpnps.filter((r) => r.expenseNature === filters.expenseNature);
+  }
+
+  if (filters.searchQuery) {
+    const q = filters.searchQuery.toLowerCase().trim();
+    rpnps = rpnps.filter(
+      (r) =>
+        r.rpnpCode.toLowerCase().includes(q) ||
+        r.supplierName.toLowerCase().includes(q) ||
+        r.ugName.toLowerCase().includes(q)
+    );
+  }
+
+  return rpnps;
+}
+
+export function getSrpProcurements(filters?: CreditFilterOptions): SrpProcurement[] {
+  let srps = [...demoSrpProcurements];
+
+  if (!filters) return srps;
+
+  if (filters.ugCode) {
+    srps = srps.filter((s) => s.managingUgCode === filters.ugCode);
+  }
+
+  if (filters.searchQuery) {
+    const q = filters.searchQuery.toLowerCase().trim();
+    srps = srps.filter(
+      (s) =>
+        s.ataNumber.toLowerCase().includes(q) ||
+        s.itemDescription.toLowerCase().includes(q) ||
+        s.supplierName.toLowerCase().includes(q) ||
+        s.catmatCode.includes(q)
+    );
+  }
+
+  return srps;
+}
+
+export function getBudgetGoals(category: "EXERCICIO" | "RPNP"): BudgetGoal[] {
+  return demoBudgetGoals.filter((g) => g.category === category);
 }
 
 export function calculateBudgetSummary(filters?: CreditFilterOptions): BudgetExecutionSummary {

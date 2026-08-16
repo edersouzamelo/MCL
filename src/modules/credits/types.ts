@@ -6,35 +6,30 @@ export type BudgetExecutionStatus = "DISPONIVEL" | "EM_EXECUCAO" | "COMPROMETIDO
 
 export type CommitmentStatus = "EMITIDO" | "LIQUIDADO" | "PAGO" | "CANCELADO" | "PARCIALMENTE_LIQUIDADO";
 
-export interface BudgetProgram {
-  code: string; // PTRES (ex: 172948)
-  actionCode: string; // Ação Orçamentária (ex: 2000, 2021)
-  name: string;
-  subprogram: string;
-}
+export type ModuleOwnerType = "REQUISITANTE" | "RPCM";
 
 export interface CreditRecord {
   id: string;
-  persistentCode: string; // ex: MCL-CRED-2026-0001
-  ugCode: string; // UG Emitente (ex: 160001 - COLOG)
-  ugName: string; // Nome da UG
+  persistentCode: string;
+  ugCode: string;
+  ugName: string;
   organizationId: string;
-  financialYear: number; // 2026
-  planningCode: string; // PI - Plano Interno
-  budgetProgramCode: string; // PTRES
+  financialYear: number;
+  planningCode: string;
+  budgetProgramCode: string;
   budgetProgramName: string;
-  expenseNature: ExpenseNatureCode; // ND (ex: 339030 - Material de Consumo)
+  expenseNature: ExpenseNatureCode;
   expenseNatureLabel: string;
-  resourceSource: ResourceSourceCode; // Fonte (ex: 0100 - Recursos Ordinários)
+  resourceSource: ResourceSourceCode;
   resourceSourceLabel: string;
-  initialAmount: number; // Dotação Inicial
-  supplementedAmount: number; // Suplementação (+)
-  canceledAmount: number; // Anulação (-)
-  totalAmount: number; // Dotação Atualizada (Inicial + Suplementado - Anulado)
-  committedAmount: number; // Empenhado
-  liquidatedAmount: number; // Liquidado
-  paidAmount: number; // Pago
-  availableAmount: number; // Saldo Disponível (Dotação Atualizada - Empenhado)
+  initialAmount: number;
+  supplementedAmount: number;
+  canceledAmount: number;
+  totalAmount: number;
+  committedAmount: number;
+  liquidatedAmount: number;
+  paidAmount: number;
+  availableAmount: number;
   status: BudgetExecutionStatus;
   expiresAt: string;
   sourceSystem: string;
@@ -44,30 +39,100 @@ export interface CreditRecord {
   recordedAt: string;
 }
 
-export interface CommitmentRecord {
+export interface CreditNote {
   id: string;
-  neCode: string; // Código da NE no SIAFI (ex: 2026NE000123)
+  ncCode: string; // ex: 2026NC000412
   persistentCode: string;
-  creditId: string;
-  ugCode: string;
-  ugName: string;
-  acquisitionInstrumentId?: string; // Vínculo com ARP ou Contrato
-  acquisitionInstrumentRef?: string; // ex: ARP-2026-0001
-  needId?: string; // Vínculo com Necessidade MCL
-  needItemDescription?: string; // ex: Coturno de Couro Preto Tam 42
-  supplierName: string; // Favorecido
-  supplierDocument: string; // CNPJ / CPF
+  ownerType: ModuleOwnerType; // REQUISITANTE ou RPCM
+  ugIssuerCode: string; // UG Emitente
+  ugIssuerName: string;
+  ugReceiverCode: string; // UG Favorecida / Recebedora
+  ugReceiverName: string;
+  planningCode: string; // PI - Plano Interno
+  budgetProgramCode: string; // PTRES
+  budgetProgramName: string;
   expenseNature: ExpenseNatureCode;
   resourceSource: ResourceSourceCode;
-  committedAmount: number; // Valor Empenhado
-  liquidatedAmount: number; // Valor Liquidado
-  paidAmount: number; // Valor Pago
-  balanceAmount: number; // Saldo do Empenho (Empenhado - Pago)
+  amount: number; // Valor da NC
+  availableBalance: number; // Saldo Disponível na NC
+  issuedAt: string;
+  status: string;
+  sourceSystem: string;
+}
+
+export interface CommitmentRecord {
+  id: string;
+  neCode: string; // ex: 2026NE000123
+  persistentCode: string;
+  ownerType: ModuleOwnerType; // REQUISITANTE ou RPCM
+  creditId?: string;
+  ncCode?: string;
+  ugCode: string;
+  ugName: string;
+  acquisitionInstrumentId?: string;
+  acquisitionInstrumentRef?: string; // ex: ARP-2026-0001
+  needId?: string;
+  needItemDescription?: string;
+  supplierName: string;
+  supplierDocument: string;
+  expenseNature: ExpenseNatureCode;
+  resourceSource: ResourceSourceCode;
+  committedAmount: number;
+  liquidatedAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
   issuedAt: string;
   status: CommitmentStatus;
-  sourceSystem: string; // SIAFI_STN
+  sourceSystem: string;
   sourceRecordId: string;
   confidence: number;
+}
+
+export interface RPNPRecord {
+  id: string;
+  rpnpCode: string; // ex: 2025NE000840 (Inscrito como RPNP em 2026)
+  ownerType: ModuleOwnerType; // REQUISITANTE ou RPCM
+  enrollmentYear: number; // 2025
+  ugCode: string;
+  ugName: string;
+  supplierName: string;
+  supplierDocument: string;
+  expenseNature: ExpenseNatureCode;
+  resourceSource: ResourceSourceCode;
+  enrolledAmount: number; // Valor Inscrito
+  liquidatedAmount: number; // Valor Liquidado em 2026
+  paidAmount: number; // Valor Pago em 2026
+  canceledAmount: number; // Valor Cancelado
+  balanceAmount: number; // Saldo a Pagar de RPNP
+  status: "EM_LIQUIDACAO" | "LIQUIDADO" | "PAGO" | "CANCELADO";
+}
+
+export interface SrpProcurement {
+  id: string;
+  ataNumber: string; // ex: ARP-2026-0012-COLOG
+  processNumber: string; // ex: PE 09/2026
+  managingUgCode: string; // UG Gerenciadora da Ata
+  managingUgName: string;
+  catmatCode: string;
+  itemDescription: string;
+  supplierName: string;
+  supplierDocument: string;
+  unitValue: number;
+  registeredQuantity: number;
+  committedQuantity: number;
+  adhesionBalanceQuantity: number; // Saldo para Carona/Adesão
+  validUntil: string;
+  status: "VIGENTE" | "ENCERRADA" | "CANCELADA";
+}
+
+export interface BudgetGoal {
+  id: string;
+  category: "EXERCICIO" | "RPNP";
+  title: string;
+  targetAmount: number; // Meta em R$
+  achievedAmount: number; // Realizado em R$
+  percentageAchieved: number; // %
+  status: "NO_RITMO" | "ATENCAO" | "CRITICO" | "CONCLUIDO";
 }
 
 export interface BudgetExecutionSummary {
@@ -75,13 +140,13 @@ export interface BudgetExecutionSummary {
   totalInitial: number;
   totalSupplemented: number;
   totalCanceled: number;
-  totalUpdated: number; // Dotação Atualizada
-  totalCommitted: number; // Total Empenhado
-  totalLiquidated: number; // Total Liquidado
-  totalPaid: number; // Total Pago
-  totalAvailable: number; // Saldo Disponível Total
-  executionPercentageCommitted: number; // % Empenhado / Dotação Atualizada
-  executionPercentagePaid: number; // % Pago / Dotação Atualizada
+  totalUpdated: number;
+  totalCommitted: number;
+  totalLiquidated: number;
+  totalPaid: number;
+  totalAvailable: number;
+  executionPercentageCommitted: number;
+  executionPercentagePaid: number;
   countCredits: number;
   countCommitments: number;
   alertsCount: number;
@@ -107,7 +172,7 @@ export interface ResourceSourceBreakdown {
 }
 
 export interface MonthlyExecutionPoint {
-  month: string; // "Jan", "Fev", "Mar", etc.
+  month: string;
   empenhado: number;
   liquidado: number;
   pago: number;
@@ -118,12 +183,12 @@ export interface CoverageFinancialMatrixItem {
   needCode: string;
   itemDescription: string;
   requestedQuantity: number;
-  estimatedTotalValue: number; // Necessidade em R$
+  estimatedTotalValue: number;
   creditPersistentCode?: string;
   creditAvailableAmount?: number;
   neCode?: string;
   neCommittedAmount?: number;
-  financialCoveragePercentage: number; // % do valor financeiro coberto
+  financialCoveragePercentage: number;
   status: "COBERTO" | "PARCIALMENTE_COBERTO" | "SEM_RECURSO" | "AGUARDANDO_EMPENHO";
 }
 
