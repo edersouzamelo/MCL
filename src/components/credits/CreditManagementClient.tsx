@@ -211,7 +211,7 @@ export function CreditManagementClient() {
 
           <div className="text-right hidden sm:block border-l border-zinc-800 pl-3">
             <span className="text-xs text-zinc-500 block">Atualizado em</span>
-            <span className="text-sm font-bold text-emerald-400">17/08/2026 17:33</span>
+            <span className="text-sm font-bold text-emerald-400">17/08/2026 18:10</span>
           </div>
         </div>
       </div>
