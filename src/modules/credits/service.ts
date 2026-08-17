@@ -21,6 +21,12 @@ import {
   demoMonthlyExecution,
   demoCoverageFinancialMatrix,
 } from "./demo-data";
+import {
+  hasIngestedSiafiData,
+  mapSiafiToCommitmentRecords,
+  mapSiafiToRPNPRecords,
+  mapSiafiToCreditNotes,
+} from "../connectors/siafi/store";
 
 export function getCreditRecords(filters?: CreditFilterOptions): CreditRecord[] {
   let records = [...demoCreditRecords];
@@ -63,7 +69,9 @@ export function getCreditRecords(filters?: CreditFilterOptions): CreditRecord[] 
 }
 
 export function getCreditNotes(ownerType: ModuleOwnerType, filters?: CreditFilterOptions): CreditNote[] {
-  let notes = demoCreditNotes.filter((nc) => nc.ownerType === ownerType);
+  let notes = hasIngestedSiafiData()
+    ? mapSiafiToCreditNotes().filter((nc) => nc.ownerType === ownerType)
+    : demoCreditNotes.filter((nc) => nc.ownerType === ownerType);
 
   if (!filters) return notes;
 
@@ -94,7 +102,7 @@ export function getCreditNotes(ownerType: ModuleOwnerType, filters?: CreditFilte
 }
 
 export function getCommitmentRecords(filters?: CreditFilterOptions, ownerType?: ModuleOwnerType): CommitmentRecord[] {
-  let commitments = [...demoCommitmentRecords];
+  let commitments = hasIngestedSiafiData() ? mapSiafiToCommitmentRecords() : [...demoCommitmentRecords];
 
   if (ownerType) {
     commitments = commitments.filter((c) => c.ownerType === ownerType);
@@ -119,9 +127,9 @@ export function getCommitmentRecords(filters?: CreditFilterOptions, ownerType?: 
     commitments = commitments.filter(
       (c) =>
         c.neCode.toLowerCase().includes(q) ||
-        c.persistentCode.toLowerCase().includes(q) ||
+        (c.persistentCode && c.persistentCode.toLowerCase().includes(q)) ||
         c.supplierName.toLowerCase().includes(q) ||
-        c.supplierDocument.toLowerCase().includes(q) ||
+        (c.supplierDocument && c.supplierDocument.toLowerCase().includes(q)) ||
         (c.needItemDescription && c.needItemDescription.toLowerCase().includes(q))
     );
   }
@@ -130,7 +138,9 @@ export function getCommitmentRecords(filters?: CreditFilterOptions, ownerType?: 
 }
 
 export function getRPNPs(ownerType: ModuleOwnerType, filters?: CreditFilterOptions): RPNPRecord[] {
-  let rpnps = demoRPNPs.filter((r) => r.ownerType === ownerType);
+  let rpnps = hasIngestedSiafiData()
+    ? mapSiafiToRPNPRecords().filter((r) => r.ownerType === ownerType)
+    : demoRPNPs.filter((r) => r.ownerType === ownerType);
 
   if (!filters) return rpnps;
 
@@ -146,7 +156,7 @@ export function getRPNPs(ownerType: ModuleOwnerType, filters?: CreditFilterOptio
     const q = filters.searchQuery.toLowerCase().trim();
     rpnps = rpnps.filter(
       (r) =>
-        r.rpnpCode.toLowerCase().includes(q) ||
+        (r.rpnpCode && r.rpnpCode.toLowerCase().includes(q)) ||
         r.supplierName.toLowerCase().includes(q) ||
         r.ugName.toLowerCase().includes(q)
     );

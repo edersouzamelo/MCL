@@ -110,10 +110,14 @@ export function parseSiafiBuffer(buffer: Buffer, filename: string): SiafiReportR
   return records;
 }
 
+import { setIngestedSiafiRecords } from "./store";
+
 export function processSiafiIngestion(
   records: SiafiReportRecord[],
   filename: string
 ): SiafiIngestionResult {
+  setIngestedSiafiRecords(records, filename);
+
   const creditsUpdatedCount = records.length;
   const commitmentsUpdatedCount = records.filter((r) => !r.isRPNP).length;
   const rpnpsUpdatedCount = records.filter((r) => r.isRPNP).length;
