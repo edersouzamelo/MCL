@@ -46,6 +46,7 @@ import {
 import { CreditFilterBar } from "./CreditFilterBar";
 import { CreditDashboardCharts } from "./CreditDashboardCharts";
 import { CommitmentDetailModal } from "./CommitmentDetailModal";
+import { TechnicalGuideModal } from "./TechnicalGuideModal";
 
 export type PowerBiSubpage =
   | "capa"
@@ -73,6 +74,7 @@ export function CreditManagementClient() {
     financialYear: 2026,
   });
   const [selectedCommitment, setSelectedCommitment] = useState<CommitmentRecord | null>(null);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const summary: BudgetExecutionSummary = calculateBudgetSummary(filters);
   const credits: CreditRecord[] = getCreditRecords(filters);
@@ -121,9 +123,17 @@ export function CreditManagementClient() {
         </div>
 
         <div className="relative z-10 flex items-center gap-3">
-          <div className="text-right hidden sm:block">
+          <button
+            onClick={() => setIsGuideOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+          >
+            <BookOpen className="h-4 w-4 text-emerald-400" />
+            <span>Guia de Orientação Técnica (Outras OMs)</span>
+          </button>
+
+          <div className="text-right hidden sm:block border-l border-zinc-800 pl-3">
             <span className="text-xs text-zinc-500 block">Atualizado em</span>
-            <span className="text-sm font-bold text-emerald-400">15/08/2026 16:38</span>
+            <span className="text-sm font-bold text-emerald-400">17/08/2026 15:13</span>
           </div>
         </div>
       </div>
@@ -821,6 +831,12 @@ export function CreditManagementClient() {
       <CommitmentDetailModal
         commitment={selectedCommitment}
         onClose={() => setSelectedCommitment(null)}
+      />
+
+      {/* Modal do Guia de Orientação Técnica (Replicação para outras OMs) */}
+      <TechnicalGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
       />
     </div>
   );
