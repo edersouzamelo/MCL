@@ -47,6 +47,7 @@ import { CreditFilterBar } from "./CreditFilterBar";
 import { CreditDashboardCharts } from "./CreditDashboardCharts";
 import { CommitmentDetailModal } from "./CommitmentDetailModal";
 import { TechnicalGuideModal } from "./TechnicalGuideModal";
+import { Upload, RefreshCw } from "lucide-react";
 
 export type PowerBiSubpage =
   | "capa"
@@ -75,6 +76,48 @@ export function CreditManagementClient() {
   });
   const [selectedCommitment, setSelectedCommitment] = useState<CommitmentRecord | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileUploadClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadMessage("Processando planilha do Tesouro Gerencial...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/connectors/siafi/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setUploadMessage(
+          `🚀 Sucesso! Planilha '${file.name}' lida com ${data.result.totalRecordsProcessed} registros!`
+        );
+        // Force state update to re-render 10 subpages
+        setFilters((prev) => ({ ...prev }));
+      } else {
+        setUploadMessage(`⚠️ Erro: ${data.error || "Falha ao ler arquivo"}`);
+      }
+    } catch (err: any) {
+      setUploadMessage(`⚠️ Erro na transmissão: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const summary: BudgetExecutionSummary = calculateBudgetSummary(filters);
   const credits: CreditRecord[] = getCreditRecords(filters);
@@ -100,6 +143,28 @@ export function CreditManagementClient() {
 
   return (
     <div className="space-y-6">
+      {/* Hidden File Input for TG Spreadsheet Ingestion */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".xlsx,.xls,.csv"
+        className="hidden"
+      />
+
+      {/* Upload Notification Banner */}
+      {uploadMessage && (
+        <div className="bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between shadow-lg">
+          <span>{uploadMessage}</span>
+          <button
+            onClick={() => setUploadMessage(null)}
+            className="text-emerald-400 hover:text-white font-bold ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-emerald-500/10 to-transparent pointer-events-none" />
@@ -122,18 +187,31 @@ export function CreditManagementClient() {
           </p>
         </div>
 
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10 flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleFileUploadClick}
+            disabled={isUploading}
+            className="px-3.5 py-2 rounded-xl bg-emerald-500 text-zinc-950 hover:bg-emerald-400 font-bold text-xs transition-all flex items-center gap-2 shadow-md disabled:opacity-50"
+          >
+            {isUploading ? (
+              <RefreshCw className="h-4 w-4 animate-spin text-zinc-950" />
+            ) : (
+              <Upload className="h-4 w-4 text-zinc-950" />
+            )}
+            <span>{isUploading ? "Processando..." : "Carregar Planilha TG (.xlsx)"}</span>
+          </button>
+
           <button
             onClick={() => setIsGuideOpen(true)}
             className="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
           >
             <BookOpen className="h-4 w-4 text-emerald-400" />
-            <span>Guia de Orientação Técnica (Outras OMs)</span>
+            <span>Guia Técnico (Outras OMs)</span>
           </button>
 
           <div className="text-right hidden sm:block border-l border-zinc-800 pl-3">
             <span className="text-xs text-zinc-500 block">Atualizado em</span>
-            <span className="text-sm font-bold text-emerald-400">17/08/2026 15:13</span>
+            <span className="text-sm font-bold text-emerald-400">17/08/2026 17:33</span>
           </div>
         </div>
       </div>
