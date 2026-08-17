@@ -18,10 +18,10 @@ describe("Credit Module - Service Unit Tests", () => {
   });
 
   it("filtra créditos por UG com precisão", () => {
-    const cologCredits = getCreditRecords({ ugCode: "160001" });
+    const cologCredits = getCreditRecords({ ugCode: "160136" });
     expect(cologCredits.length).toBeGreaterThan(0);
     cologCredits.forEach((c) => {
-      expect(c.ugCode).toBe("160001");
+      expect(c.ugCode).toBe("160136");
     });
   });
 
@@ -34,10 +34,10 @@ describe("Credit Module - Service Unit Tests", () => {
   });
 
   it("filtra notas de empenho por busca textual", () => {
-    const commitments = getCommitmentRecords({ searchQuery: "CALCADOS" });
+    const commitments = getCommitmentRecords({ searchQuery: "PETROBRAS" });
     expect(commitments.length).toBeGreaterThan(0);
     commitments.forEach((c) => {
-      expect(c.supplierName.toUpperCase()).toContain("CALCADOS");
+      expect(c.supplierName.toUpperCase()).toContain("PETROBRAS");
     });
   });
 

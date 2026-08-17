@@ -29,7 +29,7 @@ describe("Credit Module - API Route Unit Tests", () => {
   });
 
   it("GET /api/creditos/empenhos retorna as notas de empenho", async () => {
-    const req = new NextRequest("http://localhost:3000/api/creditos/empenhos?q=CALCADOS");
+    const req = new NextRequest("http://localhost:3000/api/creditos/empenhos?q=PETROBRAS");
     const res = await getEmpenhosHandler(req);
     expect(res.status).toBe(200);
 

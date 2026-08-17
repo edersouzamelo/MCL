@@ -60,7 +60,7 @@ export function mapSiafiToCommitmentRecords(): CommitmentRecord[] {
         paidAmount: r.amount * 0.75,
         balanceAmount: r.amount * 0.2,
         issuedAt: "2026-02-10",
-        status: "EMPENHADO_TOTAL" as CommitmentStatus,
+        status: "EMITIDO" as CommitmentStatus,
         sourceSystem: "SIAFI_TESOURO_GERENCIAL",
         sourceRecordId: `tg-${r.neCode}`,
         confidence: 1.0,
