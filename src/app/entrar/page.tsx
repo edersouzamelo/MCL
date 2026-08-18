@@ -1,60 +1,67 @@
 import Link from "next/link";
-import { ArrowLeft, LockKeyhole } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
-import { DemoBanner } from "@/components/DemoBanner";
 import { LoginForm } from "@/components/LoginForm";
-import { Card } from "@/components/ui";
 import { PageTransition } from "@/components/PageTransition";
+
+export const metadata = {
+  title: "Acesso ao sistema — MCL",
+  description: "Autenticação do ambiente demonstrativo do Modelo de Continuidade Logística.",
+};
 
 export default function LoginPage() {
   return (
     <PageTransition>
-      <div className="min-h-screen relative flex flex-col">
-        {/* Background Image with Veil */}
-        <div
-          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed"
-          style={{ backgroundImage: "url('/bg.png')" }}
-        />
-        {/* Transluced Dark Veil */}
-        <div className="absolute inset-0 z-0 bg-zinc-950/60 backdrop-blur-sm" />
+      <div className="auth-shell">
+        <div className="auth-background" aria-hidden="true" />
+        <div className="auth-grid" aria-hidden="true" />
 
-        <div className="relative z-10">
-          <DemoBanner />
-        </div>
+        <header className="auth-topbar">
+          <Link href="/" className="auth-brand" aria-label="MCL — voltar à capa">
+            <strong>MCL</strong>
+            <span>Modelo de Continuidade Logística</span>
+          </Link>
+          <div className="auth-environment">
+            <span><i /> Ambiente demonstrativo</span>
+            <b>V0.9</b>
+          </div>
+        </header>
 
-        <main className="relative z-10 flex-1 grid place-items-center px-4 py-8">
-          <div className="w-full max-w-[440px]">
-            <Link href="/" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-zinc-300 hover:text-white transition-colors drop-shadow-md">
-              <ArrowLeft aria-hidden className="h-4 w-4" />
-              Voltar para a capa
-            </Link>
+        <main className="auth-layout">
+          <section className="auth-visual" aria-label="Modelo de Continuidade Logística">
+            <div className="auth-logo-wrap">
+              <BrandLogo tone="light" className="auth-main-logo" priority sizes="(max-width: 900px) 46vw, 520px" />
+              <span className="auth-side-code">AUTH — 01</span>
+            </div>
 
-            <Card className="p-6 bg-white dark:bg-zinc-900/95 backdrop-blur-md shadow-2xl border-white/20">
-              <div className="mb-6 flex items-start justify-between gap-4">
-                <div>
-                  <div className="mb-4 flex items-center gap-3">
-                    <BrandLogo className="h-12 w-12 shrink-0 drop-shadow-md" />
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-500">MCL Auth</p>
-                      <h1 className="text-2xl font-semibold text-zinc-950 dark:text-white">Acesso ao sistema</h1>
-                    </div>
-                  </div>
-                  <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                    Autenticação local do protótipo, sem vínculo com a identidade corporativa do Exército Brasileiro. Os perfis controlam somente funções demonstrativas e não atribuem competência administrativa.
-                  </p>
-                </div>
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
-                  <LockKeyhole aria-hidden className="h-5 w-5" />
-                </span>
-              </div>
+            <div className="auth-visual-copy">
+              <span>MCL / CONTINUIDADE LOGÍSTICA</span>
+              <h2>Informação preservada. <em>Acesso controlado.</em></h2>
+              <p>Um único ambiente para acompanhar a cadeia logística com contexto, rastreabilidade e origem.</p>
+            </div>
+          </section>
+
+          <section className="auth-access">
+            <div className="auth-panel">
+              <Link href="/" className="auth-back-link">
+                <ArrowLeft aria-hidden />
+                Voltar para a capa
+              </Link>
+
+              <header className="auth-panel-header">
+                <div className="auth-kicker"><span>MCL AUTH</span><i /></div>
+                <h1>Acesso ao sistema</h1>
+                <p>Autenticação do ambiente demonstrativo. Os perfis limitam funções de operação e preservam a origem das ações.</p>
+              </header>
 
               <LoginForm />
-            </Card>
 
-            <p className="mt-4 text-center text-xs leading-5 text-zinc-300 drop-shadow-md">
-              Ambiente demonstrativo. Os dados do piloto são sintéticos e não constituem sistema oficial.
-            </p>
-          </div>
+              <footer className="auth-panel-footer">
+                <i />
+                <span><strong>Ambiente demonstrativo</strong> — sem vínculo com a identidade corporativa do Exército Brasileiro.</span>
+              </footer>
+            </div>
+          </section>
         </main>
       </div>
     </PageTransition>
