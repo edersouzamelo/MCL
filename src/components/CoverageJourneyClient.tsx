@@ -942,7 +942,7 @@ export function CoverageJourneyClient({
               )}
               {entries.length > 0 && synthesis.currentAtaCount === 0 && (
                 <p className="rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-900 dark:text-blue-200">
-                  ℹ <strong>Nota de Vigência:</strong> Foram localizadas {entries.length} ata(s) no Compras.gov.br na janela consultada, porém suas vigências de 1 ano já expiraram antes da data de hoje ({new Date().toLocaleDateString("pt-BR")}). Para atas vigentes hoje, altere o filtro de período acima para <strong>"Últ. 6 meses"</strong>.
+                  ℹ <strong>Nota de Vigência:</strong> Foram localizadas {entries.length} ata(s) no Compras.gov.br na janela consultada, porém suas vigências de 1 ano já expiraram antes da data de hoje ({new Date().toLocaleDateString("pt-BR")}). Para atas vigentes hoje, altere o filtro de período acima para <strong>&ldquo;Últ. 6 meses&rdquo;</strong>.
                 </p>
               )}
               <dl className="grid grid-cols-2 gap-2 text-sm">

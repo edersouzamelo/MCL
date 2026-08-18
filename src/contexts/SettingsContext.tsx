@@ -22,6 +22,14 @@ interface SettingsContextData {
 
 const SettingsContext = createContext<SettingsContextData>({} as SettingsContextData);
 
+function applyVisualPreferences(theme: string, fontSize: FontSize, animationsEnabled: boolean) {
+  const root = document.documentElement;
+  root.classList.toggle("dark", theme === "dark");
+  root.dataset.mclTheme = theme;
+  root.dataset.mclFont = fontSize;
+  root.dataset.mclMotion = animationsEnabled ? "on" : "off";
+}
+
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
 
@@ -35,25 +43,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const localLang = (localStorage.getItem("mcl-lang") as Language) || "pt-BR";
     const localAnim = localStorage.getItem("mcl-anim") !== "false"; // Default is true
     const localFont = (localStorage.getItem("mcl-font") as FontSize) || "media";
-    const localTheme = localStorage.getItem("mcl_theme") || "light";
+    const localTheme = localStorage.getItem("mcl_theme") || "dark";
 
     setLanguage(localLang);
     setAnimationsEnabled(localAnim);
     setFontSize(localFont);
     setTheme(localTheme);
 
-    // Apply visual classes
-    const root = document.documentElement;
-    if (localTheme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-
-    root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
-    if (localFont === "pequena") root.classList.add("text-[14px]");
-    else if (localFont === "media") root.classList.add("text-[16px]");
-    else if (localFont === "grande") root.classList.add("text-[18px]");
+    applyVisualPreferences(localTheme, localFont, localAnim);
   }, []);
 
   // Fetch from server DB when user logs in/authenticates
@@ -71,18 +68,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem("mcl-font", serverPrefs.fontSize);
           localStorage.setItem("mcl_theme", serverPrefs.theme);
 
-          // Apply visual classes
-          const root = document.documentElement;
-          if (serverPrefs.theme === "dark") {
-            root.classList.add("dark");
-          } else {
-            root.classList.remove("dark");
-          }
-
-          root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
-          if (serverPrefs.fontSize === "pequena") root.classList.add("text-[14px]");
-          else if (serverPrefs.fontSize === "media") root.classList.add("text-[16px]");
-          else if (serverPrefs.fontSize === "grande") root.classList.add("text-[18px]");
+          applyVisualPreferences(serverPrefs.theme, serverPrefs.fontSize as FontSize, serverPrefs.animationsEnabled);
         }
       });
     }
@@ -99,6 +85,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const handleAnimationsChange = (enabled: boolean) => {
     setAnimationsEnabled(enabled);
     localStorage.setItem("mcl-anim", String(enabled));
+    applyVisualPreferences(theme, fontSize, enabled);
     if (status === "authenticated") {
       saveUserPreferences({ language, theme, fontSize, animationsEnabled: enabled });
     }
@@ -108,12 +95,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setFontSize(size);
     localStorage.setItem("mcl-font", size);
     
-    // Apply font size class to document
-    const root = document.documentElement;
-    root.classList.remove("text-[14px]", "text-[16px]", "text-[18px]");
-    if (size === "pequena") root.classList.add("text-[14px]");
-    else if (size === "media") root.classList.add("text-[16px]");
-    else if (size === "grande") root.classList.add("text-[18px]");
+    applyVisualPreferences(theme, size, animationsEnabled);
 
     if (status === "authenticated") {
       saveUserPreferences({ language, theme, fontSize: size, animationsEnabled });
@@ -123,11 +105,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme);
     localStorage.setItem("mcl_theme", newTheme);
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    applyVisualPreferences(newTheme, fontSize, animationsEnabled);
 
     if (status === "authenticated") {
       saveUserPreferences({ language, theme: newTheme, fontSize, animationsEnabled });

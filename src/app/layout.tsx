@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1e293b", // Slate 800 - azul acinzentado
+  themeColor: "#050c12",
 };
 
 export default function RootLayout({
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="pt-BR" className="dark h-full antialiased" data-mcl-font="media" data-mcl-motion="on" suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-zinc-950 text-white transition-colors duration-300">
         <Providers>{children}</Providers>
       </body>

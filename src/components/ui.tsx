@@ -12,20 +12,21 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 border-b border-zinc-200 dark:border-zinc-800 pb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+    <header className="mcl-page-header mb-8 border-b border-zinc-200 dark:border-zinc-800 pb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div className="space-y-1">
+        <span className="mcl-page-kicker">PLATAFORMA LOGÍSTICA</span>
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">{title}</h1>
         <p className="max-w-3xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{description}</p>
       </div>
       {action && <div className="shrink-0 flex items-center">{action}</div>}
-    </div>
+    </header>
   );
 }
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <section className={clsx(
-      "rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-5 shadow-sm hover:shadow-md transition-all duration-200",
+      "mcl-card rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-5 shadow-sm hover:shadow-md transition-all duration-200",
       className
     )}>
       {children}
@@ -36,7 +37,7 @@ export function Card({ children, className }: { children: React.ReactNode; class
 export function OperationalSurface({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={clsx(
-      "rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/40 backdrop-blur-md p-6 shadow-md shadow-zinc-100/50 dark:shadow-none",
+      "mcl-surface rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/40 backdrop-blur-md p-6 shadow-md shadow-zinc-100/50 dark:shadow-none",
       className
     )}>
       {children}
@@ -63,7 +64,7 @@ export function MetricCard({
   }[tone];
 
   return (
-    <Card className={clsx("border-l-4", color)}>
+    <Card className={clsx("mcl-metric-card border-l-4", color)}>
       <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{label}</p>
       <p className="mt-2 text-3xl font-extrabold text-zinc-950 dark:text-zinc-50">{value}</p>
       <p className="mt-1 text-sm text-zinc-650 dark:text-zinc-400">{detail}</p>
@@ -141,7 +142,7 @@ export function Timeline({ events }: { events: LogisticsEvent[] }) {
 
 export function InlineLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="font-semibold text-emerald-800 dark:text-emerald-500 underline-offset-4 hover:underline">
+    <Link href={href} className="mcl-inline-link font-semibold text-sky-700 dark:text-sky-400 underline-offset-4 hover:underline">
       {children}
     </Link>
   );
