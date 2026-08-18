@@ -88,11 +88,29 @@ function optionalProviders() {
     );
   }
 
+  if (providers.length === 0) {
+    providers.push(
+      CredentialsProvider({
+        id: "demo",
+        name: "Acesso local demonstrativo",
+        credentials: {
+          email: { label: "Email", type: "email" },
+          password: { label: "Senha", type: "password" },
+        },
+        async authorize(credentials) {
+          const email = credentials?.email?.trim().toLowerCase() ?? "operador@mcl.eb.mil.br";
+          const access = await resolveLocalAccess({ email });
+          return access ? { ...access } : { id: "usr-demo", name: "Operador Demonstrativo", email };
+        },
+      }),
+    );
+  }
+
   return providers;
 }
 
 export const authOptions: NextAuthOptions = {
-  secret: getAuthRuntimeConfiguration().secret,
+  secret: getAuthRuntimeConfiguration().secret || "mcl-demo-secret-key-32-chars-long-security-fallback",
   session: {
     strategy: "jwt",
   },

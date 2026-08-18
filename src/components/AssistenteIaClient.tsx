@@ -1,229 +1,849 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 import {
-  BookOpen,
-  Bot,
-  Check,
-  Copy,
-  Database,
-  ExternalLink,
-  HelpCircle,
-  MessageSquare,
-  Plus,
-  RefreshCw,
+  Sparkles,
   Search,
   Send,
+  BookOpen,
+  ExternalLink,
+  Copy,
+  Check,
+  RefreshCw,
+  HelpCircle,
+  MessageSquare,
+  ArrowLeft,
+  ChevronDown,
+  Layers,
+  Info,
+  X,
+  Plus,
+  Menu,
+  FileText,
   ShieldCheck,
-  Sparkles,
+  Database,
 } from "lucide-react";
 import type { RagResponse } from "@/modules/ai/rag-engine";
 
-const quickPrompts = [
-  { title: "Analisar cobertura", text: "Qual necessidade crítica devo priorizar hoje?", query: "Qual necessidade crítica devo priorizar hoje?" },
-  { title: "Explorar o orçamento", text: "Resuma a execução orçamentária por unidade.", query: "Resuma a execução orçamentária por unidade." },
-  { title: "Consultar normas", text: "O que a Lei 14.133 exige para este vínculo?", query: "Quais são as regras e limites de carona no Art. 86 da Lei 14.133?" },
-  { title: "Preparar documento", text: "Gere uma minuta com fontes e justificativa.", query: "Como gerar e baixar a Minuta de Adesão para instruir o processo no SEI?" },
+interface MessageItem {
+  id: string;
+  sender: "user" | "assistant";
+  text: string;
+  response?: RagResponse;
+  timestamp: string;
+}
+
+interface ChatHistoryEntry {
+  id: string;
+  title: string;
+  query: string;
+  category: "HOJE" | "ÚLTIMOS 7 DIAS";
+}
+
+const PRESET_CONVERSATIONS: ChatHistoryEntry[] = [
+  {
+    id: "coturnos",
+    title: "Déficit de coturnos",
+    query: "Qual o déficit e situação do Coturno Operacional no 9º Gpt Log?",
+    category: "HOJE",
+  },
+  {
+    id: "orcamento",
+    title: "Síntese da execução financeira",
+    query: "Resuma a execução orçamentária por unidade.",
+    category: "HOJE",
+  },
+  {
+    id: "catmat",
+    title: "Atas vigentes por CATMAT",
+    query: "Quais são as Atas vigentes por CATMAT no Compras.gov.br?",
+    category: "ÚLTIMOS 7 DIAS",
+  },
+  {
+    id: "divergencias",
+    title: "Divergências abertas",
+    query: "Quais divergências de recebimento físico ou fiscal estão abertas?",
+    category: "ÚLTIMOS 7 DIAS",
+  },
+  {
+    id: "minuta",
+    title: "Minuta de cobertura",
+    query: "Gere uma minuta com fontes e justificativa para instruir o processo no SEI.",
+    category: "ÚLTIMOS 7 DIAS",
+  },
 ];
 
-const recentChats = [
-  "Déficit de coturnos",
-  "Síntese da execução financeira",
-  "Atas vigentes por CATMAT",
-  "Divergências abertas",
-  "Minuta de cobertura",
+const QUICK_CARDS = [
+  {
+    title: "Analisar cobertura",
+    desc: "Qual necessidade crítica devo priorizar hoje?",
+    query: "Qual necessidade crítica devo priorizar hoje?",
+  },
+  {
+    title: "Explorar o orçamento",
+    desc: "Resuma a execução orçamentária por unidade.",
+    query: "Resuma a execução orçamentária por unidade.",
+  },
+  {
+    title: "Consultar normas",
+    desc: "O que a Lei 14.133 exige para este vínculo?",
+    query: "O que a Lei 14.133 exige para este vínculo?",
+  },
+  {
+    title: "Preparar documento",
+    desc: "Gere uma minuta com fontes e justificativa.",
+    query: "Gere uma minuta com fontes e justificativa.",
+  },
 ];
 
-export function AssistenteIaClient() {
+const SCOPES = [
+  "Piloto Classe II",
+  "Art. 86 (Lei 14.133)",
+  "CATMAT & Atas",
+  "Todos os Dados",
+];
+
+interface AssistenteIaClientProps {
+  userRole?: string;
+  userUnit?: string;
+}
+
+export function AssistenteIaClient({
+  userUnit = "9º Gpt Log",
+}: AssistenteIaClientProps) {
   const [prompt, setPrompt] = useState("");
-  const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState<RagResponse | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedScope, setSelectedScope] = useState(SCOPES[0]);
+  const [isScopeMenuOpen, setIsScopeMenuOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const startNewChat = () => {
-    setPrompt("");
-    setSubmittedPrompt("");
-    setResponse(null);
+  // Modais informativos
+  const [sourcesModalOpen, setSourcesModalOpen] = useState(false);
+  const [aboutModalOpen, setAboutModalOpen] = useState(false);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSearch = async (queryText?: string) => {
-    const query = (queryText ?? prompt).trim();
-    if (!query || loading) return;
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
-    setLoading(true);
-    setSubmittedPrompt(query);
+  const handleSearch = async (queryText?: string, chatId?: string) => {
+    const q = (queryText !== undefined ? queryText : prompt).trim();
+    if (!q) return;
+
+    const userMessage: MessageItem = {
+      id: "usr-" + Date.now(),
+      sender: "user",
+      text: q,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
     setPrompt("");
+    setLoading(true);
+    if (chatId) {
+      setActiveChatId(chatId);
+    }
 
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: query }),
+        body: JSON.stringify({ prompt: q, scope: selectedScope }),
       });
-      const data = await res.json();
-      setResponse(data);
+      const data: RagResponse = await res.json();
+
+      const assistantMessage: MessageItem = {
+        id: "ast-" + Date.now(),
+        sender: "assistant",
+        text: data.answer,
+        response: data,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch {
-      setResponse({
-        answer: "Erro ao comunicar com o assistente. Por favor, tente novamente.",
-        citations: [],
-        suggestedQuestions: [],
-        confidenceScore: 0,
-      });
+      const errorMessage: MessageItem = {
+        id: "err-" + Date.now(),
+        sender: "assistant",
+        text: "Ocorreu um erro ao comunicar com a inteligência logística. Por favor, tente novamente.",
+        response: {
+          answer: "Ocorreu um erro ao comunicar com a inteligência logística. Por favor, tente novamente.",
+          citations: [],
+          suggestedQuestions: ["Quais são as regras de adesão à Ata pela Lei 14.133?"],
+          confidenceScore: 0,
+        },
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="mcl-assistant-layout">
-      <aside className="mcl-assistant-rail">
-        <button type="button" className="mcl-new-chat" onClick={startNewChat}>
-          <Sparkles aria-hidden />
-          <span>Novo chat</span>
-          <Plus aria-hidden />
-        </button>
+  const handleNewChat = () => {
+    setMessages([]);
+    setActiveChatId(null);
+    setPrompt("");
+    setSidebarOpen(false);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
 
-        <div className="mcl-chat-search">
-          <Search aria-hidden />
-          <span>Buscar conversas</span>
+  const handleSelectHistory = (entry: ChatHistoryEntry) => {
+    setActiveChatId(entry.id);
+    setMessages([]);
+    handleSearch(entry.query, entry.id);
+    setSidebarOpen(false);
+  };
+
+  const handleCopyText = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const filteredHistory = PRESET_CONVERSATIONS.filter((item) =>
+    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.query.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const historyHoje = filteredHistory.filter((item) => item.category === "HOJE");
+  const history7Dias = filteredHistory.filter((item) => item.category === "ÚLTIMOS 7 DIAS");
+
+  return (
+    <div className="h-screen w-full flex overflow-hidden bg-gradient-to-br from-[#ebf4fa] via-[#edf3f8] to-[#f4f7fa] dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 p-2.5 sm:p-4 gap-3 font-sans">
+      {/* OVERLAY MOBILE PARA SIDEBAR */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* ========================================================= */}
+      {/* 1. SIDEBAR LATERAL DO ASSISTENTE IA                       */}
+      {/* ========================================================= */}
+      <aside
+        className={`
+          fixed md:relative inset-y-2 left-2 z-50 md:z-auto
+          w-72 sm:w-80 shrink-0 h-[calc(100vh-16px)] md:h-full
+          flex flex-col bg-[#f7fafc]/90 dark:bg-zinc-900/90 backdrop-blur-md
+          rounded-2xl sm:rounded-3xl border border-white/80 dark:border-zinc-800
+          p-3.5 sm:p-4 shadow-sm transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        `}
+      >
+        {/* Topo da Sidebar: Botão Novo Chat */}
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="flex-1 flex items-center justify-between px-4 py-2.5 rounded-2xl bg-sky-50 dark:bg-sky-950/50 hover:bg-sky-100 dark:hover:bg-sky-900/50 border border-sky-200/90 dark:border-sky-800/80 text-sky-700 dark:text-sky-300 font-semibold text-xs sm:text-sm transition-all shadow-xs cursor-pointer group"
+          >
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-sky-500 group-hover:scale-110 transition-transform" />
+              <span>Novo chat</span>
+            </span>
+            <Plus className="h-4 w-4 text-sky-500 group-hover:rotate-90 transition-transform" />
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden p-2 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <nav aria-label="Histórico de conversas">
-          <span>Hoje</span>
-          {recentChats.slice(0, 2).map((chat, index) => (
-            <button type="button" key={chat} className={index === 0 ? "active" : ""}>
-              <MessageSquare aria-hidden />
-              {chat}
-            </button>
-          ))}
-          <span>Últimos 7 dias</span>
-          {recentChats.slice(2).map((chat) => (
-            <button type="button" key={chat}>
-              <MessageSquare aria-hidden />
-              {chat}
-            </button>
-          ))}
-        </nav>
+        {/* Campo de Busca de Conversas */}
+        <div className="relative mb-3">
+          <div className="flex items-center w-full px-3 py-2 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-transparent focus-within:border-sky-400 focus-within:bg-white dark:focus-within:bg-zinc-900 transition-all text-xs">
+            <Search className="h-3.5 w-3.5 text-zinc-400 mr-2 shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar conversas"
+              className="w-full bg-transparent text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none text-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
 
-        <footer>
-          <button type="button"><Database aria-hidden /> Fontes conectadas</button>
-          <button type="button"><ShieldCheck aria-hidden /> Sobre o assistente</button>
-          <small>Respostas com origem e confiança</small>
-        </footer>
+        {/* Lista de Histórico de Conversas com Scroll */}
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
+          {/* Seção HOJE */}
+          {historyHoje.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 mb-1.5">
+                HOJE
+              </h3>
+              <div className="space-y-1">
+                {historyHoje.map((entry) => {
+                  const isActive = activeChatId === entry.id;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => handleSelectHistory(entry)}
+                      className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-[#dce6ee] dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <MessageSquare className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-sky-600 dark:text-sky-400" : "text-zinc-400"}`} />
+                      <span className="truncate">{entry.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Seção ÚLTIMOS 7 DIAS */}
+          {history7Dias.length > 0 && (
+            <div>
+              <h3 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 mb-1.5">
+                ÚLTIMOS 7 DIAS
+              </h3>
+              <div className="space-y-1">
+                {history7Dias.map((entry) => {
+                  const isActive = activeChatId === entry.id;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => handleSelectHistory(entry)}
+                      className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-[#dce6ee] dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <MessageSquare className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-sky-600 dark:text-sky-400" : "text-zinc-400"}`} />
+                      <span className="truncate">{entry.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {filteredHistory.length === 0 && (
+            <div className="text-center py-6 text-xs text-zinc-400">
+              Nenhuma conversa encontrada.
+            </div>
+          )}
+        </div>
+
+        {/* Rodapé da Sidebar: Fontes Conectadas & Sobre */}
+        <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1 mt-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setSourcesModalOpen(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <Database className="h-3.5 w-3.5 text-zinc-400" />
+            <span>Fontes conectadas</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAboutModalOpen(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <Info className="h-3.5 w-3.5 text-zinc-400" />
+            <span>Sobre o assistente</span>
+          </button>
+        </div>
       </aside>
 
-      <section className="mcl-assistant-main">
-        {!response && !loading ? (
-          <div className="mcl-assistant-intro">
-            <span className="mcl-assistant-mark"><Bot aria-hidden /></span>
-            <span>ASSISTENTE MCL</span>
-            <h1>Como posso ajudar?</h1>
-            <p>Converse com os dados da cadeia logística. As respostas preservam contexto, evidências e nível de confiança.</p>
+      {/* ========================================================= */}
+      {/* 2. ÁREA PRINCIPAL DO CHAT (FULL-SCREEN)                   */}
+      {/* ========================================================= */}
+      <main className="flex-1 h-full flex flex-col bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200/90 dark:border-zinc-800 shadow-sm relative overflow-hidden">
+        {/* Barra Superior com Botão 'Retornar ao Sistema' */}
+        <header className="px-4 sm:px-6 py-3 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 shrink-0 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm z-10">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              aria-label="Abrir menu de conversas"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+            <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-zinc-400">
+              <span className="hover:text-zinc-600 dark:hover:text-zinc-300">MCL</span>
+              <span>/</span>
+              <span className="text-sky-600 dark:text-sky-400 font-bold">ASSISTENTE IA</span>
+            </div>
           </div>
-        ) : null}
 
-        {submittedPrompt ? (
-          <div className="mcl-conversation" aria-live="polite">
-            <article className="mcl-user-message"><p>{submittedPrompt}</p></article>
-            {loading ? (
-              <article className="mcl-assistant-message loading">
-                <span><RefreshCw aria-hidden /></span>
-                <p>Consultando fontes e preservando o contexto…</p>
-              </article>
-            ) : response ? (
-              <article className="mcl-assistant-message">
-                <header>
-                  <span><Sparkles aria-hidden /></span>
-                  <div>
-                    <strong>Inteligência logística</strong>
-                    <small>Confiança RAG · {Math.round(response.confidenceScore * 100)}%</small>
+          {/* Botão no canto superior direito: 'Retornar ao Sistema' */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/inicio"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200/80 dark:border-zinc-700/80 transition-all shadow-xs hover:scale-105 active:scale-95"
+              title="Sair do módulo IA e voltar à tela inicial"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+              <span>Retornar ao Sistema</span>
+            </Link>
+          </div>
+        </header>
+
+        {/* Conteúdo Central */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col justify-between">
+          {/* CASO A: ESTADO INICIAL / HERO (COMO POSSO AJUDAR?) */}
+          {messages.length === 0 ? (
+            <div className="max-w-2xl w-full mx-auto my-auto flex flex-col items-center justify-center py-2 sm:py-4">
+              {/* ÍCONE LOGO MCL EM TOM AZUL CLARO NA MESMA PALETA */}
+              <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-[#e6f4fb] dark:bg-sky-950/60 border border-[#cbe8f6] dark:border-sky-800/80 flex items-center justify-center p-2.5 shadow-xs mb-2 transition-transform hover:scale-105">
+                <BrandLogo
+                  tone="sky"
+                  className="h-full w-full object-contain"
+                  priority
+                />
+              </div>
+
+              {/* Subtítulo ASSISTENTE MCL */}
+              <span className="text-[11px] sm:text-xs font-extrabold tracking-widest text-[#229bd8] dark:text-sky-400 uppercase block mb-1.5">
+                ASSISTENTE MCL
+              </span>
+
+              {/* Título Principal */}
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-zinc-800 dark:text-zinc-100 tracking-tight text-center">
+                Como posso ajudar?
+              </h1>
+
+              {/* Descrição */}
+              <p className="mt-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-lg leading-relaxed">
+                Converse com os dados da cadeia logística. As respostas preservam contexto, evidências e nível de confiança.
+              </p>
+
+              {/* Caixa de Entrada de Prompt Principal */}
+              <div className="mt-6 w-full rounded-2xl sm:rounded-3xl border border-zinc-300/90 dark:border-zinc-700 bg-white dark:bg-zinc-900/90 shadow-sm focus-within:shadow-md focus-within:border-sky-500 transition-all p-3 sm:p-4">
+                <textarea
+                  ref={textareaRef}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSearch();
+                    }
+                  }}
+                  placeholder="Pergunte sobre necessidades, créditos, atas, rastreabilidade ou normas..."
+                  rows={3}
+                  className="w-full bg-transparent resize-none focus:outline-none text-xs sm:text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 leading-relaxed font-medium"
+                />
+
+                {/* Linha Inferior da Caixa de Entrada */}
+                <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800/80 mt-1">
+                  {/* Seletor de Escopo (+ Piloto Classe II ˅) */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsScopeMenuOpen(!isScopeMenuOpen)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium transition-colors cursor-pointer border border-zinc-200/60 dark:border-zinc-700/80"
+                    >
+                      <Plus className="h-3 w-3 text-zinc-500" />
+                      <span>{selectedScope}</span>
+                      <ChevronDown className="h-3 w-3 text-zinc-400" />
+                    </button>
+
+                    {isScopeMenuOpen && (
+                      <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg py-1 z-30 animate-menu-in">
+                        {SCOPES.map((scope) => (
+                          <button
+                            key={scope}
+                            type="button"
+                            onClick={() => {
+                              setSelectedScope(scope);
+                              setIsScopeMenuOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                              selectedScope === scope
+                                ? "bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-semibold"
+                                : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700/60"
+                            }`}
+                          >
+                            {scope}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Botão de Envio Circular */}
                   <button
                     type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(response.answer);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
+                    onClick={() => handleSearch()}
+                    disabled={loading || !prompt.trim()}
+                    className="p-2.5 rounded-full bg-[#a3d3f2] hover:bg-[#86c4ee] dark:bg-sky-800 dark:hover:bg-sky-700 text-[#0f5380] dark:text-sky-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs cursor-pointer active:scale-95"
+                    title="Enviar pergunta"
                   >
-                    {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-                    {copied ? "Copiado" : "Copiar"}
+                    {loading ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                   </button>
-                </header>
-                <div className="mcl-answer">{response.answer}</div>
+                </div>
+              </div>
 
-                {response.citations.length > 0 ? (
-                  <section className="mcl-answer-sources">
-                    <strong><BookOpen aria-hidden /> Fontes e citações</strong>
-                    <div>
-                      {response.citations.map((citation) => (
-                        <span key={citation.title}>
-                          {citation.title} <small>{citation.source}</small>
-                          {citation.url ? <a href={citation.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${citation.title}`}><ExternalLink aria-hidden /></a> : null}
-                        </span>
-                      ))}
+              {/* Grade 2x2 de Cartões de Sugestão Rápida */}
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                {QUICK_CARDS.map((card) => (
+                  <button
+                    key={card.title}
+                    type="button"
+                    onClick={() => handleSearch(card.query)}
+                    className="group p-3.5 rounded-2xl border border-zinc-200/90 dark:border-zinc-800/90 bg-white dark:bg-zinc-900/60 hover:bg-sky-50/60 dark:hover:bg-sky-950/30 hover:border-sky-200 dark:hover:border-sky-800/60 transition-all text-left flex justify-between items-start cursor-pointer shadow-xs hover:shadow"
+                  >
+                    <div className="space-y-1 pr-2">
+                      <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-sky-700 dark:group-hover:text-sky-400 transition-colors">
+                        {card.title}
+                      </h4>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                        {card.desc}
+                      </p>
                     </div>
-                  </section>
-                ) : null}
+                    <Send className="h-3.5 w-3.5 text-zinc-400 group-hover:text-sky-500 shrink-0 mt-0.5 group-hover:translate-x-0.5 transition-all" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* CASO B: THREAD DE MENSAGENS ATIVA */
+            <div className="max-w-3xl w-full mx-auto space-y-6 pb-4">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${
+                    msg.sender === "user" ? "items-end" : "items-start"
+                  }`}
+                >
+                  {msg.sender === "user" ? (
+                    /* Balão do Usuário */
+                    <div className="max-w-[85%] rounded-2xl rounded-tr-xs bg-sky-600 text-white p-3.5 text-xs sm:text-sm font-medium shadow-sm leading-relaxed">
+                      {msg.text}
+                      <div className="text-[10px] text-sky-200 text-right mt-1 font-mono">
+                        {msg.timestamp}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Cartão de Resposta do Assistente RAG */
+                    <div className="w-full rounded-2xl bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200/90 dark:border-zinc-700/80 p-4 sm:p-5 space-y-4 shadow-sm">
+                      {/* Cabeçalho da Resposta com Confiança & Ações */}
+                      <div className="flex items-center justify-between pb-3 border-b border-zinc-200/70 dark:border-zinc-700/70">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-xl bg-sky-100 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800/60 flex items-center justify-center p-1">
+                            <BrandLogo tone="sky" className="h-full w-full object-contain" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 block">
+                              Inteligência Logística MCL
+                            </span>
+                            {msg.response && (
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
+                                Confiança RAG: {Math.round(msg.response.confidenceScore * 100)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                {response.suggestedQuestions.length > 0 ? (
-                  <section className="mcl-related-questions">
-                    <strong><HelpCircle aria-hidden /> Perguntas relacionadas</strong>
-                    {response.suggestedQuestions.map((question) => (
-                      <button type="button" key={question} onClick={() => handleSearch(question)}>{question}</button>
-                    ))}
-                  </section>
-                ) : null}
-              </article>
-            ) : null}
-          </div>
-        ) : null}
+                        {/* Botões Copiar e Timestamp */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(msg.text, msg.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 hover:text-sky-600 dark:hover:text-sky-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1 transition-colors cursor-pointer"
+                          >
+                            {copiedId === msg.id ? (
+                              <>
+                                <Check className="h-3 w-3 text-emerald-500" />
+                                <span>Copiado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3 w-3" />
+                                <span>Copiar</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
 
-        <form
-          className="mcl-assistant-composer"
-          onSubmit={(event) => {
-            event.preventDefault();
-            handleSearch();
-          }}
-        >
-          <textarea
-            aria-label="Mensagem ao assistente"
-            placeholder="Pergunte sobre necessidades, créditos, atas, rastreabilidade ou normas…"
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                handleSearch();
-              }
-            }}
-          />
-          <div>
-            <span>
-              <button type="button" aria-label="Anexar contexto"><Plus aria-hidden /></button>
-              <button type="button">Piloto Classe II <b>⌄</b></button>
-            </span>
-            <button type="submit" className="mcl-assistant-send" aria-label="Enviar pergunta" disabled={loading || !prompt.trim()}>
-              {loading ? <RefreshCw aria-hidden /> : <Send aria-hidden />}
-            </button>
-          </div>
-        </form>
+                      {/* Conteúdo Textual Formatado */}
+                      <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">
+                        {msg.text}
+                      </div>
 
-        {!response && !loading ? (
-          <div className="mcl-assistant-suggestions">
-            {quickPrompts.map((item) => (
-              <button type="button" key={item.title} onClick={() => handleSearch(item.query)}>
-                <strong>{item.title}</strong>
-                <span>{item.text}</span>
-                <Send aria-hidden />
+                      {/* Citações e Fontes Legais */}
+                      {msg.response && msg.response.citations.length > 0 && (
+                        <div className="pt-3 border-t border-zinc-200/70 dark:border-zinc-700/70 space-y-2">
+                          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <BookOpen className="h-3.5 w-3.5 text-sky-500" />
+                            Fontes & Citações da Resposta:
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {msg.response.citations.map((cit) => (
+                              <span
+                                key={cit.title}
+                                className="inline-flex items-center gap-1 rounded-lg bg-white dark:bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shadow-2xs"
+                              >
+                                <span>{cit.title}</span>
+                                <span className="text-zinc-400 font-normal">({cit.source})</span>
+                                {cit.url && (
+                                  <a
+                                    href={cit.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-sky-600 dark:text-sky-400 hover:underline ml-0.5"
+                                  >
+                                    <ExternalLink className="h-3 w-3 inline" />
+                                  </a>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Perguntas Sugeridas de Acompanhamento */}
+                      {msg.response && msg.response.suggestedQuestions.length > 0 && (
+                        <div className="pt-3 border-t border-zinc-200/70 dark:border-zinc-700/70 space-y-2">
+                          <span className="text-[11px] font-bold text-zinc-500 flex items-center gap-1">
+                            <HelpCircle className="h-3.5 w-3.5 text-amber-500" />
+                            Perguntas Relacionadas:
+                          </span>
+                          <div className="space-y-1">
+                            {msg.response.suggestedQuestions.map((q) => (
+                              <button
+                                key={q}
+                                type="button"
+                                onClick={() => handleSearch(q)}
+                                className="block text-left text-[11px] font-medium text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                              >
+                                • {q}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {loading && (
+                <div className="flex items-center gap-2 text-xs text-zinc-400 p-2 animate-pulse">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-500" />
+                  <span>Consultando fontes logísticas e legislação...</span>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* BARRA FIXA INFERIOR DE PROMPT (QUANDO EM CONVERSA ATIVA) */}
+        {messages.length > 0 && (
+          <div className="p-3 sm:p-4 border-t border-zinc-100 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm shrink-0">
+            <div className="max-w-3xl mx-auto flex items-center gap-2 rounded-2xl bg-zinc-100/90 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 px-3 py-1.5 focus-within:border-sky-500 focus-within:bg-white dark:focus-within:bg-zinc-900 transition-all">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                placeholder="Faça uma pergunta complementar ou continue o diálogo..."
+                className="w-full bg-transparent text-xs sm:text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none font-medium px-1"
+              />
+              <button
+                type="button"
+                onClick={() => handleSearch()}
+                disabled={loading || !prompt.trim()}
+                className="p-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
+              >
+                <Send className="h-3.5 w-3.5" />
               </button>
-            ))}
+            </div>
           </div>
-        ) : null}
+        )}
+      </main>
 
-        <small className="mcl-assistant-disclaimer">O assistente pode cometer erros. Confirme as fontes e os atos decisórios.</small>
-      </section>
+      {/* ========================================================= */}
+      {/* 3. MODAIS INFORMATIVOS (FONTES & SOBRE O ASSISTENTE)        */}
+      {/* ========================================================= */}
+
+      {/* Modal: Fontes Conectadas */}
+      {sourcesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-menu-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-sky-500" />
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Fontes de Dados Conectadas
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSourcesModalOpen(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              O motor de IA consulta em tempo real bases oficiais, ontologias e repositórios parametrizados:
+            </p>
+
+            <div className="space-y-2.5">
+              <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 flex items-start gap-3">
+                <ShieldCheck className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                    Legislação Federal & Lei 14.133/2021
+                  </h4>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Art. 86, limites de carona (50% individual e 200% global) e Decreto nº 11.462/2023.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 flex items-start gap-3">
+                <Database className="h-4 w-4 text-sky-500 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                    Compras.gov.br (API Oficial de ARPs)
+                  </h4>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Atas de Registro de Preços vigentes, saldos de adesão, fornecedores e atas homologadas.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 flex items-start gap-3">
+                <FileText className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                    Catálogo Unificado CATMAT
+                  </h4>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Indexação de códigos de materiais com descritores oficiais padronizados.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 flex items-start gap-3">
+                <Layers className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                    Base Operacional {userUnit} (Demonstrativo)
+                  </h4>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Déficits de suprimento Classe II, histórico de demandas e níveis de estoque.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSourcesModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Sobre o Assistente */}
+      {aboutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-menu-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-sky-500" />
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Sobre o Assistente IA MCL
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAboutModalOpen(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+              O <strong>Assistente IA MCL</strong> é uma camada de inteligência cognitiva voltada para a gestão de suprimentos e compras públicas federais.
+            </p>
+
+            <div className="p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 text-xs text-sky-900 dark:text-sky-200 space-y-2">
+              <div className="font-bold flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-sky-500" />
+                Arquitetura RAG Determinística
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                As respostas são geradas com fundamentação normativa estrita, sem alucinações de dados orçamentários e com indicação explícita dos níveis de confiança e das fontes consultadas.
+              </p>
+            </div>
+
+            <div className="text-[11px] text-zinc-500 dark:text-zinc-400 space-y-1">
+              <div>• <strong>Versão do Motor:</strong> MCL RAG Engine v0.9 (Piloto Classe II)</div>
+              <div>• <strong>Governança:</strong> Em conformidade com as diretrizes do Exército Brasileiro e Compras.gov.br</div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAboutModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
