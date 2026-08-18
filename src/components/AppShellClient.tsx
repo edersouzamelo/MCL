@@ -20,7 +20,6 @@ import {
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
-import { PageTransition } from "@/components/PageTransition";
 import { TechnicalFooter } from "@/components/TechnicalFooter";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 
@@ -168,7 +167,7 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className={`mcl-page ${pathname.startsWith("/assistente") ? "mcl-page-assistant" : ""} ${pathname.startsWith("/creditos") ? "mcl-page-credits" : ""}`}>
-          <PageTransition>{children}</PageTransition>
+          {children}
         </main>
 
         <TechnicalFooter />

@@ -3,7 +3,6 @@ import { ArrowLeft, UserPlus } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { RegisterForm } from "@/components/RegisterForm";
 import { Card } from "@/components/ui";
-import { PageTransition } from "@/components/PageTransition";
 
 export const metadata = {
   title: "Cadastro — MCL Piloto Classe II",
@@ -12,8 +11,7 @@ export const metadata = {
 
 export default function CadastroPage() {
   return (
-    <PageTransition>
-      <div className="min-h-screen relative flex flex-col">
+    <div className="min-h-screen relative flex flex-col">
         {/* Background */}
         <div
           className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed"
@@ -58,7 +56,6 @@ export default function CadastroPage() {
             </p>
           </div>
         </main>
-      </div>
-    </PageTransition>
+    </div>
   );
 }

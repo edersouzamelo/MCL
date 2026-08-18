@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
-import { PageTransition } from "@/components/PageTransition";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { getUserProfile } from "@/app/actions/onboarding";
 import { getDemoState } from "@/server/demo-store";
@@ -52,8 +51,7 @@ export default async function InicioPage() {
   const pendingStages = resolvedStages.length - functionalStages;
 
   return (
-    <PageTransition>
-      <main className="ops-shell">
+    <main className="ops-shell">
         <div className="ops-grid-field" />
         <div className="ops-ambient" />
 
@@ -123,7 +121,6 @@ export default async function InicioPage() {
             </div>
           </section>
         </div>
-      </main>
-    </PageTransition>
+    </main>
   );
 }
