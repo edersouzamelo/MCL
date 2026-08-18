@@ -12,7 +12,7 @@ export default async function AssistenteIaPage() {
   }
 
   return (
-    <main className="h-screen w-screen overflow-hidden bg-[#edf2f7] dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans">
+    <main className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#ebf3fa] via-[#edf4fa] to-[#f2f7fb] dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans">
       <AssistenteIaClient userRole={profile?.role} userUnit={profile?.organization} />
     </main>
   );

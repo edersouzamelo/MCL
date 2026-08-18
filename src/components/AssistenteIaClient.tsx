@@ -223,7 +223,7 @@ export function AssistenteIaClient({
   const history7Dias = filteredHistory.filter((item) => item.category === "ÚLTIMOS 7 DIAS");
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-[#edf2f7] dark:bg-zinc-950 p-2.5 sm:p-3.5 gap-3 font-sans">
+    <div className="h-screen w-full flex overflow-hidden bg-gradient-to-br from-[#ebf3fa] via-[#edf4fa] to-[#f2f7fb] dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 p-3 sm:p-4 gap-3.5 font-sans">
       {/* OVERLAY MOBILE PARA SIDEBAR */}
       {sidebarOpen && (
         <div
@@ -239,9 +239,9 @@ export function AssistenteIaClient({
         className={`
           fixed md:relative inset-y-2 left-2 z-50 md:z-auto
           w-72 sm:w-80 shrink-0 h-[calc(100vh-16px)] md:h-full
-          flex flex-col bg-[#f4f7fa] dark:bg-zinc-900/90
-          rounded-2xl border border-zinc-200/70 dark:border-zinc-800
-          p-3.5 flex flex-col transition-transform duration-300 ease-in-out
+          flex flex-col bg-gradient-to-b from-[#f4f8fb]/95 to-[#f0f5fa]/95 dark:bg-zinc-900/90 backdrop-blur-md
+          rounded-2xl border border-white/80 dark:border-zinc-800
+          p-3.5 flex flex-col transition-transform duration-300 ease-in-out shadow-2xs
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
       >
@@ -250,7 +250,7 @@ export function AssistenteIaClient({
           <button
             type="button"
             onClick={handleNewChat}
-            className="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#e3f2fd] dark:bg-sky-950/60 hover:bg-[#d4ebfc] border border-[#cbe5fb] dark:border-sky-800/60 text-[#0284c7] dark:text-sky-300 font-medium text-xs sm:text-sm transition-colors cursor-pointer"
+            className="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#e3f2fd] dark:bg-sky-950/60 hover:bg-[#d4ebfc] border border-[#cbe5fb] dark:border-sky-800/60 text-[#0284c7] dark:text-sky-300 font-normal text-xs sm:text-sm transition-colors cursor-pointer"
           >
             <span className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-[#0284c7] shrink-0" />
@@ -270,7 +270,7 @@ export function AssistenteIaClient({
 
         {/* Campo de Busca de Conversas */}
         <div className="relative mb-3">
-          <div className="flex items-center w-full px-3 py-1.5 rounded-lg bg-[#eef2f6] dark:bg-zinc-800/80 border border-transparent focus-within:border-sky-300 focus-within:bg-white dark:focus-within:bg-zinc-900 transition-all text-xs">
+          <div className="flex items-center w-full px-3 py-1.5 rounded-lg bg-white/80 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-transparent focus-within:border-sky-300 focus-within:bg-white dark:focus-within:bg-zinc-900 transition-all text-xs">
             <Search className="h-3.5 w-3.5 text-zinc-400 mr-2 shrink-0" />
             <input
               type="text"
@@ -296,7 +296,7 @@ export function AssistenteIaClient({
           {/* Seção HOJE */}
           {historyHoje.length > 0 && (
             <div>
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2 mb-1">
+              <h3 className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2 mb-1">
                 HOJE
               </h3>
               <div className="space-y-0.5">
@@ -309,8 +309,8 @@ export function AssistenteIaClient({
                       onClick={() => handleSelectHistory(entry)}
                       className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-[#e2edf6] dark:bg-zinc-800 text-zinc-800 dark:text-white font-medium"
-                          : "text-zinc-600 dark:text-zinc-400 hover:bg-[#eef2f6] dark:hover:bg-zinc-800/60 font-normal"
+                          ? "bg-[#e2edf6] dark:bg-zinc-800 text-[#0f172a] dark:text-white font-medium"
+                          : "text-[#475569] dark:text-zinc-400 hover:bg-white/70 dark:hover:bg-zinc-800/60 font-normal"
                       }`}
                     >
                       <MessageSquare className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-[#0284c7] dark:text-sky-400" : "text-zinc-400"}`} />
@@ -325,7 +325,7 @@ export function AssistenteIaClient({
           {/* Seção ÚLTIMOS 7 DIAS */}
           {history7Dias.length > 0 && (
             <div>
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2 mb-1">
+              <h3 className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2 mb-1">
                 ÚLTIMOS 7 DIAS
               </h3>
               <div className="space-y-0.5">
@@ -338,8 +338,8 @@ export function AssistenteIaClient({
                       onClick={() => handleSelectHistory(entry)}
                       className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-[#e2edf6] dark:bg-zinc-800 text-zinc-800 dark:text-white font-medium"
-                          : "text-zinc-600 dark:text-zinc-400 hover:bg-[#eef2f6] dark:hover:bg-zinc-800/60 font-normal"
+                          ? "bg-[#e2edf6] dark:bg-zinc-800 text-[#0f172a] dark:text-white font-medium"
+                          : "text-[#475569] dark:text-zinc-400 hover:bg-white/70 dark:hover:bg-zinc-800/60 font-normal"
                       }`}
                     >
                       <MessageSquare className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-[#0284c7] dark:text-sky-400" : "text-zinc-400"}`} />
@@ -363,7 +363,7 @@ export function AssistenteIaClient({
           <button
             type="button"
             onClick={() => setSourcesModalOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-zinc-600 dark:text-zinc-400 hover:bg-[#eef2f6] dark:hover:bg-zinc-800/60 transition-colors text-left font-normal cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 dark:text-zinc-400 hover:bg-white/70 dark:hover:bg-zinc-800/60 hover:text-zinc-800 transition-colors text-left font-normal cursor-pointer"
           >
             <Database className="h-3.5 w-3.5 text-zinc-400" />
             <span>Fontes conectadas</span>
@@ -371,7 +371,7 @@ export function AssistenteIaClient({
           <button
             type="button"
             onClick={() => setAboutModalOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-zinc-600 dark:text-zinc-400 hover:bg-[#eef2f6] dark:hover:bg-zinc-800/60 transition-colors text-left font-normal cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs text-zinc-500 dark:text-zinc-400 hover:bg-white/70 dark:hover:bg-zinc-800/60 hover:text-zinc-800 transition-colors text-left font-normal cursor-pointer"
           >
             <Info className="h-3.5 w-3.5 text-zinc-400" />
             <span>Sobre o assistente</span>
@@ -380,11 +380,11 @@ export function AssistenteIaClient({
       </aside>
 
       {/* ========================================================= */}
-      {/* 2. ÁREA PRINCIPAL DO CHAT (FULL-SCREEN)                   */}
+      {/* 2. ÁREA PRINCIPAL DO CHAT (FULL-SCREEN DEGRADÊ SUAVE)      */}
       {/* ========================================================= */}
-      <main className="flex-1 h-full flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/70 dark:border-zinc-800 shadow-2xs relative overflow-hidden">
+      <main className="flex-1 h-full flex flex-col bg-gradient-to-b from-white via-[#fbfdff] to-[#f7fafe] dark:from-zinc-900 dark:to-zinc-900 rounded-2xl border border-white/90 dark:border-zinc-800 shadow-sm relative overflow-hidden">
         {/* Barra Superior com Botão 'Retornar ao Sistema' */}
-        <header className="px-4 sm:px-6 py-3 flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 shrink-0 bg-white/90 dark:bg-zinc-900/90 z-10">
+        <header className="px-4 sm:px-6 py-3 flex items-center justify-between border-b border-zinc-100/80 dark:border-zinc-800/80 shrink-0 bg-white/90 dark:bg-zinc-900/90 z-10">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -401,14 +401,14 @@ export function AssistenteIaClient({
             </div>
           </div>
 
-          {/* Botão no canto superior direito: 'Retornar ao Sistema' (a tag para navegação limpa) */}
+          {/* Botão no canto superior direito: 'Retornar ao Sistema' */}
           <div className="flex items-center gap-2">
             <a
               href="/inicio"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-normal text-zinc-600 dark:text-zinc-300 bg-[#f0f4f8] dark:bg-zinc-800 hover:bg-[#e2edf6] border border-zinc-200/80 dark:border-zinc-700 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-normal text-[#475569] dark:text-zinc-300 bg-[#f0f4f8] dark:bg-zinc-800 hover:bg-[#e2edf6] border border-zinc-200/80 dark:border-zinc-700 transition-all shadow-2xs"
               title="Sair do módulo IA e voltar à tela inicial"
             >
-              <ArrowLeft className="h-3.5 w-3.5 text-zinc-400" />
+              <ArrowLeft className="h-3.5 w-3.5 text-[#64748b]" />
               <span>Retornar ao Sistema</span>
             </a>
           </div>
@@ -419,8 +419,8 @@ export function AssistenteIaClient({
           {/* CASO A: ESTADO INICIAL / HERO (COMO POSSO AJUDAR?) */}
           {messages.length === 0 ? (
             <div className="max-w-2xl w-full mx-auto my-auto flex flex-col items-center justify-center py-2 sm:py-4">
-              {/* ÍCONE LOGO MCL EM TOM AZUL CLARO NA MESMA PALETA */}
-              <div className="w-11 h-11 rounded-xl bg-[#e8f3fb] dark:bg-sky-950/60 border border-[#d0e5f7] dark:border-sky-800/60 flex items-center justify-center p-2 shadow-2xs mb-2.5">
+              {/* ÍCONE LOGO MCL EM TOM AZUL CLARO NA MESMA PALETA DEGRADÊ */}
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#e1f0fa] to-[#e8f4fc] dark:bg-sky-950/60 border border-[#cce5f7] dark:border-sky-800/80 flex items-center justify-center p-2.5 shadow-2xs mb-2.5">
                 <BrandLogo
                   tone="sky"
                   className="h-full w-full object-contain"
@@ -429,22 +429,22 @@ export function AssistenteIaClient({
               </div>
 
               {/* Subtítulo ASSISTENTE MCL */}
-              <span className="text-[11px] font-bold tracking-wider text-[#38a3e5] uppercase block text-center mb-1">
+              <span className="text-[11px] font-semibold tracking-wider text-[#38a3e5] uppercase block text-center mb-1">
                 ASSISTENTE MCL
               </span>
 
-              {/* Título Principal (SEM NEGITO PESADO - FONT-SEMIBOLD ELEGANTE) */}
-              <h1 className="text-3xl sm:text-[34px] font-semibold text-[#1e293b] dark:text-zinc-100 tracking-tight text-center">
+              {/* Título Principal (SUAVE, SEM NEGITO GROSSO - FONT-NORMAL/REGULAR) */}
+              <h1 className="text-3xl sm:text-[36px] font-normal text-[#1e293b] dark:text-zinc-100 tracking-tight text-center">
                 Como posso ajudar?
               </h1>
 
               {/* Descrição em fonte leve/normal */}
-              <p className="mt-1.5 text-xs sm:text-sm text-[#64748b] dark:text-zinc-400 text-center max-w-md mx-auto leading-relaxed font-normal">
+              <p className="mt-1.5 text-xs sm:text-sm text-[#64748b] dark:text-zinc-400 text-center max-w-lg mx-auto leading-relaxed font-normal">
                 Converse com os dados da cadeia logística. As respostas preservam contexto, evidências e nível de confiança.
               </p>
 
               {/* Caixa de Entrada de Prompt Principal */}
-              <div className="mt-6 w-full rounded-2xl border border-zinc-200/90 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xs focus-within:border-sky-400 transition-all p-3.5">
+              <div className="mt-6 w-full rounded-2xl border border-zinc-200/90 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xs focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-100 transition-all p-3.5">
                 <textarea
                   ref={textareaRef}
                   value={prompt}
@@ -457,7 +457,7 @@ export function AssistenteIaClient({
                   }}
                   placeholder="Pergunte sobre necessidades, créditos, atas, rastreabilidade ou normas..."
                   rows={3}
-                  className="w-full bg-transparent resize-none focus:outline-none text-xs sm:text-sm text-zinc-700 dark:text-zinc-200 placeholder-zinc-400 leading-relaxed font-normal"
+                  className="w-full bg-transparent resize-none focus:outline-none text-xs sm:text-sm text-[#334155] dark:text-zinc-200 placeholder-zinc-400 leading-relaxed font-normal"
                 />
 
                 {/* Linha Inferior da Caixa de Entrada */}
@@ -467,7 +467,7 @@ export function AssistenteIaClient({
                     <button
                       type="button"
                       onClick={() => setIsScopeMenuOpen(!isScopeMenuOpen)}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#f0f4f8] dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-600 dark:text-zinc-300 text-[11px] font-normal transition-colors cursor-pointer border border-zinc-200/60 dark:border-zinc-700"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#f0f4f8] dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-600 dark:text-zinc-300 text-[11px] font-normal transition-colors cursor-pointer border border-zinc-200/60 dark:border-zinc-700"
                     >
                       <Plus className="h-3 w-3 text-zinc-400" />
                       <span>{selectedScope}</span>
@@ -521,10 +521,10 @@ export function AssistenteIaClient({
                     key={card.title}
                     type="button"
                     onClick={() => handleSearch(card.query)}
-                    className="group p-3.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-sky-300 transition-colors text-left flex justify-between items-start cursor-pointer shadow-2xs"
+                    className="group p-3.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800 bg-gradient-to-br from-white to-[#f8fafc] hover:from-[#f4f9fd] hover:to-[#eff7fc] hover:border-sky-200 transition-all text-left flex justify-between items-start cursor-pointer shadow-2xs"
                   >
                     <div className="space-y-0.5 pr-2">
-                      <h4 className="text-xs font-semibold text-[#1e293b] dark:text-zinc-200 group-hover:text-[#0284c7] transition-colors">
+                      <h4 className="text-xs font-medium text-[#1e293b] dark:text-zinc-200 group-hover:text-[#0284c7] transition-colors">
                         {card.title}
                       </h4>
                       <p className="text-[11px] font-normal text-[#64748b] dark:text-zinc-400 leading-snug">
