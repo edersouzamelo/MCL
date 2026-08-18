@@ -1,43 +1,68 @@
 "use client";
 
 import { useState } from "react";
-import { BrandLogo } from "@/components/BrandLogo";
-import { Sparkles, Search, Send, BookOpen, ExternalLink, Copy, Check, RefreshCw, HelpCircle } from "lucide-react";
+import {
+  BookOpen,
+  Bot,
+  Check,
+  Copy,
+  Database,
+  ExternalLink,
+  HelpCircle,
+  MessageSquare,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import type { RagResponse } from "@/modules/ai/rag-engine";
 
 const quickPrompts = [
-  { label: "📜 Regras do Art. 86 (Lei 14.133/2021)", query: "Quais são as regras e limites de carona no Art. 86 da Lei 14.133?" },
-  { label: "🥾 Déficit de Coturno no 9º Gpt Log", query: "Qual o déficit e situação do Coturno Operacional no 9º Gpt Log?" },
-  { label: "📊 Como funciona o Score MCL?", query: "Como funciona o cálculo do Score Multicritério Operacional do MCL?" },
-  { label: "📝 Como gerar a Minuta de Adesão?", query: "Como gerar e baixar a Minuta de Adesão para instruir o processo no SEI?" },
+  { title: "Analisar cobertura", text: "Qual necessidade crítica devo priorizar hoje?", query: "Qual necessidade crítica devo priorizar hoje?" },
+  { title: "Explorar o orçamento", text: "Resuma a execução orçamentária por unidade.", query: "Resuma a execução orçamentária por unidade." },
+  { title: "Consultar normas", text: "O que a Lei 14.133 exige para este vínculo?", query: "Quais são as regras e limites de carona no Art. 86 da Lei 14.133?" },
+  { title: "Preparar documento", text: "Gere uma minuta com fontes e justificativa.", query: "Como gerar e baixar a Minuta de Adesão para instruir o processo no SEI?" },
+];
+
+const recentChats = [
+  "Déficit de coturnos",
+  "Síntese da execução financeira",
+  "Atas vigentes por CATMAT",
+  "Divergências abertas",
+  "Minuta de cobertura",
 ];
 
 export function AssistenteIaClient() {
   const [prompt, setPrompt] = useState("");
+  const [submittedPrompt, setSubmittedPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<RagResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const startNewChat = () => {
+    setPrompt("");
+    setSubmittedPrompt("");
+    setResponse(null);
+  };
+
   const handleSearch = async (queryText?: string) => {
-    const q = (queryText !== undefined ? queryText : prompt).trim();
-    if (!q) return;
+    const query = (queryText ?? prompt).trim();
+    if (!query || loading) return;
 
     setLoading(true);
-    setPrompt(q);
+    setSubmittedPrompt(query);
+    setPrompt("");
 
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: q }),
+        body: JSON.stringify({ prompt: query }),
       });
       const data = await res.json();
       setResponse(data);
-
-      setTimeout(() => {
-        const el = document.getElementById("rag-response-container");
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }, 100);
     } catch {
       setResponse({
         answer: "Erro ao comunicar com o assistente. Por favor, tente novamente.",
@@ -51,164 +76,154 @@ export function AssistenteIaClient() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl py-6 sm:py-10 space-y-6 overflow-hidden">
-      {/* Topo Centralizado — Logotipo MCL em Proporção Google */}
-      <div className="flex flex-col items-center justify-center text-center space-y-3">
-        <div className="p-3 rounded-2xl bg-white/5 border border-white/10 shadow-lg backdrop-blur-md transition-transform duration-300 hover:scale-105">
-          <BrandLogo tone="light" className="h-14 sm:h-16 w-auto" priority />
-        </div>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight flex items-center justify-center gap-2">
-            <Sparkles className="h-5 w-5 text-emerald-500 animate-pulse" />
-            Assistente de Inteligência Logística
-          </h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-md mx-auto">
-            RAG com base de conhecimento sobre a Lei nº 14.133/2021, catálogo CATMAT, Atas do Compras.gov.br e dados operacionais da Força.
-          </p>
-        </div>
-      </div>
+    <div className="mcl-assistant-layout">
+      <aside className="mcl-assistant-rail">
+        <button type="button" className="mcl-new-chat" onClick={startNewChat}>
+          <Sparkles aria-hidden />
+          <span>Novo chat</span>
+          <Plus aria-hidden />
+        </button>
 
-      {/* Campo de Prompt Centralizado Estilo Google / Gemini (Pílula Glassmorphism) */}
-      <div className="relative max-w-2xl mx-auto">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSearch();
-          }}
-          className="relative flex items-center w-full rounded-full bg-white dark:bg-zinc-900/90 border border-zinc-300 dark:border-white/15 shadow-lg hover:shadow-xl focus-within:border-emerald-500 dark:focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all duration-300 p-1.5 pl-5"
-        >
-          <Search className="h-5 w-5 text-zinc-400 shrink-0 mr-3" />
-          <input
-            type="text"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Pergunte sobre a Lei 14.133, necessidades, CATMAT ou atas..."
-            className="w-full bg-transparent text-sm sm:text-base text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none pr-4 font-medium"
-          />
-          <button
-            type="submit"
-            disabled={loading || !prompt.trim()}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-5 py-2.5 shadow-md disabled:opacity-40 transition-all duration-200"
-          >
-            {loading ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <span>Consultar</span>
-                <Send className="h-3.5 w-3.5" />
-              </>
-            )}
-          </button>
-        </form>
+        <div className="mcl-chat-search">
+          <Search aria-hidden />
+          <span>Buscar conversas</span>
+        </div>
 
-        {/* Sugestões Rápidas (Pills de Atalho) */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          {quickPrompts.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => handleSearch(item.query)}
-              className="rounded-full bg-zinc-100 dark:bg-zinc-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-zinc-200 dark:border-zinc-700/60 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-emerald-700 dark:hover:text-emerald-300 px-3.5 py-1.5 transition-colors duration-200"
-            >
-              {item.label}
+        <nav aria-label="Histórico de conversas">
+          <span>Hoje</span>
+          {recentChats.slice(0, 2).map((chat, index) => (
+            <button type="button" key={chat} className={index === 0 ? "active" : ""}>
+              <MessageSquare aria-hidden />
+              {chat}
             </button>
           ))}
-        </div>
-      </div>
+          <span>Últimos 7 dias</span>
+          {recentChats.slice(2).map((chat) => (
+            <button type="button" key={chat}>
+              <MessageSquare aria-hidden />
+              {chat}
+            </button>
+          ))}
+        </nav>
 
-      {/* Área de Resposta Gerada pelo Motor RAG */}
-      {response && (
-        <div id="rag-response-container" className="max-w-3xl mx-auto rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl p-6 sm:p-8 space-y-6 transition-all duration-300">
-          <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
-            <div className="flex items-center gap-2">
-              <span className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
-                <Sparkles className="h-5 w-5" />
-              </span>
-              <div>
-                <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">Resposta da Inteligência Logística</h3>
-                <span className="text-[10px] text-zinc-500 font-mono">Confiança RAG: {Math.round(response.confidenceScore * 100)}%</span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(response.answer);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 border border-zinc-200 dark:border-zinc-700 rounded-md px-3 py-1.5 transition-colors"
-              >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                <span>{copied ? "Copiado!" : "Copiar"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setResponse(null);
-                  setPrompt("");
-                }}
-                className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 px-2 py-1"
-              >
-                Limpar
-              </button>
-            </div>
+        <footer>
+          <button type="button"><Database aria-hidden /> Fontes conectadas</button>
+          <button type="button"><ShieldCheck aria-hidden /> Sobre o assistente</button>
+          <small>Respostas com origem e confiança</small>
+        </footer>
+      </aside>
+
+      <section className="mcl-assistant-main">
+        {!response && !loading ? (
+          <div className="mcl-assistant-intro">
+            <span className="mcl-assistant-mark"><Bot aria-hidden /></span>
+            <span>ASSISTENTE MCL</span>
+            <h1>Como posso ajudar?</h1>
+            <p>Converse com os dados da cadeia logística. As respostas preservam contexto, evidências e nível de confiança.</p>
           </div>
+        ) : null}
 
-          {/* Conteúdo Formatado */}
-          <div className="prose dark:prose-invert max-w-none text-sm leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">
-            {response.answer}
-          </div>
-
-          {/* Citações e Fontes de Fundamentação */}
-          {response.citations.length > 0 && (
-            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
-              <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                <BookOpen className="h-3.5 w-3.5" />
-                Fontes & Citações da Resposta:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {response.citations.map((cit) => (
-                  <span
-                    key={cit.title}
-                    className="inline-flex items-center gap-1 rounded-md bg-zinc-100 dark:bg-zinc-800/80 px-2.5 py-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
-                  >
-                    <span>{cit.title}</span>
-                    <span className="text-zinc-400 font-normal">({cit.source})</span>
-                    {cit.url && (
-                      <a href={cit.url} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline ml-1">
-                        <ExternalLink className="h-3 w-3 inline" />
-                      </a>
-                    )}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Perguntas Sugeridas de Acompanhamento */}
-          {response.suggestedQuestions.length > 0 && (
-            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
-              <span className="text-xs font-bold text-zinc-500 flex items-center gap-1">
-                <HelpCircle className="h-3.5 w-3.5" />
-                Perguntas Relacionadas:
-              </span>
-              <div className="space-y-1.5">
-                {response.suggestedQuestions.map((q) => (
+        {submittedPrompt ? (
+          <div className="mcl-conversation" aria-live="polite">
+            <article className="mcl-user-message"><p>{submittedPrompt}</p></article>
+            {loading ? (
+              <article className="mcl-assistant-message loading">
+                <span><RefreshCw aria-hidden /></span>
+                <p>Consultando fontes e preservando o contexto…</p>
+              </article>
+            ) : response ? (
+              <article className="mcl-assistant-message">
+                <header>
+                  <span><Sparkles aria-hidden /></span>
+                  <div>
+                    <strong>Inteligência logística</strong>
+                    <small>Confiança RAG · {Math.round(response.confidenceScore * 100)}%</small>
+                  </div>
                   <button
-                    key={q}
                     type="button"
-                    onClick={() => handleSearch(q)}
-                    className="block text-left text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(response.answer);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
                   >
-                    • {q}
+                    {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+                    {copied ? "Copiado" : "Copiar"}
                   </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+                </header>
+                <div className="mcl-answer">{response.answer}</div>
+
+                {response.citations.length > 0 ? (
+                  <section className="mcl-answer-sources">
+                    <strong><BookOpen aria-hidden /> Fontes e citações</strong>
+                    <div>
+                      {response.citations.map((citation) => (
+                        <span key={citation.title}>
+                          {citation.title} <small>{citation.source}</small>
+                          {citation.url ? <a href={citation.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${citation.title}`}><ExternalLink aria-hidden /></a> : null}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {response.suggestedQuestions.length > 0 ? (
+                  <section className="mcl-related-questions">
+                    <strong><HelpCircle aria-hidden /> Perguntas relacionadas</strong>
+                    {response.suggestedQuestions.map((question) => (
+                      <button type="button" key={question} onClick={() => handleSearch(question)}>{question}</button>
+                    ))}
+                  </section>
+                ) : null}
+              </article>
+            ) : null}
+          </div>
+        ) : null}
+
+        <form
+          className="mcl-assistant-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSearch();
+          }}
+        >
+          <textarea
+            aria-label="Mensagem ao assistente"
+            placeholder="Pergunte sobre necessidades, créditos, atas, rastreabilidade ou normas…"
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                handleSearch();
+              }
+            }}
+          />
+          <div>
+            <span>
+              <button type="button" aria-label="Anexar contexto"><Plus aria-hidden /></button>
+              <button type="button">Piloto Classe II <b>⌄</b></button>
+            </span>
+            <button type="submit" className="mcl-assistant-send" aria-label="Enviar pergunta" disabled={loading || !prompt.trim()}>
+              {loading ? <RefreshCw aria-hidden /> : <Send aria-hidden />}
+            </button>
+          </div>
+        </form>
+
+        {!response && !loading ? (
+          <div className="mcl-assistant-suggestions">
+            {quickPrompts.map((item) => (
+              <button type="button" key={item.title} onClick={() => handleSearch(item.query)}>
+                <strong>{item.title}</strong>
+                <span>{item.text}</span>
+                <Send aria-hidden />
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <small className="mcl-assistant-disclaimer">O assistente pode cometer erros. Confirme as fontes e os atos decisórios.</small>
+      </section>
     </div>
   );
 }
