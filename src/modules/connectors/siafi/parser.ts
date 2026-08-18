@@ -1,28 +1,35 @@
 import * as XLSX from "xlsx";
 import { SiafiReportRecord, SiafiIngestionResult } from "./types";
+import { setIngestedSiafiRecords } from "./store";
 
 export function parseSiafiBuffer(buffer: Buffer, filename: string): SiafiReportRecord[] {
   const isCsv = filename.toLowerCase().endsWith(".csv");
   let rows: any[][] = [];
 
-  if (isCsv) {
-    const text = buffer.toString("utf-8");
-    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    rows = lines.map((line) => {
-      // Split by tab or semicolon or comma
-      if (line.includes("\t")) return line.split("\t");
-      if (line.includes(";")) return line.split(";");
-      return line.split(",");
-    });
-  } else {
-    // Parse XLSX / XLS using SheetJS
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const firstSheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[firstSheetName];
-    rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+  try {
+    if (isCsv) {
+      const text = buffer.toString("utf-8");
+      const lines = text.split(/\r?\n/).filter((l) => typeof l === "string" && l.trim().length > 0);
+      rows = lines.map((line) => {
+        if (line.includes("\t")) return line.split("\t");
+        if (line.includes(";")) return line.split(";");
+        return line.split(",");
+      });
+    } else {
+      // Parse XLSX / XLS / HTML tables saved as XLS using SheetJS
+      const workbook = XLSX.read(buffer, { type: "buffer", raw: false });
+      const firstSheetName = workbook.SheetNames[0];
+      if (firstSheetName && workbook.Sheets[firstSheetName]) {
+        const sheet = workbook.Sheets[firstSheetName];
+        rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, defval: "" });
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao ler buffer do arquivo com SheetJS:", err);
+    return [];
   }
 
-  if (!rows || rows.length === 0) return [];
+  if (!Array.isArray(rows) || rows.length === 0) return [];
 
   // Locate header row or column indices
   let headerIndex = -1;
@@ -34,21 +41,25 @@ export function parseSiafiBuffer(buffer: Buffer, filename: string): SiafiReportR
   let colExpenseNature = -1;
   let colAmount = -1;
 
-  for (let i = 0; i < Math.min(rows.length, 25); i++) {
-    const rowStr = rows[i].map((cell) => String(cell || "").toLowerCase());
-    
+  const maxHeaderCheck = Math.min(rows.length, 30);
+  for (let i = 0; i < maxHeaderCheck; i++) {
+    const row = rows[i];
+    if (!Array.isArray(row)) continue;
+
+    const rowStr = row.map((cell) => String(cell ?? "").toLowerCase().trim());
+
     for (let c = 0; c < rowStr.length; c++) {
-      const val = rowStr[c].trim();
-      if (val.includes("ug executora") || val === "ug") colUg = c;
-      if (val === "pi" || val.includes("plano interno")) colPi = c;
-      if (val.includes("ano emiss") || val.includes("ano emissa")) colNeYear = c;
-      else if (val.includes("favorecido") || val.includes("credor")) colSupplier = c;
-      else if (val === "ne ccor" || val === "nota de empenho" || (val.includes("ne ccor") && !val.includes("ano") && !val.includes("favorecido"))) colNe = c;
+      const val = rowStr[c] || "";
+      if (val.includes("ug executora") || val === "ug" || val.includes("ug ")) colUg = c;
+      if (val === "pi" || val.includes("plano interno") || val.includes("pi ")) colPi = c;
+      if (val.includes("ano emiss") || val.includes("ano emissa") || val.includes("exercicio")) colNeYear = c;
+      else if (val.includes("favorecido") || val.includes("credor") || val.includes("fornecedor")) colSupplier = c;
+      else if (val === "ne ccor" || val === "nota de empenho" || val.includes("empenho")) colNe = c;
       if (val.includes("natureza despesa") || val.includes("nd")) colExpenseNature = c;
-      if (val.includes("movim") || val.includes("líquido") || val.includes("valor") || val.includes("empenhado")) colAmount = c;
+      if (val.includes("movim") || val.includes("líquido") || val.includes("valor") || val.includes("empenhado") || val.includes("saldo")) colAmount = c;
     }
 
-    if (colNe !== -1 || colAmount !== -1) {
+    if (colNe !== -1 || colAmount !== -1 || colUg !== -1) {
       headerIndex = i;
       break;
     }
@@ -61,44 +72,45 @@ export function parseSiafiBuffer(buffer: Buffer, filename: string): SiafiReportR
   if (colNeYear === -1) colNeYear = 3;
   if (colSupplier === -1) colSupplier = 4;
   if (colExpenseNature === -1) colExpenseNature = 5;
-  if (colAmount === -1) colAmount = rows[0] ? rows[0].length - 1 : 6;
+  if (colAmount === -1) colAmount = rows[0] && Array.isArray(rows[0]) ? rows[0].length - 1 : 6;
 
   const records: SiafiReportRecord[] = [];
   const startRow = headerIndex !== -1 ? headerIndex + 1 : 0;
 
   for (let i = startRow; i < rows.length; i++) {
     const row = rows[i];
-    if (!row || row.length === 0) continue;
+    if (!Array.isArray(row) || row.length === 0) continue;
 
-    const neCode = String(row[colNe] || "").trim();
-    if (!neCode || neCode.toLowerCase().includes("linhas de dados") || neCode.toLowerCase().includes("detalhes do relatório")) {
+    const rawNeCell = String(row[colNe] ?? "").trim();
+    if (!rawNeCell || rawNeCell.toLowerCase().includes("linhas de dados") || rawNeCell.toLowerCase().includes("detalhes do relatório") || rawNeCell.toLowerCase().includes("total")) {
       continue;
     }
 
-    const ugCodeRaw = String(row[colUg] || "").trim();
+    const ugCodeRaw = String(row[colUg] ?? "").trim();
     const ugMatch = ugCodeRaw.match(/\d{6}/);
     const ugCode = ugMatch ? ugMatch[0] : ugCodeRaw || "160136";
 
-    const planningCode = String(row[colPi] || "PI-MCL-2026").trim();
+    const planningCode = String(row[colPi] ?? "PI-MCL-2026").trim() || "PI-MCL-2026";
 
-    const neYearRaw = String(row[colNeYear] || "").trim();
+    const neYearRaw = String(row[colNeYear] ?? "").trim();
     const neYearMatch = neYearRaw.match(/\d{4}/);
     const neYear = neYearMatch ? parseInt(neYearMatch[0], 10) : 2026;
     const isRPNP = neYear < 2026;
 
-    const supplierName = String(row[colSupplier] || "FORNECEDOR DIVERSO").trim();
-    const expenseNatureRaw = String(row[colExpenseNature] || "339030").trim();
+    const supplierName = String(row[colSupplier] ?? "FORNECEDOR CADASTRADO").trim() || "FORNECEDOR CADASTRADO";
+    const expenseNatureRaw = String(row[colExpenseNature] ?? "339030").trim();
     const ndMatch = expenseNatureRaw.match(/\d{6}/);
     const expenseNature = ndMatch ? ndMatch[0] : "339030";
 
-    const amountRaw = String(row[colAmount] || "0").replace(/\./g, "").replace(",", ".");
+    const amountCell = String(row[colAmount] ?? "0").trim();
+    const amountRaw = amountCell.replace(/\./g, "").replace(",", ".");
     const amountParsed = parseFloat(amountRaw);
-    const amount = isNaN(amountParsed) ? 0 : amountParsed;
+    const amount = isNaN(amountParsed) ? 0 : Math.abs(amountParsed);
 
     records.push({
       ugCode,
       planningCode,
-      neCode,
+      neCode: rawNeCell,
       neYearIssued: neYear,
       supplierName,
       expenseNature,
@@ -109,8 +121,6 @@ export function parseSiafiBuffer(buffer: Buffer, filename: string): SiafiReportR
 
   return records;
 }
-
-import { setIngestedSiafiRecords } from "./store";
 
 export function processSiafiIngestion(
   records: SiafiReportRecord[],
