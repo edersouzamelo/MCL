@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
+import { useSettings } from "@/contexts/SettingsContext";
 import {
   Sparkles,
   Search,
@@ -112,6 +114,7 @@ interface AssistenteIaClientProps {
 export function AssistenteIaClient({
   userUnit = "9º Gpt Log",
 }: AssistenteIaClientProps) {
+  const { animationsEnabled } = useSettings();
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<MessageItem[]>([]);
@@ -128,21 +131,25 @@ export function AssistenteIaClient({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messageSequenceRef = useRef(0);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const nextMessageId = (prefix: string) => {
+    messageSequenceRef.current += 1;
+    return `${prefix}-${messageSequenceRef.current}`;
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: animationsEnabled ? "smooth" : "auto",
+    });
+  }, [messages, loading, animationsEnabled]);
 
   const handleSearch = async (queryText?: string, chatId?: string) => {
     const q = (queryText !== undefined ? queryText : prompt).trim();
     if (!q) return;
 
     const userMessage: MessageItem = {
-      id: "usr-" + Date.now(),
+      id: nextMessageId("usr"),
       sender: "user",
       text: q,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -164,7 +171,7 @@ export function AssistenteIaClient({
       const data: RagResponse = await res.json();
 
       const assistantMessage: MessageItem = {
-        id: "ast-" + Date.now(),
+        id: nextMessageId("ast"),
         sender: "assistant",
         text: data.answer,
         response: data,
@@ -174,7 +181,7 @@ export function AssistenteIaClient({
       setMessages((prev) => [...prev, assistantMessage]);
     } catch {
       const errorMessage: MessageItem = {
-        id: "err-" + Date.now(),
+        id: nextMessageId("err"),
         sender: "assistant",
         text: "Ocorreu um erro ao comunicar com a inteligência logística. Por favor, tente novamente.",
         response: {
@@ -223,7 +230,7 @@ export function AssistenteIaClient({
   const history7Dias = filteredHistory.filter((item) => item.category === "ÚLTIMOS 7 DIAS");
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-gradient-to-br from-[#ebf3fa] via-[#edf4fa] to-[#f2f7fb] dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 p-3 sm:p-4 gap-3.5 font-sans">
+    <div className="mcl-ai-shell">
       {/* OVERLAY MOBILE PARA SIDEBAR */}
       {sidebarOpen && (
         <div
@@ -236,7 +243,7 @@ export function AssistenteIaClient({
       {/* 1. SIDEBAR LATERAL DO ASSISTENTE IA                       */}
       {/* ========================================================= */}
       <aside
-        className={`
+        className={`mcl-ai-rail
           fixed md:relative inset-y-2 left-2 z-50 md:z-auto
           w-72 sm:w-80 shrink-0 h-[calc(100vh-16px)] md:h-full
           flex flex-col bg-gradient-to-b from-[#f4f8fb]/95 to-[#f0f5fa]/95 dark:bg-zinc-900/90 backdrop-blur-md
@@ -246,11 +253,11 @@ export function AssistenteIaClient({
         `}
       >
         {/* Topo da Sidebar: Botão Novo Chat */}
-        <div className="flex items-center gap-2 mb-3">
+        <div className="mcl-ai-rail-head flex items-center gap-2 mb-3">
           <button
             type="button"
             onClick={handleNewChat}
-            className="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#e3f2fd] dark:bg-sky-950/60 hover:bg-[#d4ebfc] border border-[#cbe5fb] dark:border-sky-800/60 text-[#0284c7] dark:text-sky-300 font-normal text-xs sm:text-sm transition-colors cursor-pointer"
+            className="mcl-ai-new-chat flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl"
           >
             <span className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-[#0284c7] shrink-0" />
@@ -269,8 +276,8 @@ export function AssistenteIaClient({
         </div>
 
         {/* Campo de Busca de Conversas */}
-        <div className="relative mb-3">
-          <div className="flex items-center w-full px-3 py-1.5 rounded-lg bg-white/80 dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-transparent focus-within:border-sky-300 focus-within:bg-white dark:focus-within:bg-zinc-900 transition-all text-xs">
+        <div className="mcl-ai-search-wrap relative mb-3">
+          <div className="mcl-ai-search flex items-center w-full px-3 py-1.5 rounded-lg">
             <Search className="h-3.5 w-3.5 text-zinc-400 mr-2 shrink-0" />
             <input
               type="text"
@@ -292,7 +299,7 @@ export function AssistenteIaClient({
         </div>
 
         {/* Lista de Histórico de Conversas com Scroll */}
-        <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
+        <div className="mcl-ai-history flex-1 overflow-y-auto space-y-3.5 pr-1">
           {/* Seção HOJE */}
           {historyHoje.length > 0 && (
             <div>
@@ -309,7 +316,7 @@ export function AssistenteIaClient({
                       onClick={() => handleSelectHistory(entry)}
                       className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-[#e2edf6] dark:bg-zinc-800 text-[#0f172a] dark:text-white font-medium"
+                          ? "mcl-ai-history-item-active bg-[#e2edf6] dark:bg-zinc-800 text-[#0f172a] dark:text-white font-medium"
                           : "text-[#475569] dark:text-zinc-400 hover:bg-white/70 dark:hover:bg-zinc-800/60 font-normal"
                       }`}
                     >
@@ -338,7 +345,7 @@ export function AssistenteIaClient({
                       onClick={() => handleSelectHistory(entry)}
                       className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
                         isActive
-                          ? "bg-[#e2edf6] dark:bg-zinc-800 text-[#0f172a] dark:text-white font-medium"
+                          ? "mcl-ai-history-item-active bg-[#e2edf6] dark:bg-zinc-800 text-[#0f172a] dark:text-white font-medium"
                           : "text-[#475569] dark:text-zinc-400 hover:bg-white/70 dark:hover:bg-zinc-800/60 font-normal"
                       }`}
                     >
@@ -359,7 +366,7 @@ export function AssistenteIaClient({
         </div>
 
         {/* Rodapé da Sidebar: Fontes Conectadas & Sobre */}
-        <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-800 space-y-0.5 mt-auto shrink-0">
+        <div className="mcl-ai-rail-footer pt-2.5 space-y-0.5 mt-auto shrink-0">
           <button
             type="button"
             onClick={() => setSourcesModalOpen(true)}
@@ -382,9 +389,9 @@ export function AssistenteIaClient({
       {/* ========================================================= */}
       {/* 2. ÁREA PRINCIPAL DO CHAT (FULL-SCREEN DEGRADÊ SUAVE)      */}
       {/* ========================================================= */}
-      <main className="flex-1 h-full flex flex-col bg-gradient-to-b from-white via-[#fbfdff] to-[#f7fafe] dark:from-zinc-900 dark:to-zinc-900 rounded-2xl border border-white/90 dark:border-zinc-800 shadow-sm relative overflow-hidden">
+      <main className="mcl-ai-stage flex-1 h-full flex flex-col relative overflow-hidden">
         {/* Barra Superior com Botão 'Retornar ao Sistema' */}
-        <header className="px-4 sm:px-6 py-3 flex items-center justify-between border-b border-zinc-100/80 dark:border-zinc-800/80 shrink-0 bg-white/90 dark:bg-zinc-900/90 z-10">
+        <header className="mcl-ai-topbar px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 z-10">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -394,7 +401,7 @@ export function AssistenteIaClient({
             >
               <Menu className="h-4 w-4" />
             </button>
-            <div className="hidden sm:flex items-center gap-2 text-xs font-normal text-zinc-400">
+            <div className="mcl-ai-breadcrumb hidden sm:flex items-center gap-2">
               <span className="hover:text-zinc-600 dark:hover:text-zinc-300">MCL</span>
               <span>/</span>
               <span className="text-[#0284c7] dark:text-sky-400 font-medium">ASSISTENTE IA</span>
@@ -403,24 +410,24 @@ export function AssistenteIaClient({
 
           {/* Botão no canto superior direito: 'Retornar ao Sistema' */}
           <div className="flex items-center gap-2">
-            <a
+            <Link
               href="/inicio"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-normal text-[#475569] dark:text-zinc-300 bg-[#f0f4f8] dark:bg-zinc-800 hover:bg-[#e2edf6] border border-zinc-200/80 dark:border-zinc-700 transition-all shadow-2xs"
+              className="mcl-ai-return inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full"
               title="Sair do módulo IA e voltar à tela inicial"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-[#64748b]" />
               <span>Retornar ao Sistema</span>
-            </a>
+            </Link>
           </div>
         </header>
 
         {/* Conteúdo Central */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col justify-between">
+        <div className="mcl-ai-body flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col justify-between">
           {/* CASO A: ESTADO INICIAL / HERO (COMO POSSO AJUDAR?) */}
           {messages.length === 0 ? (
-            <div className="max-w-2xl w-full mx-auto my-auto flex flex-col items-center justify-center py-2 sm:py-4">
+            <div className="mcl-ai-welcome max-w-2xl w-full mx-auto my-auto flex flex-col items-center justify-center py-2 sm:py-4">
               {/* ÍCONE LOGO MCL EM TOM AZUL CLARO NA MESMA PALETA DEGRADÊ */}
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#e1f0fa] to-[#e8f4fc] dark:bg-sky-950/60 border border-[#cce5f7] dark:border-sky-800/80 flex items-center justify-center p-2.5 shadow-2xs mb-2.5">
+              <div className="mcl-ai-mark w-12 h-12 rounded-2xl flex items-center justify-center p-2.5 mb-2.5">
                 <BrandLogo
                   tone="sky"
                   className="h-full w-full object-contain"
@@ -429,22 +436,22 @@ export function AssistenteIaClient({
               </div>
 
               {/* Subtítulo ASSISTENTE MCL */}
-              <span className="text-[11px] font-semibold tracking-wider text-[#38a3e5] uppercase block text-center mb-1">
+              <span className="mcl-ai-kicker block text-center mb-1">
                 ASSISTENTE MCL
               </span>
 
               {/* Título Principal (SUAVE, SEM NEGITO GROSSO - FONT-NORMAL/REGULAR) */}
-              <h1 className="text-3xl sm:text-[36px] font-normal text-[#1e293b] dark:text-zinc-100 tracking-tight text-center">
+              <h1 className="mcl-ai-title text-center">
                 Como posso ajudar?
               </h1>
 
               {/* Descrição em fonte leve/normal */}
-              <p className="mt-1.5 text-xs sm:text-sm text-[#64748b] dark:text-zinc-400 text-center max-w-lg mx-auto leading-relaxed font-normal">
+              <p className="mcl-ai-intro mt-1.5 text-center max-w-lg mx-auto">
                 Converse com os dados da cadeia logística. As respostas preservam contexto, evidências e nível de confiança.
               </p>
 
               {/* Caixa de Entrada de Prompt Principal */}
-              <div className="mt-6 w-full rounded-2xl border border-zinc-200/90 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xs focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-100 transition-all p-3.5">
+              <div className="mcl-ai-composer mt-6 w-full rounded-2xl p-3.5">
                 <textarea
                   ref={textareaRef}
                   value={prompt}
@@ -457,17 +464,17 @@ export function AssistenteIaClient({
                   }}
                   placeholder="Pergunte sobre necessidades, créditos, atas, rastreabilidade ou normas..."
                   rows={3}
-                  className="w-full bg-transparent resize-none focus:outline-none text-xs sm:text-sm text-[#334155] dark:text-zinc-200 placeholder-zinc-400 leading-relaxed font-normal"
+                  className="mcl-ai-textarea w-full bg-transparent resize-none focus:outline-none leading-relaxed"
                 />
 
                 {/* Linha Inferior da Caixa de Entrada */}
-                <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800 mt-1">
+                <div className="mcl-ai-composer-bar flex items-center justify-between pt-2 mt-1">
                   {/* Seletor de Escopo (+ Piloto Classe II ˅) */}
                   <div className="relative">
                     <button
                       type="button"
                       onClick={() => setIsScopeMenuOpen(!isScopeMenuOpen)}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#f0f4f8] dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-600 dark:text-zinc-300 text-[11px] font-normal transition-colors cursor-pointer border border-zinc-200/60 dark:border-zinc-700"
+                      className="mcl-ai-scope-trigger inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
                     >
                       <Plus className="h-3 w-3 text-zinc-400" />
                       <span>{selectedScope}</span>
@@ -475,7 +482,7 @@ export function AssistenteIaClient({
                     </button>
 
                     {isScopeMenuOpen && (
-                      <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-lg py-1 z-30 animate-menu-in">
+                      <div className="mcl-ai-scope-menu absolute bottom-full left-0 mb-2 w-48 rounded-xl py-1 z-30 animate-menu-in">
                         {SCOPES.map((scope) => (
                           <button
                             key={scope}
@@ -502,7 +509,7 @@ export function AssistenteIaClient({
                     type="button"
                     onClick={() => handleSearch()}
                     disabled={loading || !prompt.trim()}
-                    className="w-8 h-8 rounded-full bg-[#80caee] hover:bg-[#64bfea] text-white flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+                    className="mcl-ai-send w-8 h-8 rounded-full flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                     title="Enviar pergunta"
                   >
                     {loading ? (
@@ -515,13 +522,13 @@ export function AssistenteIaClient({
               </div>
 
               {/* Grade 2x2 de Cartões de Sugestão Rápida */}
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+              <div className="mcl-ai-suggestions mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                 {QUICK_CARDS.map((card) => (
                   <button
                     key={card.title}
                     type="button"
                     onClick={() => handleSearch(card.query)}
-                    className="group p-3.5 rounded-xl border border-zinc-200/70 dark:border-zinc-800 bg-gradient-to-br from-white to-[#f8fafc] hover:from-[#f4f9fd] hover:to-[#eff7fc] hover:border-sky-200 transition-all text-left flex justify-between items-start cursor-pointer shadow-2xs"
+                    className="mcl-ai-suggestion group p-3.5 rounded-xl text-left flex justify-between items-start cursor-pointer"
                   >
                     <div className="space-y-0.5 pr-2">
                       <h4 className="text-xs font-medium text-[#1e293b] dark:text-zinc-200 group-hover:text-[#0284c7] transition-colors">
@@ -538,7 +545,7 @@ export function AssistenteIaClient({
             </div>
           ) : (
             /* CASO B: THREAD DE MENSAGENS ATIVA */
-            <div className="max-w-3xl w-full mx-auto space-y-5 pb-4">
+            <div className="mcl-ai-thread max-w-3xl w-full mx-auto space-y-5 pb-4">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -548,7 +555,7 @@ export function AssistenteIaClient({
                 >
                   {msg.sender === "user" ? (
                     /* Balão do Usuário */
-                    <div className="max-w-[85%] rounded-2xl rounded-tr-xs bg-[#0284c7] text-white p-3.5 text-xs sm:text-sm font-normal shadow-2xs leading-relaxed">
+                    <div className="mcl-ai-user-message max-w-[85%] rounded-2xl rounded-tr-xs p-3.5 leading-relaxed">
                       {msg.text}
                       <div className="text-[10px] text-sky-100 text-right mt-1 font-mono">
                         {msg.timestamp}
@@ -556,7 +563,7 @@ export function AssistenteIaClient({
                     </div>
                   ) : (
                     /* Cartão de Resposta do Assistente RAG */
-                    <div className="w-full rounded-2xl bg-[#f8fafc] dark:bg-zinc-800/70 border border-zinc-200/80 dark:border-zinc-700/80 p-4 sm:p-5 space-y-4 shadow-2xs">
+                    <div className="mcl-ai-answer-card w-full rounded-2xl p-4 sm:p-5 space-y-4">
                       {/* Cabeçalho da Resposta com Confiança & Ações */}
                       <div className="flex items-center justify-between pb-3 border-b border-zinc-200/70 dark:border-zinc-700/70">
                         <div className="flex items-center gap-2.5">
@@ -672,8 +679,8 @@ export function AssistenteIaClient({
 
         {/* BARRA FIXA INFERIOR DE PROMPT (QUANDO EM CONVERSA ATIVA) */}
         {messages.length > 0 && (
-          <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
-            <div className="max-w-3xl mx-auto flex items-center gap-2 rounded-xl bg-[#f0f4f8] dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 px-3 py-1.5 focus-within:border-sky-400 focus-within:bg-white transition-colors">
+          <div className="mcl-ai-thread-footer p-3 shrink-0">
+            <div className="mcl-ai-thread-composer max-w-3xl mx-auto flex items-center gap-2 rounded-xl px-3 py-1.5">
               <input
                 type="text"
                 value={prompt}
@@ -706,8 +713,8 @@ export function AssistenteIaClient({
 
       {/* Modal: Fontes Conectadas */}
       {sourcesModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-menu-in">
-          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl space-y-4">
+        <div className="mcl-ai-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-menu-in">
+          <div className="mcl-ai-modal w-full max-w-lg rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-[#0284c7]" />
@@ -793,8 +800,8 @@ export function AssistenteIaClient({
 
       {/* Modal: Sobre o Assistente */}
       {aboutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-menu-in">
-          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl space-y-4">
+        <div className="mcl-ai-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-menu-in">
+          <div className="mcl-ai-modal w-full max-w-lg rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <Info className="h-5 w-5 text-[#0284c7]" />
@@ -845,4 +852,3 @@ export function AssistenteIaClient({
     </div>
   );
 }
-

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { HoneycombLogo } from "@/components/HoneycombLogo";
-import { PageTransition } from "@/components/PageTransition";
 import { useSettings } from "@/contexts/SettingsContext";
 import styles from "./page.module.css";
 
@@ -19,8 +18,7 @@ export default function Home() {
   const { animationsEnabled } = useSettings();
 
   return (
-    <PageTransition>
-      <main className={styles.shell}>
+    <main className={styles.shell}>
         <div className={`${styles.ambient} ${styles.ambientLeft}`} />
         <div className={`${styles.ambient} ${styles.ambientRight}`} />
         <div className={styles.gridField} />
@@ -85,7 +83,6 @@ export default function Home() {
             </motion.section>
           </div>
         </section>
-      </main>
-    </PageTransition>
+    </main>
   );
 }

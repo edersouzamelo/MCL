@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { LoginForm } from "@/components/LoginForm";
-import { PageTransition } from "@/components/PageTransition";
 
 export const metadata = {
   title: "Acesso ao sistema — MCL",
@@ -11,8 +10,7 @@ export const metadata = {
 
 export default function LoginPage() {
   return (
-    <PageTransition>
-      <div className="auth-shell">
+    <div className="auth-shell">
         <div className="auth-background" aria-hidden="true" />
         <div className="auth-grid" aria-hidden="true" />
 
@@ -63,7 +61,6 @@ export default function LoginPage() {
             </div>
           </section>
         </main>
-      </div>
-    </PageTransition>
+    </div>
   );
 }
