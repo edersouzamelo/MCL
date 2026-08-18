@@ -46,9 +46,9 @@ export function CreditFilterBar({ filters, onChange, onReset }: CreditFilterBarP
             className="bg-zinc-100 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
           >
             <option value="">Todas as UGs</option>
-            <option value="160001">160001 - COLOG</option>
-            <option value="160091">160091 - Dep. Central Fardamento</option>
-            <option value="160205">160205 - 21º D Sup</option>
+            <option value="160136">160136 - Cmdo 9º Gpt Log</option>
+            <option value="160142">160142 - 9º B Sup</option>
+            <option value="160513">160513 - 9º B Mnt</option>
           </select>
 
           <select
