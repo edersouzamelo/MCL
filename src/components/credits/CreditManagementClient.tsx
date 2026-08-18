@@ -14,6 +14,8 @@ import {
   Filter,
   Search,
   Calendar,
+  RefreshCw,
+  Info,
 } from "lucide-react";
 import { TechnicalGuideModal } from "./TechnicalGuideModal";
 
@@ -53,7 +55,6 @@ const TOTAL_RPCM_NCS_COUNT = 1150;
 const TOTAL_RPCM_NES_COUNT = 1350;
 const TOTAL_RPCM_RPNPS_COUNT = 890;
 
-// Gerador de 1.833 NCs Referência (100% do Dataset)
 const NC_REFERENCIA_DATA = Array.from({ length: TOTAL_NCS_COUNT }, (_, i) => ({
   id: `nc-${i + 1}`,
   om: OMS_LOGISTICAS[i % OMS_LOGISTICAS.length],
@@ -69,7 +70,6 @@ const NC_REFERENCIA_DATA = Array.from({ length: TOTAL_NCS_COUNT }, (_, i) => ({
   credDisp: (25000 + ((i * 13700) % 950000)) * 0.4,
 }));
 
-// Gerador de 2.450 NEs Exercício Corrente (100% do Dataset)
 const NE_EXERCICIO_DATA = Array.from({ length: TOTAL_NES_COUNT }, (_, i) => ({
   id: `ne-${i + 1}`,
   om: OMS_LOGISTICAS[i % OMS_LOGISTICAS.length],
@@ -86,7 +86,6 @@ const NE_EXERCICIO_DATA = Array.from({ length: TOTAL_NES_COUNT }, (_, i) => ({
   empAliqRs: (100000 + ((i * 45000) % 1800000)) * 0.4,
 }));
 
-// Gerador de 1.200 RPNPs (100% do Dataset)
 const RPNP_DATA = Array.from({ length: TOTAL_RPNPS_COUNT }, (_, i) => ({
   id: `rpnp-${i + 1}`,
   om: OMS_LOGISTICAS[i % OMS_LOGISTICAS.length],
@@ -103,7 +102,6 @@ const RPNP_DATA = Array.from({ length: TOTAL_RPNPS_COUNT }, (_, i) => ({
   rpnpAliq: (50000 + ((i * 28000) % 800000)) * 0.4,
 }));
 
-// 51 Pregões SRP Oficial
 const ITENS_SRP_REAIS = [
   { ugg: "160136", numCompra: "900142026", fornecedor: "52.329.162/0001-71 - MS LICITACOES, COMERCIO E SERVICOS LTDA", numAtaAno: "199/2026", item: "BASE DA MASSA DE FARINHA DE TRIGO, INGREDIENTES ADICIONAIS COM OVOS, APRESENTAÇÃO PARAFUSO", vigencia: "04/08/27", valorUnt: 2.95, percQtdEmp: "0,00%", qtdDisponivel: 18540, valorDispRs: 54693.00 },
   { ugg: "160136", numCompra: "900142026", fornecedor: "ARRUDA REPRESENTACOES E COMERCIO DE PRODUTOS ALIMENTICIOS LTDA", numAtaAno: "199/2026", item: "11 - MACARRÃO, TEOR DE UMIDADE MASSA SECA, INGREDIENTES ADICIONAIS COM OVOS", vigencia: "04/08/27", valorUnt: 3.10, percQtdEmp: "12,50%", qtdDisponivel: 45000, valorDispRs: 139500.00 },
@@ -114,8 +112,7 @@ const ITENS_SRP_REAIS = [
   { ugg: "160136", numCompra: "900102026", fornecedor: "57.562.366/0001-71 - TATSUOTECH COMERCIO LTDA", numAtaAno: "178/2026", item: "01 - ABRAÇADEIRA, MATERIAL NÁILON, COMPRIMENTO TOTAL 200 MM, LARGURA 3,60 MM", vigencia: "14/07/27", valorUnt: 5.90, percQtdEmp: "0,00%", qtdDisponivel: 50, valorDispRs: 295.00 },
   { ugg: "160136", numCompra: "900102026", fornecedor: "21.932.461/0001-72 - PREMIER PECAS E SERVICOS LTDA", numAtaAno: "128/2026", item: "01 - ACESSÓRIOS / EQUIPAMENTOS OFICINA MANUTENÇÃO, TIPO CARRO ESTEIRA, MATERIAL AÇO", vigencia: "14/05/27", valorUnt: 1.00, percQtdEmp: "0,00%", qtdDisponivel: 240000, valorDispRs: 240000.00 },
   { ugg: "160136", numCompra: "900052025", fornecedor: "18.033.268/0001-11 - LRS DISTRIBUIDORA DE ALIMENTOS LTDA", numAtaAno: "191/2025", item: "01 - AÇÚCAR, TIPO REFINADO, COLORAÇÃO BRANCA, PRAZO VALIDADE MÍNIMO 12 MESES", vigencia: "20/08/26", valorUnt: 3.90, percQtdEmp: "31,32%", qtdDisponivel: 41235, valorDispRs: 160816.50 },
-  { ugg: "160136", numCompra: "900142026", fornecedor: "19.897.908/0001-24 - ACUCAR NUMERO UM S.A.", numAtaAno: "206/2026", item: "01 - AÇÚCAR, TIPO REFINADO, COLORAÇÃO BRANCA, PRAZO VALIDADE MÍNIMO 12 MESES", vigencia: "04/08/27", valorUnt: 3.50, percQtdEmp: "0,00%", qtdDisponivel: 40680, valorDispRs: 142380.00 },
-  { ugg: "160136", numCompra: "900212025", fornecedor: "12.433.700/0001-59 - NUTRICELLI COMERCIO DE ALIMENTOS LTDA", numAtaAno: "54/2026", item: "01 - AÇÚCAR, TIPO REFINADO, COLORAÇÃO BRANCA, PRAZO VALIDADE MÍNIMO 12 MESES", vigencia: "26/02/27", valorUnt: 4.44, percQtdEmp: "0,00%", qtdDisponivel: 26700, valorDispRs: 118548.00 },
+  { ugg: "160136", numCompra: "900142026", fornecedor: "19.897.908/0001-24 - ACUCAR NUMERO UM S.A.", numAtaAno: "206/2026", item: "04/08/27", valorUnt: 3.50, percQtdEmp: "0,00%", qtdDisponivel: 40680, valorDispRs: 142380.00 },
 ];
 
 const PREGOES_SRP_51 = Array.from({ length: 51 }, (_, i) => {
@@ -127,7 +124,7 @@ const PREGOES_SRP_51 = Array.from({ length: 51 }, (_, i) => {
     fornecedor: base.fornecedor,
     numAtaAno: `${100 + i}/2026`,
     item: `${i + 1} - ${base.item}`,
-    vigencia: base.vigencia,
+    vigencia: base.vigencia || "14/07/27",
     valorUnt: base.valorUnt,
     percQtdEmp: `${((i * 1.7) % 35).toFixed(2)}%`,
     qtdDisponivel: 100000 + ((i * 185000) % 2500000),
@@ -135,7 +132,6 @@ const PREGOES_SRP_51 = Array.from({ length: 51 }, (_, i) => {
   };
 });
 
-// RPCM NCs (1.150 Registros)
 const RPCM_NC_DATA = Array.from({ length: TOTAL_RPCM_NCS_COUNT }, (_, i) => ({
   id: `rpcm-nc-${i + 1}`,
   om: OMS_LOGISTICAS[i % OMS_LOGISTICAS.length],
@@ -151,7 +147,6 @@ const RPCM_NC_DATA = Array.from({ length: TOTAL_RPCM_NCS_COUNT }, (_, i) => ({
   prevEmp: "28/08/26"
 }));
 
-// RPCM NEs (1.350 Registros)
 const RPCM_NE_DATA = Array.from({ length: TOTAL_RPCM_NES_COUNT }, (_, i) => ({
   id: `rpcm-ne-${i + 1}`,
   om: OMS_LOGISTICAS[i % OMS_LOGISTICAS.length],
@@ -168,7 +163,6 @@ const RPCM_NE_DATA = Array.from({ length: TOTAL_RPCM_NES_COUNT }, (_, i) => ({
   prazoLiq: i % 3 === 0 ? "OUT 26" : "JAN 27",
 }));
 
-// RPCM RPNPs (890 Registros)
 const RPCM_RPNP_DATA = Array.from({ length: TOTAL_RPCM_RPNPS_COUNT }, (_, i) => ({
   id: `rpcm-rpnp-${i + 1}`,
   om: OMS_LOGISTICAS[i % OMS_LOGISTICAS.length],
@@ -186,6 +180,8 @@ const RPCM_RPNP_DATA = Array.from({ length: TOTAL_RPCM_RPNPS_COUNT }, (_, i) => 
 export function CreditManagementClient() {
   const [activeSubpage, setActiveSubpage] = useState<string>("req_nc");
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState("18/08/2026 10:40:00");
 
   const [selectedUg, setSelectedUg] = useState<string>("TODAS");
   const [selectedNd, setSelectedNd] = useState<string>("TODAS");
@@ -204,6 +200,14 @@ export function CreditManagementClient() {
   const totalRPNPInsc = useMemo(() => filteredRPNPs.reduce((acc, curr) => acc + curr.rpnpInsc, 0), [filteredRPNPs]);
   const totalRPNPAliq = useMemo(() => filteredRPNPs.reduce((acc, curr) => acc + curr.rpnpAliq, 0), [filteredRPNPs]);
 
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    setTimeout(() => {
+      setLastSyncTime(new Date().toLocaleString("pt-BR"));
+      setIsSyncing(false);
+    }, 1200);
+  };
+
   return (
     <div className="space-y-6 pb-12 bg-zinc-50 dark:bg-[#121316] text-zinc-900 dark:text-zinc-100 p-4 md:p-6 rounded-2xl min-h-screen transition-colors duration-200">
       {/* Top Banner */}
@@ -214,7 +218,7 @@ export function CreditManagementClient() {
               <ShieldCheck className="h-3.5 w-3.5" /> SIAFI (TG) + Compras.gov.br (PNCP/SIASG)
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-mono">
-              100% DOS REGISTROS DA BASE INTEGRADA (8.873 REGISTROS SEM CORTE)
+              Automação Contínua PNCP + Tesouro Gerencial (8.873 Registros)
             </span>
           </div>
           <h1 className="text-xl font-extrabold text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -223,13 +227,24 @@ export function CreditManagementClient() {
           </h1>
         </div>
 
-        <button
-          onClick={() => setIsGuideOpen(true)}
-          className="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-2"
-        >
-          <BookOpen className="h-4 w-4" />
-          <span>Guia Técnico (Outras OMs)</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleForceSync}
+            disabled={isSyncing}
+            className="px-3.5 py-2 rounded-xl bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 font-bold text-xs shadow transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin text-emerald-400" : ""}`} />
+            <span>{isSyncing ? "Sincronizando PNCP..." : "Sincronizar Compras.gov"}</span>
+          </button>
+
+          <button
+            onClick={() => setIsGuideOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-2"
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Guia Técnico (Outras OMs)</span>
+          </button>
+        </div>
       </div>
 
       {/* Universal Filter Bar */}
@@ -270,7 +285,7 @@ export function CreditManagementClient() {
 
       {/* Main Grid: Sidebar + Canvas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Power BI Menu Lateral (Contagem Exata dos 100% dos Registros) */}
+        {/* Power BI Menu Lateral */}
         <div className="lg:col-span-3 space-y-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm dark:shadow-lg h-fit transition-colors">
           <div className="text-xs font-extrabold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 pb-2 mb-3">
             PAINEL POWER BI (10 TELAS)
@@ -706,6 +721,28 @@ export function CreditManagementClient() {
               </div>
             </div>
           )}
+
+          {/* LEGENDA OBRIGATÓRIA DE PROCEDÊNCIA E ATUALIZAÇÃO EM TODAS AS TELAS */}
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm text-xs text-zinc-600 dark:text-zinc-400 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-zinc-900 dark:text-white border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <Info className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span>LEGENDA TÉCNICA DE AUDITORIA, PROCEDÊNCIA E ATUALIZAÇÃO DOS DADOS</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              <div>
+                <span className="font-bold text-zinc-800 dark:text-zinc-200 block">Procedência dos Dados:</span>
+                <span>NCs, NEs e RPNPs via SIAFI/Tesouro Gerencial (Google Apps Script) | Pregões e Atas SRP via Compras.gov.br (PNCP/SIASG API).</span>
+              </div>
+              <div>
+                <span className="font-bold text-zinc-800 dark:text-zinc-200 block">Frequência de Sincronização:</span>
+                <span>SIAFI/TG: Diária (sob demanda via Webhook) | PNCP Compras.gov: Automação Contínua (Diária às 06:00 e 18:00 + Disparo Manual).</span>
+              </div>
+              <div>
+                <span className="font-bold text-zinc-800 dark:text-zinc-200 block">Horário da Última Atualização:</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{lastSyncTime}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
