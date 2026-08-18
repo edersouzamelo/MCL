@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { PageTransition } from "@/components/PageTransition";
-import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { TechnicalFooter } from "@/components/TechnicalFooter";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 
@@ -94,7 +93,6 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mcl-app-shell">
-      <ServiceWorkerRegister />
 
       <aside className={`mcl-sidebar ${mobileMenuOpen ? "is-open" : ""}`}>
         <div className="mcl-sidebar-head">
