@@ -176,7 +176,7 @@ const RPCM_NC_DATA = Array.from({ length: 25 }, (_, i) => ({
 const RPCM_RPNP_DATA = Array.from({ length: 20 }, (_, i) => ({
   id: `rpcm-rpnp-${i + 1}`,
   om: OMS_LOGISTICAS[i % OMS_LOGISTICAS.length],
-  ne: `160136000012025NE001${460 + i}`,
+  ne: `160136000122025NE001${460 + i}`,
   favorecido: FORNECEDORES_REAIS[i % FORNECEDORES_REAIS.length],
   nd: "339039",
   pi: PIS_REAL[i % PIS_REAL.length],
@@ -188,7 +188,7 @@ const RPCM_RPNP_DATA = Array.from({ length: 20 }, (_, i) => ({
 }));
 
 export function CreditManagementClient() {
-  const [activeSubpage, setActiveSubpage] = useState<string>("req_nc");
+  const [activeSubpage, setActiveSubpage] = useState<string>("capa");
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Filtros dinâmicos
@@ -246,7 +246,7 @@ export function CreditManagementClient() {
 
   return (
     <div className="space-y-6 pb-12 bg-zinc-50 dark:bg-[#121316] text-zinc-900 dark:text-zinc-100 p-4 md:p-6 rounded-2xl min-h-screen transition-colors duration-200">
-      {/* Top Header Banner MCL (Responsivo a Tema Claro/Escuro) */}
+      {/* Top Header Banner MCL (Completamente Responsivo a Tema Claro/Escuro) */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm dark:shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 transition-colors">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -254,7 +254,7 @@ export function CreditManagementClient() {
               <ShieldCheck className="h-3.5 w-3.5" /> Tesouro Gerencial · 9º Gpt Log 2026
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-              10 Telas Power BI (100% Suporte Tema Claro / Escuro)
+              10 Telas Power BI (Global Light/Dark Theme)
             </span>
           </div>
           <h1 className="text-xl font-extrabold text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -411,6 +411,39 @@ export function CreditManagementClient() {
 
         {/* Canvas da Tela Selecionada */}
         <div className="lg:col-span-9 space-y-6">
+          {/* SLIDE 1: CAPA / PAINEL GERAL */}
+          {activeSubpage === "capa" && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Provisão Atualizada (R$)</span>
+                  <span className="text-2xl font-bold text-zinc-900 dark:text-white block mt-1 font-mono">R$ 43.306.816,72</span>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Despesa Empenhada (R$)</span>
+                  <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 block mt-1 font-mono">R$ 34.295.503,93</span>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">% Empenhado</span>
+                  <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 block mt-1">79.19%</span>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Crédito Disponível (R$)</span>
+                  <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 block mt-1 font-mono">R$ 9.011.312,79</span>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-4">
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                  <PieIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> RESUMO GERAL DO FORTE LOGÍSTICO 2026
+                </h3>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Estrutura consolidada de créditos descentralizados e empenhados por Organização Militar Requisitante e Provedora. Selecione uma tela no menu lateral para visualizar os relatórios detalhados.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* SLIDE 2: NC(s) - NOTAS DE CRÉDITO REFERÊNCIA */}
           {activeSubpage === "req_nc" && (
             <div className="space-y-5">
