@@ -4,17 +4,11 @@
   "description": "Prototipo demonstrativo com dados sinteticos para continuidade logistica Classe II.",
   "start_url": "/painel",
   "display": "standalone",
-  "background_color": "#1e293b",
-  "theme_color": "#1e293b",
+  "background_color": "#050c12",
+  "theme_color": "#050c12",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-512.png",
+      "src": "/icon?v=4",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
