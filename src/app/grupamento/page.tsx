@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { AppShell } from "@/components/AppShell";
 import { GrupamentoCommandCenterClient } from "@/components/GrupamentoCommandCenterClient";
 import { GrupamentoRuleWorkspaceClient } from "@/components/GrupamentoRuleWorkspaceClient";
+import { GrupamentoStorageBridge } from "@/components/GrupamentoStorageBridge";
 import { authOptions } from "@/modules/auth/options";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function GrupamentoPage() {
 
   return (
     <AppShell>
+      <GrupamentoStorageBridge />
       <div className="space-y-6">
         <GrupamentoCommandCenterClient organizationId={session.user.organizationId} />
         <GrupamentoRuleWorkspaceClient />
