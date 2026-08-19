@@ -1,15 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  Boxes,
-  ClipboardCheck,
-  PackageCheck,
-  ShoppingCart,
-  Truck,
-  WalletCards,
-  type LucideIcon,
-} from "lucide-react";
-import { BrandLogo, MclVectorLogo } from "@/components/BrandLogo";
+import type { ReactNode } from "react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { getUserProfile } from "@/app/actions/onboarding";
 import { getDemoState } from "@/server/demo-store";
@@ -34,22 +26,19 @@ function getStageStatus(systems: SourceSystemCatalogEntry[]) {
   return "Lacuna / pendente";
 }
 
-const stageIcons: Record<string, LucideIcon> = {
-  clipboard: ClipboardCheck,
-  credit: WalletCards,
-  cart: ShoppingCart,
-  package: PackageCheck,
-  warehouse: Boxes,
-  truck: Truck,
-};
-
 function StageGlyph({ type }: { type: string }) {
-  const Icon = stageIcons[type] ?? Boxes;
+  const paths: Record<string, ReactNode> = {
+    clipboard: <><path d="M10 7H7v21h18V7h-3" /><path d="M11 4h10v6H11zM11 16l3 3 6-7M11 24h10" /></>,
+    credit: <><path d="M5 8h22v17H5zM5 13h22M9 20h6" /><path d="M22 18v4" /></>,
+    cart: <><path d="M4 6h4l3 14h12l3-10H10M12 25h3v3h-3zM21 25h3v3h-3z" /><path d="M13 15h10" /></>,
+    package: <><path d="M5 10l11-6 11 6v13l-11 6-11-6zM5 10l11 6 11-6M16 16v13" /><path d="M10 7l11 6v5" /></>,
+    warehouse: <><path d="M4 13L16 5l12 8v15H4zM8 16h16M9 20h6v8M18 20h6v8" /><path d="M13 11h6" /></>,
+    truck: <><path d="M3 8h15v15H3zM18 13h6l5 6v4H18zM8 23v4h4v-4M22 23v4h4v-4" /><path d="M24 14v5h5" /></>,
+  };
   return (
-    <>
-      <MclVectorLogo className="ops-stage-icon-frame" />
-      <Icon className="ops-stage-icon-symbol" strokeWidth={1.75} aria-hidden="true" />
-    </>
+    <svg className="ops-stage-icon-symbol" viewBox="0 0 32 32" aria-hidden="true">
+      {paths[type] ?? paths.package}
+    </svg>
   );
 }
 
