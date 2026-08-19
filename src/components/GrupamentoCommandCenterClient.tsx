@@ -45,10 +45,13 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    const storedSag = readStored<SagImportResult>(GROUP_STORAGE_KEYS.sag);
-    const storedMonitors = readStored<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
-    if (storedSag) setSag(storedSag);
-    if (storedMonitors?.length === 8) setMonitors(storedMonitors);
+    const frame = window.requestAnimationFrame(() => {
+      const storedSag = readStored<SagImportResult>(GROUP_STORAGE_KEYS.sag);
+      const storedMonitors = readStored<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
+      if (storedSag) setSag(storedSag);
+      if (storedMonitors?.length === 8) setMonitors(storedMonitors);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
