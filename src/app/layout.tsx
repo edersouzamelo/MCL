@@ -12,13 +12,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/favicon.png",
+        url: "/icon?v=4",
         type: "image/png",
-        sizes: "any",
+        sizes: "512x512",
       },
     ],
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    shortcut: "/icon?v=4",
+    apple: "/icon?v=4",
   },
 };
 
