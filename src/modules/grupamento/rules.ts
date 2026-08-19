@@ -63,9 +63,9 @@ function parsePiCodes(value: unknown) {
 
   return [...new Set(
     raw
-      .split(/[;,\s]+/)
-      .map((item) => item.trim().toUpperCase())
-      .filter((item) => /^[A-Z0-9]{6,}$/.test(item)),
+      .split(/[;,\s+]+/)
+      .map((item) => item.trim().toUpperCase().replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, ""))
+      .filter((item) => /^[A-Z0-9]{6,}$/.test(item) && /[A-Z]/.test(item) && /\d/.test(item)),
   )];
 }
 
@@ -141,8 +141,7 @@ function parseBriefingRules(sheetName: string, matrix: unknown[][]) {
 
     const slideNumber = Number(match[1]);
     const title = match[2].trim();
-    const parenthetical = [...title.matchAll(/\(([^)]+)\)/g)].map((item) => item[1]).join(" ");
-    const piCodes = parsePiCodes(parenthetical);
+    const piCodes = parsePiCodes(title);
     const includeAllEPrefix = /TODOS\s+OS\s+E(?:S)?\b/i.test(title);
 
     rules.push({
