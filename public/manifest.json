@@ -1,6 +1,7 @@
 {
   "name": "MCL",
   "short_name": "MCL",
+  "id": "/?mcl-app=v6",
   "description": "Prototipo demonstrativo com dados sinteticos para continuidade logistica Classe II.",
   "start_url": "/painel",
   "display": "standalone",
@@ -8,7 +9,7 @@
   "theme_color": "#050c12",
   "icons": [
     {
-      "src": "/icon?v=4",
+      "src": "/icons/mcl-app-cyan-v6.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
