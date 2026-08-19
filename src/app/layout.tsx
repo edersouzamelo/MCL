@@ -12,13 +12,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/icon?v=4",
+        url: "/icons/mcl-app-cyan-v6.png",
         type: "image/png",
         sizes: "512x512",
       },
     ],
-    shortcut: "/icon?v=4",
-    apple: "/icon?v=4",
+    shortcut: "/icons/mcl-app-cyan-v6.png",
+    apple: "/icons/mcl-app-cyan-v6.png",
   },
 };
 
