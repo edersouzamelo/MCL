@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Clock3, Database, Monitor, ShieldCheck } from "lucide-react";
 import type { SagImportResult, SagSnapshot } from "@/modules/grupamento/sag";
 import {
@@ -35,10 +35,12 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    setSag(load<SagImportResult>(GROUP_STORAGE_KEYS.sag));
-    const stored = load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
-    const selected = stored?.find((item) => item.id === monitorId);
-    if (selected) setMonitor(selected);
+    const frame = window.requestAnimationFrame(() => {
+      setSag(load<SagImportResult>(GROUP_STORAGE_KEYS.sag));
+      const stored = load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
+      const selected = stored?.find((item) => item.id === monitorId);
+      if (selected) setMonitor(selected);
+    });
 
     const onStorage = () => {
       setSag(load<SagImportResult>(GROUP_STORAGE_KEYS.sag));
@@ -46,7 +48,10 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       if (refreshed) setMonitor(refreshed);
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("storage", onStorage);
+    };
   }, [monitorId]);
 
   useEffect(() => {
@@ -55,7 +60,6 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   }, []);
 
   useEffect(() => {
-    setScreenIndex(0);
     if (monitor.mode !== "loop" || monitor.screens.length <= 1) return;
     const timer = window.setInterval(
       () => setScreenIndex((current) => (current + 1) % monitor.screens.length),
