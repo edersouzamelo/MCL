@@ -58,10 +58,10 @@ export async function POST(request: Request) {
       resourceType: "GRUPAMENTO_CCO",
       resourceId: file.name,
       organizationId: session.user.organizationId,
-      outcome: success ? "SUCESSO" : "SEM_DADOS",
+      outcome: success ? "SUCESSO" : "ERRO",
       reason: success
         ? "Carga SAG manual interpretada pelo parser determinístico."
-        : "Arquivo aceito, mas sem linhas financeiras reconhecidas.",
+        : "Arquivo aceito, mas sem linhas financeiras reconhecidas; a carga não foi considerada válida.",
       metadata: {
         fileName: file.name,
         fileSize: file.size,
