@@ -14,6 +14,7 @@ import {
   Home,
   Landmark,
   Menu,
+  PanelsTopLeft,
   QrCode,
   Search,
   Wallet,
@@ -29,6 +30,7 @@ const navigation = [
     items: [
       { href: "/inicio", label: "Início", icon: Home },
       { href: "/painel", label: "Situação geral", icon: Gauge },
+      { href: "/grupamento", label: "Escalão / CCO", icon: PanelsTopLeft },
       { href: "/assistente", label: "Assistente IA", icon: Bot },
     ],
   },
@@ -64,6 +66,7 @@ const routeNames: Array<[string, string]> = [
   ["/etiquetas/", "Etiqueta logística"],
   ["/catalogo", "CATMAT e Atas"],
   ["/admin/usuarios", "Gestão de usuários"],
+  ["/grupamento", "Escalão / CCO"],
   ["/painel", "Situação geral"],
   ["/assistente", "Assistente IA"],
   ["/necessidades", "Necessidades"],
