@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BrandLogo } from "@/components/BrandLogo";
+import {
+  Boxes,
+  ClipboardCheck,
+  PackageCheck,
+  ShoppingCart,
+  Truck,
+  WalletCards,
+  type LucideIcon,
+} from "lucide-react";
+import { BrandLogo, MclVectorLogo } from "@/components/BrandLogo";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { getUserProfile } from "@/app/actions/onboarding";
 import { getDemoState } from "@/server/demo-store";
@@ -25,13 +34,23 @@ function getStageStatus(systems: SourceSystemCatalogEntry[]) {
   return "Lacuna / pendente";
 }
 
+const stageIcons: Record<string, LucideIcon> = {
+  clipboard: ClipboardCheck,
+  credit: WalletCards,
+  cart: ShoppingCart,
+  package: PackageCheck,
+  warehouse: Boxes,
+  truck: Truck,
+};
+
 function StageGlyph({ type }: { type: string }) {
-  if (type === "clipboard") return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="12" height="16" rx="2" /><path d="M9 5V3h6v2M9 10h6M9 14h6M9 18h4" /></svg>;
-  if (type === "credit") return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18M7 15h4" /></svg>;
-  if (type === "cart") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2 11h10l3-8H6" /><circle cx="9" cy="19" r="1.5" /><circle cx="17" cy="19" r="1.5" /></svg>;
-  if (type === "package") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 0v10l8 4 8-4V7M12 11v10M8 5l8 4" /></svg>;
-  if (type === "warehouse") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10 12 4l9 6v10H3V10Z" /><path d="M7 20v-7h10v7M7 16h10" /></svg>;
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11v11H3V6Zm11 4h4l3 4v3h-7v-7Z" /><circle cx="7" cy="19" r="2" /><circle cx="18" cy="19" r="2" /></svg>;
+  const Icon = stageIcons[type] ?? Boxes;
+  return (
+    <>
+      <MclVectorLogo className="ops-stage-icon-frame" />
+      <Icon className="ops-stage-icon-symbol" strokeWidth={1.75} aria-hidden="true" />
+    </>
+  );
 }
 
 function Arrow() {
