@@ -58,10 +58,6 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   }, []);
 
   useEffect(() => {
-    setScreenIndex(0);
-  }, [monitor.screens]);
-
-  useEffect(() => {
     if (monitor.mode !== "loop" || monitor.screens.length <= 1) return;
     const timer = window.setInterval(
       () => setScreenIndex((current) => (current + 1) % monitor.screens.length),
@@ -70,7 +66,8 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     return () => window.clearInterval(timer);
   }, [monitor.mode, monitor.screens, monitor.delaySeconds]);
 
-  const activeScreen = monitor.screens[Math.min(screenIndex, monitor.screens.length - 1)] ?? "overview";
+  const safeIndex = Math.min(screenIndex, Math.max(0, monitor.screens.length - 1));
+  const activeScreen = monitor.screens[safeIndex] ?? "overview";
   const screenLabel = CCO_SCREEN_CATALOG.find((item) => item.id === activeScreen)?.label ?? "Visão executiva";
   const ccol = monitor.layout === "ccol";
   const isRuleScreen = activeScreen === "briefing" || activeScreen.startsWith("class-");
@@ -124,7 +121,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         <div className="flex items-center gap-3">
           <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
           <span>{monitor.mode === "loop" ? `loop · ${monitor.delaySeconds}s` : "tela fixa"}</span>
-          <span>{screenIndex + 1}/{monitor.screens.length}</span>
+          <span>{safeIndex + 1}/{monitor.screens.length}</span>
         </div>
       </footer>
     </main>
