@@ -1,13 +1,56 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
+import { parseCurrentSagPdf, parseRpnPdf } from "@/modules/grupamento/pdf-sag";
+import { parseRpnWorkbook } from "@/modules/grupamento/rpn";
 import { parseSagWorkbook } from "@/modules/grupamento/sag";
 import { appendAuditLog } from "@/server/demo-store";
 
 export const runtime = "nodejs";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const PDF_TIMEOUT_MS = 25_000;
 const ALLOWED_ROLES = new Set(["ADMIN", "LOGISTICS_MANAGER", "COMMAND_VIEWER"]);
+const ALLOWED_EXTENSIONS = new Set(["pdf", "xls", "xlsx"]);
+
+function extensionOf(file: File) {
+  return file.name.toLowerCase().split(".").pop() ?? "";
+}
+
+function validateFile(file: FormDataEntryValue | null, label: string): file is File {
+  if (!(file instanceof File)) return false;
+  if (!ALLOWED_EXTENSIONS.has(extensionOf(file))) return false;
+  if (file.size <= 0 || file.size > MAX_FILE_SIZE) return false;
+  return true;
+}
+
+async function withPdfTimeout<T>(promise: Promise<T>, label: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}: extração PDF excedeu ${PDF_TIMEOUT_MS / 1000}s.`)), PDF_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function parseCurrent(file: File) {
+  const buffer = await file.arrayBuffer();
+  return extensionOf(file) === "pdf"
+    ? withPdfTimeout(parseCurrentSagPdf(buffer, file.name), "Exercício Corrente")
+    : parseSagWorkbook(buffer, file.name);
+}
+
+async function parseRpn(file: File) {
+  const buffer = await file.arrayBuffer();
+  return extensionOf(file) === "pdf"
+    ? withPdfTimeout(parseRpnPdf(buffer, file.name), "RPNP")
+    : parseRpnWorkbook(buffer, file.name);
+}
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
@@ -22,7 +65,7 @@ export async function POST(request: Request) {
       actorId: session.user.id,
       action: "SAG_IMPORT",
       resourceType: "GRUPAMENTO_CCO",
-      resourceId: "manual-upload",
+      resourceId: "manual-pair-upload",
       organizationId: session.user.organizationId,
       outcome: "NEGADO",
       reason: "Perfil sem competência demonstrativa para carga SAG no nível Escalão/Grupamento.",
@@ -32,63 +75,78 @@ export async function POST(request: Request) {
   }
 
   const formData = await request.formData();
-  const file = formData.get("file");
+  const currentFile = formData.get("currentFile");
+  const rpnFile = formData.get("rpnFile");
 
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Arquivo SAG não informado." }, { status: 400 });
+  if (!(currentFile instanceof File) || !(rpnFile instanceof File)) {
+    return NextResponse.json({ error: "Selecione os dois relatórios: Exercício Corrente e RPNP." }, { status: 400 });
   }
-
-  const extension = file.name.toLowerCase().split(".").pop();
-  if (!extension || !["xls", "xlsx"].includes(extension)) {
-    return NextResponse.json({ error: "Formato não suportado. Use .xls ou .xlsx exportado do SAG." }, { status: 415 });
+  if (!ALLOWED_EXTENSIONS.has(extensionOf(currentFile)) || !ALLOWED_EXTENSIONS.has(extensionOf(rpnFile))) {
+    return NextResponse.json({ error: "Formato não suportado. Use PDF (recomendado), XLS ou XLSX nos dois campos." }, { status: 415 });
   }
-
-  if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "Arquivo vazio ou acima do limite de 10 MB." }, { status: 413 });
+  if (!validateFile(currentFile, "Exercício Corrente") || !validateFile(rpnFile, "RPNP")) {
+    return NextResponse.json({ error: "Um dos arquivos está vazio, inválido ou acima do limite de 20 MB." }, { status: 413 });
   }
 
   try {
-    const buffer = await file.arrayBuffer();
-    const result = parseSagWorkbook(buffer, file.name);
-    const success = result.rows.length > 0;
+    const [current, rpn] = await Promise.all([parseCurrent(currentFile), parseRpn(rpnFile)]);
+    const success = current.rows.length > 0 && rpn.rows.length > 0;
 
     appendAuditLog({
       actorId: session.user.id,
-      action: "SAG_IMPORT",
+      action: "SAG_PAIR_IMPORT",
       resourceType: "GRUPAMENTO_CCO",
-      resourceId: file.name,
+      resourceId: `${currentFile.name} + ${rpnFile.name}`,
       organizationId: session.user.organizationId,
       outcome: success ? "SUCESSO" : "ERRO",
       reason: success
-        ? "Carga SAG manual interpretada pelo parser determinístico."
-        : "Arquivo aceito, mas sem linhas financeiras reconhecidas; a carga não foi considerada válida.",
+        ? "Par SAG Exercício Corrente + RPNP interpretado deterministicamente."
+        : "O par foi recebido, mas pelo menos uma das duas fontes não produziu linhas válidas; publicação recusada.",
       metadata: {
-        fileName: file.name,
-        fileSize: file.size,
-        sheetCount: result.sheets.length,
-        rowCount: result.rows.length,
-        warningCount: result.warnings.length,
-        rawFilePersisted: false,
+        currentFileName: currentFile.name,
+        currentFileSize: currentFile.size,
+        currentRowCount: current.rows.length,
+        currentWarningCount: current.warnings.length,
+        rpnFileName: rpnFile.name,
+        rpnFileSize: rpnFile.size,
+        rpnRowCount: rpn.rows.length,
+        rpnWarningCount: rpn.warnings.length,
+        rawFilesPersisted: false,
       },
     });
 
-    return NextResponse.json(result, { status: success ? 200 : 422 });
+    if (!success) {
+      return NextResponse.json(
+        {
+          error: "Carga recusada: os dois relatórios precisam ser reconhecidos e conter linhas válidas.",
+          currentWarnings: current.warnings,
+          rpnWarnings: rpn.warnings,
+        },
+        { status: 422 },
+      );
+    }
+
+    return NextResponse.json({ current, rpn, importedAt: new Date().toISOString() });
   } catch (error) {
     appendAuditLog({
       actorId: session.user.id,
-      action: "SAG_IMPORT",
+      action: "SAG_PAIR_IMPORT",
       resourceType: "GRUPAMENTO_CCO",
-      resourceId: file.name,
+      resourceId: `${currentFile.name} + ${rpnFile.name}`,
       organizationId: session.user.organizationId,
       outcome: "ERRO",
-      reason: "Falha ao interpretar arquivo SAG.",
+      reason: "Falha ao interpretar o par SAG Exercício Corrente + RPNP.",
       metadata: {
-        fileName: file.name,
-        rawFilePersisted: false,
+        currentFileName: currentFile.name,
+        rpnFileName: rpnFile.name,
+        rawFilesPersisted: false,
         error: error instanceof Error ? error.message : "erro desconhecido",
       },
     });
 
-    return NextResponse.json({ error: "Falha ao interpretar o arquivo SAG. Nenhum dado foi considerado válido." }, { status: 400 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Falha ao interpretar os relatórios SAG. Nenhum dado foi considerado válido." },
+      { status: 400 },
+    );
   }
 }
