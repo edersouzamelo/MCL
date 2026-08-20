@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import type { CcoScreenId } from "@/modules/grupamento/monitor";
+import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult, SagSnapshot } from "@/modules/grupamento/sag";
 
 function currency(value: number) {
@@ -10,30 +11,31 @@ function percent(value: number) {
   return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
-export function GrupamentoBaseMonitorScreen({ screen, sag }: { screen: CcoScreenId; sag: SagImportResult }) {
+export function GrupamentoBaseMonitorScreen({ screen, sag, rpn }: { screen: CcoScreenId; sag: SagImportResult; rpn: RpnImportResult }) {
   if (screen === "execution") return <Execution snapshot={sag.totals} />;
+  if (screen === "rpn") return <RpnExecution rpn={rpn} />;
   if (screen === "pis") return <PiTable sag={sag} />;
   if (screen === "units") return <UnitTable sag={sag} />;
-  if (screen === "provenance") return <Provenance sag={sag} />;
-  return <Overview sag={sag} />;
+  if (screen === "provenance") return <Provenance sag={sag} rpn={rpn} />;
+  return <Overview sag={sag} rpn={rpn} />;
 }
 
-function Overview({ sag }: { sag: SagImportResult }) {
+function Overview({ sag, rpn }: { sag: SagImportResult; rpn: RpnImportResult }) {
   return (
     <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
       <div>
         <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">Situação orçamentária</div>
         <h1 className="mt-3 text-5xl font-black tracking-tight">{percent(sag.totals.committedPercent)} empenhado</h1>
-        <p className="mt-3 text-lg text-slate-400">{percent(sag.totals.liquidatedPercent)} liquidado · {sag.rows.length} registros financeiros válidos</p>
+        <p className="mt-3 text-lg text-slate-400">{percent(sag.totals.liquidatedPercent)} liquidado no exercício · RPNP {percent(rpn.totals.liquidatedPercent)} liquidado</p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <BigMetric label="Total" value={currency(sag.totals.total)} />
+          <BigMetric label="Crédito recebido" value={currency(sag.totals.total)} />
           <BigMetric label="Disponível" value={currency(sag.totals.available)} />
-          <BigMetric label="A liquidar" value={currency(sag.totals.toLiquidate)} />
-          <BigMetric label="Pago" value={currency(sag.totals.paid)} />
+          <BigMetric label="RPNP inscrito" value={currency(rpn.totals.inscribed)} />
+          <BigMetric label="RPNP a liquidar" value={currency(rpn.totals.toLiquidate)} />
         </div>
       </div>
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Maior volume por PI</div>
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Maior volume por PI — exercício</div>
         <div className="mt-5 space-y-4">
           {sag.byPi.slice(0, 7).map((item) => (
             <div key={item.pi} className="border-b border-white/10 pb-3 last:border-0">
@@ -63,13 +65,35 @@ function Execution({ snapshot }: { snapshot: SagSnapshot }) {
       <div className="grid gap-5 lg:grid-cols-3">
         <BigMetric label="Execução empenhada" value={percent(snapshot.committedPercent)} />
         <BigMetric label="Execução liquidada" value={percent(snapshot.liquidatedPercent)} />
-        <BigMetric label="Total da carga" value={currency(snapshot.total)} />
+        <BigMetric label="Crédito recebido" value={currency(snapshot.total)} />
       </div>
       <div className="mt-8 grid gap-4 lg:grid-cols-5">
         {items.map(([label, value]) => <BigMetric key={label} label={label} value={currency(value)} compact />)}
       </div>
       <div className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-slate-400">
-        Fórmula auditável: total = disponível + a liquidar + em liquidação + liquidado + pago; empenhado = total − disponível; execução liquidada = (liquidado + pago) ÷ total.
+        Fórmula auditável: recebido = disponível + a liquidar + em liquidação + liquidado + pago; empenhado = recebido − disponível; execução liquidada = (liquidado + pago) ÷ recebido.
+      </div>
+    </div>
+  );
+}
+
+function RpnExecution({ rpn }: { rpn: RpnImportResult }) {
+  return (
+    <div>
+      <div className="text-xs font-bold uppercase tracking-[0.18em] text-violet-300">RPNP / Restos a Pagar</div>
+      <h1 className="mt-3 text-4xl font-black">Recursos remanescentes de ano anterior</h1>
+      <div className="mt-8 grid gap-5 lg:grid-cols-3">
+        <BigMetric label="Total inscrito" value={currency(rpn.totals.inscribed)} />
+        <BigMetric label="% liquidado" value={percent(rpn.totals.liquidatedPercent)} />
+        <BigMetric label="% cancelado" value={percent(rpn.totals.cancelledPercent)} />
+      </div>
+      <div className="mt-8 grid gap-4 lg:grid-cols-3">
+        <BigMetric label="A liquidar" value={currency(rpn.totals.toLiquidate)} compact />
+        <BigMetric label="Liquidado" value={currency(rpn.totals.liquidated)} compact />
+        <BigMetric label="Cancelado" value={currency(rpn.totals.cancelled)} compact />
+      </div>
+      <div className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-slate-400">
+        Fórmula auditável: total inscrito = a liquidar + liquidado + cancelado; % liquidado = liquidado ÷ total inscrito; % cancelado = cancelado ÷ total inscrito.
       </div>
     </div>
   );
@@ -83,23 +107,26 @@ function UnitTable({ sag }: { sag: SagImportResult }) {
   return <DataTable title="Organizações / UG" columns={["UG", "Sigla", "Total", "% Emp.", "% Liq."]} rows={sag.byUg.slice(0, 12).map((item) => [item.ug, item.acronym || "—", currency(item.snapshot.total), percent(item.snapshot.committedPercent), percent(item.snapshot.liquidatedPercent)])} empty="A carga não contém UG." />;
 }
 
-function Provenance({ sag }: { sag: SagImportResult }) {
+function Provenance({ sag, rpn }: { sag: SagImportResult; rpn: RpnImportResult }) {
+  const warnings = [...sag.warnings.map((warning) => `Exercício: ${warning}`), ...rpn.warnings.map((warning) => `RPNP: ${warning}`)];
   return (
     <div className="mx-auto max-w-5xl">
       <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-300">Proveniência e confiança</div>
-      <h1 className="mt-3 text-4xl font-black">Carga SAG manual rastreável</h1>
+      <h1 className="mt-3 text-4xl font-black">Par SAG manual rastreável</h1>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <BigMetric label="Arquivo de origem" value={sag.source.fileName} compact />
-        <BigMetric label="Última atualização" value={new Date(sag.source.importedAt).toLocaleString("pt-BR")} compact />
+        <BigMetric label="Exercício Corrente" value={sag.source.fileName} compact />
+        <BigMetric label="RPNP" value={rpn.source.fileName} compact />
+        <BigMetric label="Atualização exercício" value={new Date(sag.source.importedAt).toLocaleString("pt-BR")} compact />
+        <BigMetric label="Atualização RPNP" value={new Date(rpn.source.importedAt).toLocaleString("pt-BR")} compact />
         <BigMetric label="Natureza" value="DADO IMPORTADO" compact />
-        <BigMetric label="Persistência do bruto" value="NÃO" compact />
-        <BigMetric label="Abas reconhecidas" value={String(sag.sheets.length)} compact />
-        <BigMetric label="Linhas válidas" value={String(sag.rows.length)} compact />
+        <BigMetric label="Persistência dos brutos" value="NÃO" compact />
+        <BigMetric label="Linhas exercício" value={String(sag.rows.length)} compact />
+        <BigMetric label="Linhas RPNP" value={String(rpn.rows.length)} compact />
       </div>
-      {sag.warnings.length ? (
+      {warnings.length ? (
         <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-5 text-amber-200">
           <div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-4 w-4" /> Alertas da carga</div>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{sag.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{warnings.map((warning, index) => <li key={`${warning}-${index}`}>{warning}</li>)}</ul>
         </div>
       ) : null}
     </div>
