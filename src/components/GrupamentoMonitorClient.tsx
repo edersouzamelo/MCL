@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { Clock3, Database, Monitor, ShieldCheck } from "lucide-react";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
+import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
   CCO_SCREEN_CATALOG,
   GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
   type CcoMonitorConfig,
-  type CcoScreenId,
 } from "@/modules/grupamento/monitor";
 
 function load<T>(key: string): T | null {
@@ -24,6 +24,7 @@ function load<T>(key: string): T | null {
 
 export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
+  const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [monitor, setMonitor] = useState<CcoMonitorConfig>(() => defaultCcoMonitorConfig()[Math.max(0, Math.min(7, monitorId - 1))]);
   const [screenIndex, setScreenIndex] = useState(0);
   const [now, setNow] = useState(new Date());
@@ -31,6 +32,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   useEffect(() => {
     const hydrate = () => {
       setSag(load<SagImportResult>(GROUP_STORAGE_KEYS.sag));
+      setRpn(load<RpnImportResult>(GROUP_STORAGE_KEYS.rpn));
       const stored = load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
       const selected = stored?.find((item) => item.id === monitorId);
       if (selected) setMonitor(selected);
@@ -38,10 +40,12 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     const frame = window.requestAnimationFrame(hydrate);
     window.addEventListener("storage", hydrate);
     window.addEventListener("mcl-grupamento-sag-updated", hydrate);
+    window.addEventListener("mcl-grupamento-rpn-updated", hydrate);
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("storage", hydrate);
       window.removeEventListener("mcl-grupamento-sag-updated", hydrate);
+      window.removeEventListener("mcl-grupamento-rpn-updated", hydrate);
     };
   }, [monitorId]);
 
@@ -86,18 +90,18 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       <section className="p-8">
         {!monitor.enabled ? (
           <Empty title="Monitor desativado" description="Ative esta saída na matriz do CCO para voltar a exibir conteúdo." />
-        ) : !sag ? (
-          <Empty title="Nenhuma carga SAG ativa" description="Esta tela não usa números sintéticos. Carregue um export SAG no cockpit do Grupamento." />
+        ) : !sag || !rpn ? (
+          <Empty title="Par SAG incompleto" description="Esta tela exige Exercício Corrente e RPNP validados. O MCL não substitui a fonte ausente por números sintéticos." />
         ) : activeScreen === "classes" || activeScreen === "briefing" ? (
           <GrupamentoRuleMonitorScreen screen={activeScreen} sag={sag} />
         ) : (
-          <GrupamentoBaseMonitorScreen screen={activeScreen} sag={sag} />
+          <GrupamentoBaseMonitorScreen screen={activeScreen} sag={sag} rpn={rpn} />
         )}
       </section>
 
       <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-white/10 bg-slate-950/95 px-8 py-3 text-xs text-slate-400">
         <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1.5"><Database className="h-3.5 w-3.5" /> {sag ? `Fonte: ${sag.source.fileName}` : "Fonte: sem carga"}</span>
+          <span className="flex items-center gap-1.5"><Database className="h-3.5 w-3.5" /> {sag && rpn ? `Fontes: ${sag.source.fileName} + ${rpn.source.fileName}` : "Fontes: par incompleto"}</span>
           <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> cálculo determinístico</span>
         </div>
         <div className="flex items-center gap-3">

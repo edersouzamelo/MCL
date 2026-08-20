@@ -1,5 +1,6 @@
 export const GROUP_STORAGE_KEYS = {
   sag: "mcl:grupamento:sag:v1",
+  rpn: "mcl:grupamento:rpn:v1",
   rules: "mcl:grupamento:rules:v1",
   monitors: "mcl:grupamento:monitors:v1",
 } as const;
@@ -7,6 +8,7 @@ export const GROUP_STORAGE_KEYS = {
 export const CCO_SCREEN_CATALOG = [
   { id: "overview", label: "Visão executiva" },
   { id: "execution", label: "Execução orçamentária" },
+  { id: "rpn", label: "RPNP / Restos a Pagar" },
   { id: "classes", label: "Execução por Classe" },
   { id: "briefing", label: "Modo briefing" },
   { id: "pis", label: "Planos Internos" },
@@ -27,14 +29,14 @@ export type CcoMonitorConfig = {
 
 export function defaultCcoMonitorConfig(): CcoMonitorConfig[] {
   const presets: CcoScreenId[][] = [
-    ["overview", "execution"],
+    ["overview", "execution", "rpn"],
     ["classes"],
     ["briefing"],
     ["units"],
     ["overview", "classes", "pis"],
     ["provenance"],
-    ["execution", "classes"],
-    ["overview", "execution", "classes", "briefing", "pis", "units", "provenance"],
+    ["execution", "rpn", "classes"],
+    ["overview", "execution", "rpn", "classes", "briefing", "pis", "units", "provenance"],
   ];
 
   return presets.map((screens, index) => ({
