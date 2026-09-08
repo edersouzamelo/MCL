@@ -29,7 +29,7 @@ flowchart TD
 
 ## Autenticação do modelo
 
-O caminho padrão usa o Vercel AI Gateway com `VERCEL_OIDC_TOKEN`, injetado e renovado pela Vercel no runtime. Não há `AI_GATEWAY_API_KEY` no código nem em `.env.example`.
+O caminho padrão usa o Vercel AI Gateway por identidade OIDC do projeto. No runtime atual, o SDK resolve essa identidade primeiro pelo contexto seguro da requisição (`x-vercel-oidc-token`) e também aceita `VERCEL_OIDC_TOKEN` como alternativa. A aplicação não inspeciona nem transporta esse token manualmente. Não há `AI_GATEWAY_API_KEY` no código nem em `.env.example`.
 
 As duas configurações opcionais são não secretas:
 
@@ -38,7 +38,7 @@ MCL_AI_PROVIDER=vercel-oidc
 MCL_AI_MODEL=openai/gpt-5-mini
 ```
 
-Sem `VERCEL_OIDC_TOKEN`, a rota falha explicitamente com `AI_GATEWAY_OIDC_UNAVAILABLE`. Ela não retorna respostas fixas. Para desenvolvimento local vinculado à Vercel, a identidade temporária pode ser obtida pelo fluxo da CLI (`vercel env pull`); não deve ser commitada.
+O SDK é a fonte de verdade para autenticação: a ausência de `process.env.VERCEL_OIDC_TOKEN` isoladamente não prova que OIDC está indisponível, pois o token pode existir no contexto da requisição. Se nenhum dos meios estiver disponível ou o Gateway recusar a identidade, a rota falha explicitamente com `AI_GATEWAY_AUTH_FAILED` e não retorna respostas fixas. Para desenvolvimento local vinculado à Vercel, a identidade temporária pode ser obtida pelo fluxo da CLI (`vercel env pull`); não deve ser commitada.
 
 ## RAG e ferramentas
 
@@ -76,7 +76,6 @@ Não existe mais `confidenceScore`. Uma porcentagem gerada pelo próprio sistema
 
 | Código | Significado |
 |---|---|
-| `AI_GATEWAY_OIDC_UNAVAILABLE` | Runtime não recebeu OIDC |
 | `AI_GATEWAY_AUTH_FAILED` | Gateway recusou a identidade do projeto |
 | `AI_GATEWAY_BUDGET_EXHAUSTED` | Limite financeiro atingido |
 | `AI_GATEWAY_RATE_LIMITED` | Limite temporário de requisições |
