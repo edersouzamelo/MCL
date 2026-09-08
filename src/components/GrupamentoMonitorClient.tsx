@@ -31,24 +31,39 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    const hydrate = () => {
-      setSag(load<SagImportResult>(GROUP_STORAGE_KEYS.sag));
-      setRpn(load<RpnImportResult>(GROUP_STORAGE_KEYS.rpn));
+    let cancelled = false;
+    const hydrate = async () => {
       const stored = load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
       const selected = stored?.find((item) => item.id === monitorId);
       if (selected) setMonitor({ ...selected, layout: selected.layout ?? "mcl" });
+      try {
+        const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!cancelled) {
+          setSag(payload.current ?? null);
+          setRpn(payload.rpn ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setSag(null);
+          setRpn(null);
+        }
+      }
     };
-    const frame = window.requestAnimationFrame(hydrate);
-    window.addEventListener("storage", hydrate);
-    window.addEventListener("mcl-grupamento-sag-updated", hydrate);
-    window.addEventListener("mcl-grupamento-rpn-updated", hydrate);
-    window.addEventListener("mcl-grupamento-monitors-updated", hydrate);
+    const frame = window.requestAnimationFrame(() => { void hydrate(); });
+    const refresh = () => { void hydrate(); };
+    window.addEventListener("storage", refresh);
+    window.addEventListener("mcl-grupamento-sag-updated", refresh);
+    window.addEventListener("mcl-grupamento-rpn-updated", refresh);
+    window.addEventListener("mcl-grupamento-monitors-updated", refresh);
     return () => {
+      cancelled = true;
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("storage", hydrate);
-      window.removeEventListener("mcl-grupamento-sag-updated", hydrate);
-      window.removeEventListener("mcl-grupamento-rpn-updated", hydrate);
-      window.removeEventListener("mcl-grupamento-monitors-updated", hydrate);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("mcl-grupamento-sag-updated", refresh);
+      window.removeEventListener("mcl-grupamento-rpn-updated", refresh);
+      window.removeEventListener("mcl-grupamento-monitors-updated", refresh);
     };
   }, [monitorId]);
 

@@ -125,8 +125,27 @@ model Organization {
   memberships            Membership[]
   needs                  Need[]
   procurementInstruments ProcurementInstrument[]
+  financialSourceImports FinancialSourceImport[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
+}
+
+model FinancialSourceImport {
+  id              String       @id @default(uuid())
+  organizationId  String
+  sourceKind      String
+  fileName        String
+  checksum        String
+  rowCount        Int
+  payload         Json
+  warnings        Json
+  ingestionMethod String
+  importedBy      String?
+  importedAt      DateTime     @default(now())
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, sourceKind, checksum])
+  @@index([organizationId, sourceKind, importedAt])
 }
 
 model SupplyItem {
@@ -896,4 +915,3 @@ model EventLog {
   @@index([objectType, objectId])
   @@index([occurredAt])
 }
-

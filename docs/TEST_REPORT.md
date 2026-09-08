@@ -1,5 +1,37 @@
 # Relatório de Testes
 
+## Execução em 2026-09-08 — Assistente IA Gateway OIDC/RAG
+
+Branch: `codex/assistente-rag-oidc`
+
+Baseline: `7350af8`
+
+| Comando | Resultado |
+|---|---|
+| `pnpm lint` | aprovado: 0 erros; 26 avisos preexistentes ou fora deste lote (baseline: 27) |
+| `pnpm typecheck` | aprovado |
+| `pnpm test` | aprovado: 20 arquivos, 102 testes |
+| `pnpm build` | aprovado: Next.js 16.2.9 e rota `/api/ai/chat` dinâmica em runtime Node.js |
+| `pnpm test:e2e` | bloqueado: executável Chromium do Playwright ausente |
+| chamada LLM local | não executada: `VERCEL_OIDC_TOKEN` ausente no runtime local |
+
+O comando E2E inicialmente encontrou `uv_interface_addresses` ao iniciar o Next sem hostname. `playwright.config.ts` foi corrigido para usar `127.0.0.1`; o servidor passou a iniciar e a execução alcançou o Playwright, que então confirmou o bloqueio remanescente por ausência de `chrome-headless-shell`.
+
+Cobertura adicionada:
+
+- autenticação obrigatória em `/api/ai/chat`;
+- validação de prompt, escopo e histórico;
+- encaminhamento de ator e `requestId` ao agente;
+- falha financeira explícita sem resposta falsa;
+- recuperação RAG com conhecimento versionado e citações;
+- bloqueio dos silos Crédito/TG e SAG/Grupamento;
+- ausência de números financeiros em ferramenta bloqueada;
+- histórico conversacional tipado;
+- classificação de orçamento esgotado no Gateway;
+- limite defensivo de 10 requisições por usuário/minuto.
+
+O teste de integração real do Gateway depende de um deploy Vercel com AI Gateway/OIDC habilitado. Até essa evidência existir, o lote está validado em código e build, mas não homologado operacionalmente.
+
 Execução em 2026-07-02.
 
 | Comando | Resultado |

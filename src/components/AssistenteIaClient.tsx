@@ -26,13 +26,14 @@ import {
   ShieldCheck,
   Database,
 } from "lucide-react";
-import type { RagResponse } from "@/modules/ai/rag-engine";
+import type { RagResponse } from "@/modules/ai/contracts";
 
 interface MessageItem {
   id: string;
   sender: "user" | "assistant";
   text: string;
   response?: RagResponse;
+  errorCode?: string;
   timestamp: string;
 }
 
@@ -41,6 +42,13 @@ interface ChatHistoryEntry {
   title: string;
   query: string;
   category: "HOJE" | "ÚLTIMOS 7 DIAS";
+}
+
+class AssistantRequestError extends Error {
+  constructor(message: string, public readonly code: string) {
+    super(message);
+    this.name = "AssistantRequestError";
+  }
 }
 
 const PRESET_CONVERSATIONS: ChatHistoryEntry[] = [
@@ -132,6 +140,7 @@ export function AssistenteIaClient({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messageSequenceRef = useRef(0);
+  const requestInFlightRef = useRef(false);
 
   const nextMessageId = (prefix: string) => {
     messageSequenceRef.current += 1;
@@ -145,8 +154,10 @@ export function AssistenteIaClient({
   }, [messages, loading, animationsEnabled]);
 
   const handleSearch = async (queryText?: string, chatId?: string) => {
+    if (requestInFlightRef.current) return;
     const q = (queryText !== undefined ? queryText : prompt).trim();
     if (!q) return;
+    requestInFlightRef.current = true;
 
     const userMessage: MessageItem = {
       id: nextMessageId("usr"),
@@ -155,6 +166,10 @@ export function AssistenteIaClient({
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
+    const history = (chatId ? [] : messages.slice(-8)).map((message) => ({
+      role: message.sender === "user" ? "user" as const : "assistant" as const,
+      content: message.text,
+    }));
     setMessages((prev) => [...prev, userMessage]);
     setPrompt("");
     setLoading(true);
@@ -166,9 +181,22 @@ export function AssistenteIaClient({
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: q, scope: selectedScope }),
+        body: JSON.stringify({ prompt: q, scope: selectedScope, history }),
       });
-      const data: RagResponse = await res.json();
+      const data = await res.json() as RagResponse | {
+        code?: string;
+        error?: string;
+        retryable?: boolean;
+        requestId?: string;
+      };
+      if (!res.ok || !("answer" in data)) {
+        const apiError = "error" in data ? data : {};
+        const suffix = apiError.requestId ? ` (rastro ${apiError.requestId})` : "";
+        throw new AssistantRequestError(
+          `${apiError.error ?? "O Assistente IA não respondeu."}${suffix}`,
+          apiError.code ?? "AI_REQUEST_FAILED",
+        );
+      }
 
       const assistantMessage: MessageItem = {
         id: nextMessageId("ast"),
@@ -179,21 +207,20 @@ export function AssistenteIaClient({
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "Ocorreu um erro ao comunicar com a inteligência logística.";
       const errorMessage: MessageItem = {
         id: nextMessageId("err"),
         sender: "assistant",
-        text: "Ocorreu um erro ao comunicar com a inteligência logística. Por favor, tente novamente.",
-        response: {
-          answer: "Ocorreu um erro ao comunicar com a inteligência logística. Por favor, tente novamente.",
-          citations: [],
-          suggestedQuestions: ["Quais são as regras de adesão à Ata pela Lei 14.133?"],
-          confidenceScore: 0,
-        },
+        text: message,
+        errorCode: error instanceof AssistantRequestError ? error.code : "AI_REQUEST_FAILED",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
+      requestInFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -447,7 +474,7 @@ export function AssistenteIaClient({
 
               {/* Descrição em fonte leve/normal */}
               <p className="mcl-ai-intro mt-1.5 text-center max-w-lg mx-auto">
-                Converse com os dados da cadeia logística. As respostas preservam contexto, evidências e nível de confiança.
+                Converse com os silos autorizados da cadeia logística. Cada resposta informa fontes, datas e lacunas.
               </p>
 
               {/* Caixa de Entrada de Prompt Principal */}
@@ -563,8 +590,8 @@ export function AssistenteIaClient({
                     </div>
                   ) : (
                     /* Cartão de Resposta do Assistente RAG */
-                    <div className="mcl-ai-answer-card w-full rounded-2xl p-4 sm:p-5 space-y-4">
-                      {/* Cabeçalho da Resposta com Confiança & Ações */}
+                    <div className="mcl-ai-answer-card w-full rounded-2xl p-4 sm:p-5 space-y-4" aria-live="polite">
+                      {/* Cabeçalho da Resposta com provedor e ações */}
                       <div className="flex items-center justify-between pb-3 border-b border-zinc-200/70 dark:border-zinc-700/70">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-lg bg-[#e8f3fb] dark:bg-sky-950/60 border border-[#d0e5f7] flex items-center justify-center p-1">
@@ -576,7 +603,12 @@ export function AssistenteIaClient({
                             </span>
                             {msg.response && (
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-                                Confiança RAG: {Math.round(msg.response.confidenceScore * 100)}%
+                                {msg.response.model} · Gateway OIDC
+                              </span>
+                            )}
+                            {msg.errorCode && (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-medium">
+                                {msg.errorCode} · sem resposta substituta
                               </span>
                             )}
                           </div>
@@ -604,6 +636,17 @@ export function AssistenteIaClient({
                         </div>
                       </div>
 
+                      {msg.response && msg.response.warnings.length > 0 && (
+                        <div className="rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/30 dark:text-amber-200">
+                          <span className="font-semibold">Lacunas declaradas:</span>
+                          <ul className="mt-1 space-y-1">
+                            {msg.response.warnings.map((warning) => (
+                              <li key={warning}>• {warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
                       {/* Conteúdo Textual Formatado */}
                       <div className="prose dark:prose-invert max-w-none text-xs sm:text-sm leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap font-normal">
                         {msg.text}
@@ -614,7 +657,7 @@ export function AssistenteIaClient({
                         <div className="pt-3 border-t border-zinc-200/70 dark:border-zinc-700/70 space-y-2">
                           <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
                             <BookOpen className="h-3.5 w-3.5 text-[#38a3e5]" />
-                            Fontes & Citações da Resposta:
+                            Fontes consultadas:
                           </span>
                           <div className="flex flex-wrap gap-2">
                             {msg.response.citations.map((cit) => (
@@ -624,6 +667,9 @@ export function AssistenteIaClient({
                               >
                                 <span className="font-medium">{cit.title}</span>
                                 <span className="text-zinc-400">({cit.source})</span>
+                                {cit.asOf && (
+                                  <span className="text-zinc-400">· {cit.asOf}</span>
+                                )}
                                 {cit.url && (
                                   <a
                                     href={cit.url}
@@ -667,9 +713,9 @@ export function AssistenteIaClient({
               ))}
 
               {loading && (
-                <div className="flex items-center gap-2 text-xs text-zinc-400 p-2 animate-pulse font-normal">
+                <div className="flex items-center gap-2 text-xs text-zinc-400 p-2 animate-pulse font-normal" role="status" aria-live="polite">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-[#38a3e5]" />
-                  <span>Consultando fontes logísticas e legislação...</span>
+                  <span>Consultando fontes autorizadas e conhecimento versionado...</span>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -714,25 +760,26 @@ export function AssistenteIaClient({
       {/* Modal: Fontes Conectadas */}
       {sourcesModalOpen && (
         <div className="mcl-ai-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-menu-in">
-          <div className="mcl-ai-modal w-full max-w-lg rounded-2xl p-6 space-y-4">
+          <div className="mcl-ai-modal w-full max-w-lg rounded-2xl p-6 space-y-4" role="dialog" aria-modal="true" aria-labelledby="mcl-ai-sources-title">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <Database className="h-5 w-5 text-[#0284c7]" />
-                <h3 className="text-base font-semibold text-[#1e293b] dark:text-zinc-100">
-                  Fontes de Dados Conectadas
+                <h3 id="mcl-ai-sources-title" className="text-base font-semibold text-[#1e293b] dark:text-zinc-100">
+                  Fontes e Estados de Acesso
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSourcesModalOpen(false)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                aria-label="Fechar fontes de dados"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-normal">
-              O motor de IA consulta em tempo real bases oficiais, ontologias e repositórios parametrizados:
+              O Assistente separa fontes disponíveis, condicionais e bloqueadas. Nenhum fallback demonstrativo é tratado como dado atual.
             </p>
 
             <div className="space-y-2.5">
@@ -740,10 +787,10 @@ export function AssistenteIaClient({
                 <ShieldCheck className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                 <div>
                   <h4 className="text-xs font-semibold text-[#1e293b] dark:text-zinc-200">
-                    Legislação Federal & Lei 14.133/2021
+                    Base de conhecimento versionada
                   </h4>
                   <p className="text-[11px] text-zinc-500 font-normal">
-                    Art. 86, limites de carona (50% individual e 200% global) e Decreto nº 11.462/2023.
+                    Explica arquitetura, fluxos e limitações a partir do repositório. Código não substitui fonte jurídica oficial.
                   </p>
                 </div>
               </div>
@@ -752,10 +799,10 @@ export function AssistenteIaClient({
                 <Database className="h-4 w-4 text-[#0284c7] mt-0.5 shrink-0" />
                 <div>
                   <h4 className="text-xs font-semibold text-[#1e293b] dark:text-zinc-200">
-                    Compras.gov.br (API Oficial de ARPs)
+                    CATMAT no Compras.gov.br
                   </h4>
                   <p className="text-[11px] text-zinc-500 font-normal">
-                    Atas de Registro de Preços vigentes, saldos de adesão, fornecedores e atas homologadas.
+                    Consulta oficial sob demanda. Resultados vazios e falhas permanecem vazios e falhos.
                   </p>
                 </div>
               </div>
@@ -764,10 +811,10 @@ export function AssistenteIaClient({
                 <FileText className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
                 <div>
                   <h4 className="text-xs font-semibold text-[#1e293b] dark:text-zinc-200">
-                    Catálogo Unificado CATMAT
+                    PostgreSQL do MCL
                   </h4>
                   <p className="text-[11px] text-zinc-500 font-normal">
-                    Indexação de códigos de materiais com descritores oficiais padronizados.
+                    Necessidades, cobertura, rastreabilidade, divergências e conectores, quando persistidos e autorizados. Registros sintéticos são excluídos.
                   </p>
                 </div>
               </div>
@@ -776,10 +823,10 @@ export function AssistenteIaClient({
                 <Layers className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                 <div>
                   <h4 className="text-xs font-semibold text-[#1e293b] dark:text-zinc-200">
-                    Base Operacional {userUnit} (Demonstrativo)
+                    Créditos e SAG/Grupamento bloqueados
                   </h4>
                   <p className="text-[11px] text-zinc-500 font-normal">
-                    Déficits de suprimento Classe II, histórico de demandas e níveis de estoque.
+                    Créditos permanecem bloqueados por integridade/escopo; o SAG permanece bloqueado enquanto seu snapshot existir apenas no navegador.
                   </p>
                 </div>
               </div>
@@ -801,11 +848,11 @@ export function AssistenteIaClient({
       {/* Modal: Sobre o Assistente */}
       {aboutModalOpen && (
         <div className="mcl-ai-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 animate-menu-in">
-          <div className="mcl-ai-modal w-full max-w-lg rounded-2xl p-6 space-y-4">
+          <div className="mcl-ai-modal w-full max-w-lg rounded-2xl p-6 space-y-4" role="dialog" aria-modal="true" aria-labelledby="mcl-ai-about-title">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <Info className="h-5 w-5 text-[#0284c7]" />
-                <h3 className="text-base font-semibold text-[#1e293b] dark:text-zinc-100">
+                <h3 id="mcl-ai-about-title" className="text-base font-semibold text-[#1e293b] dark:text-zinc-100">
                   Sobre o Assistente IA MCL
                 </h3>
               </div>
@@ -813,6 +860,7 @@ export function AssistenteIaClient({
                 type="button"
                 onClick={() => setAboutModalOpen(false)}
                 className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                aria-label="Fechar informações sobre o Assistente"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -825,16 +873,18 @@ export function AssistenteIaClient({
             <div className="p-3.5 rounded-xl bg-[#f0f4f8] dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 text-xs text-zinc-700 dark:text-sky-200 space-y-1.5">
               <div className="font-semibold text-[#0284c7] flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4" />
-                Arquitetura RAG Determinística
+                Agente LLM com RAG e ferramentas somente leitura
               </div>
               <p className="text-[11px] leading-relaxed font-normal text-zinc-600">
-                As respostas são geradas com fundamentação normativa estrita, sem alucinações de dados orçamentários e com indicação explícita dos níveis de confiança e das fontes consultadas.
+                O modelo usa Vercel AI Gateway por OIDC, recupera conhecimento versionado e consulta ferramentas autorizadas. Fontes ausentes são declaradas; nenhuma pontuação de confiança é fabricada.
               </p>
             </div>
 
             <div className="text-[11px] text-zinc-500 font-normal space-y-1">
-              <div>• <strong>Versão do Motor:</strong> MCL RAG Engine v0.9 (Piloto Classe II)</div>
-              <div>• <strong>Governança:</strong> Em conformidade com as diretrizes do Exército Brasileiro e Compras.gov.br</div>
+              <div>• <strong>Provedor:</strong> Vercel AI Gateway com identidade OIDC do projeto</div>
+              <div>• <strong>Modelo padrão:</strong> openai/gpt-5-mini, configurável sem alterar as ferramentas</div>
+              <div>• <strong>Unidade da sessão:</strong> {userUnit}</div>
+              <div>• <strong>Governança:</strong> somente leitura, RBAC, proveniência e falha fechada</div>
             </div>
 
             <div className="pt-2 flex justify-end">
