@@ -15,7 +15,7 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run dev -- -p 3010",
+    command: "npm run dev -- --hostname 127.0.0.1 -p 3010",
     url: "http://127.0.0.1:3010/entrar",
     reuseExistingServer: true,
     timeout: 120_000,

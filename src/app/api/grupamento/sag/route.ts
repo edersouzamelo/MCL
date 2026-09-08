@@ -5,12 +5,13 @@ import { parseCurrentSagPdf, parseRpnPdf } from "@/modules/grupamento/pdf-sag";
 import { parseRpnWorkbook } from "@/modules/grupamento/rpn";
 import { parseSagWorkbook } from "@/modules/grupamento/sag";
 import { appendAuditLog } from "@/server/demo-store";
+import { checksumBuffer, persistFinancialPair } from "@/modules/financial-snapshots/repository";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const PDF_TIMEOUT_MS = 25_000;
-const ALLOWED_ROLES = new Set(["ADMIN", "LOGISTICS_MANAGER", "COMMAND_VIEWER"]);
+const ALLOWED_ROLES = new Set(["ADMIN", "LOGISTICS_MANAGER"]);
 const ALLOWED_EXTENSIONS = new Set(["pdf", "xls", "xlsx"]);
 
 function extensionOf(file: File) {
@@ -39,16 +40,18 @@ async function withPdfTimeout<T>(promise: Promise<T>, label: string) {
 
 async function parseCurrent(file: File) {
   const buffer = await file.arrayBuffer();
-  return extensionOf(file) === "pdf"
+  const parsed = extensionOf(file) === "pdf"
     ? withPdfTimeout(parseCurrentSagPdf(buffer, file.name), "Exercício Corrente")
     : parseSagWorkbook(buffer, file.name);
+  return { parsed: await parsed, buffer };
 }
 
 async function parseRpn(file: File) {
   const buffer = await file.arrayBuffer();
-  return extensionOf(file) === "pdf"
+  const parsed = extensionOf(file) === "pdf"
     ? withPdfTimeout(parseRpnPdf(buffer, file.name), "RPNP")
     : parseRpnWorkbook(buffer, file.name);
+  return { parsed: await parsed, buffer };
 }
 
 export async function POST(request: Request) {
@@ -86,7 +89,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const [current, rpn] = await Promise.all([parseCurrent(currentFile), parseRpn(rpnFile)]);
+    const [currentSource, rpnSource] = await Promise.all([parseCurrent(currentFile), parseRpn(rpnFile)]);
+    const current = currentSource.parsed;
+    const rpn = rpnSource.parsed;
     const success = current.rows.length > 0 && rpn.rows.length > 0;
 
     appendAuditLog({
@@ -120,7 +125,42 @@ export async function POST(request: Request) {
       }, { status: 422 });
     }
 
-    return NextResponse.json({ current, rpn, importedAt: new Date().toISOString() });
+    const organizationId = session.user.organizationId;
+    if (!organizationId) {
+      return NextResponse.json({ error: "Sessão sem organização. A carga não foi persistida." }, { status: 422 });
+    }
+
+    const [currentImport, rpnImport] = await persistFinancialPair(
+      {
+        organizationId,
+        sourceKind: "CURRENT",
+        fileName: currentFile.name,
+        checksum: checksumBuffer(currentSource.buffer),
+        rowCount: current.rows.length,
+        payload: current,
+        warnings: current.warnings,
+        ingestionMethod: "MANUAL_PAIR",
+        importedBy: session.user.id,
+      },
+      {
+        organizationId,
+        sourceKind: "RPNP",
+        fileName: rpnFile.name,
+        checksum: checksumBuffer(rpnSource.buffer),
+        rowCount: rpn.rows.length,
+        payload: rpn,
+        warnings: rpn.warnings,
+        ingestionMethod: "MANUAL_PAIR",
+        importedBy: session.user.id,
+      },
+    );
+
+    return NextResponse.json({
+      current: { ...current, persistedAt: currentImport.importedAt.toISOString(), checksum: currentImport.checksum },
+      rpn: { ...rpn, persistedAt: rpnImport.importedAt.toISOString(), checksum: rpnImport.checksum },
+      importedAt: new Date().toISOString(),
+      persisted: true,
+    });
   } catch (error) {
     appendAuditLog({
       actorId: session.user.id,

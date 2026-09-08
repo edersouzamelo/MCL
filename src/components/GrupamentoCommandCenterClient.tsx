@@ -65,15 +65,26 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const storedSag = readStored<SagImportResult>(GROUP_STORAGE_KEYS.sag);
-      const storedRpn = readStored<RpnImportResult>(GROUP_STORAGE_KEYS.rpn);
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(async () => {
       const storedMonitors = readStored<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
-      if (storedSag) setSag(storedSag);
-      if (storedRpn) setRpn(storedRpn);
       if (storedMonitors?.length === 8) setMonitors(storedMonitors.map((item) => ({ ...item, layout: item.layout ?? "mcl" })));
+      try {
+        const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Falha ao consultar a última carga persistida.");
+        if (!cancelled) {
+          setSag(payload.current ?? null);
+          setRpn(payload.rpn ?? null);
+        }
+      } catch (cause) {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : "Falha ao consultar a última carga persistida.");
+      }
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
@@ -108,8 +119,6 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
       const parsed = payload as SagPairResponse;
       setSag(parsed.current);
       setRpn(parsed.rpn);
-      window.localStorage.setItem(GROUP_STORAGE_KEYS.sag, JSON.stringify(parsed.current));
-      window.localStorage.setItem(GROUP_STORAGE_KEYS.rpn, JSON.stringify(parsed.rpn));
       window.dispatchEvent(new CustomEvent("mcl-grupamento-sag-updated"));
       window.dispatchEvent(new CustomEvent("mcl-grupamento-rpn-updated"));
       setNotice(`Par carregado: ${parsed.current.rows.length} linha(s) do Exercício Corrente + ${parsed.rpn.rows.length} linha(s) dos créditos do exercício anterior.`);
@@ -187,6 +196,7 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
           <div className="mt-4 space-y-2 border-t border-zinc-200 pt-4 text-xs text-zinc-500 dark:border-zinc-800">
             <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Os relatórios são validados como um par; nenhum número sintético substitui fonte ausente.</p>
             <p className="flex items-start gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0" /> A classificação usa PI exato conforme a matriz fornecida; PI não mapeado permanece explicitamente fora da Classe.</p>
+            <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> A fonte de verdade é persistida no banco com checksum; o navegador não fabrica nem conserva saldos financeiros.</p>
             <p className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Escopo de sessão: {organizationId || "organização não informada"}.</p>
           </div>
         </div>
