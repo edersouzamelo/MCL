@@ -23,6 +23,7 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@zxing/browser": "^0.2.0",
+    "ai": "^7.0.93",
     "clsx": "^2.1.1",
     "csv-parse": "^7.0.0",
     "framer-motion": "^12.0.0",

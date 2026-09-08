@@ -13,6 +13,7 @@ export const config = {
     "/necessidades/:path*",
     "/analises/:path*",
     "/aquisicoes/:path*",
+    "/assistente/:path*",
     "/scanner/:path*",
     "/conectores/:path*",
     "/divergencias/:path*",
