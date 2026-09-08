@@ -24,19 +24,6 @@ function configuredModelId() {
   return value;
 }
 
-export function assertOidcRuntimeAvailable() {
-  if (process.env.NODE_ENV === "test") return;
-
-  if (!process.env.VERCEL_OIDC_TOKEN) {
-    throw new MclAiServiceError(
-      "AI_GATEWAY_OIDC_UNAVAILABLE",
-      "O runtime atual não recebeu a identidade OIDC da Vercel. Publique em um projeto Vercel com AI Gateway habilitado ou use o ambiente local vinculado pela CLI da Vercel.",
-      503,
-      false,
-    );
-  }
-}
-
 export function resolveMclModel(): MclModelConfiguration {
   const requestedProvider = process.env.MCL_AI_PROVIDER?.trim() || "vercel-oidc";
   if (requestedProvider !== "vercel-oidc") {

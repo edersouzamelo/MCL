@@ -16,7 +16,7 @@ import {
   type RagResponse,
 } from "@/modules/ai/contracts";
 import { retrieveMclKnowledge } from "@/modules/ai/knowledge-base";
-import { assertOidcRuntimeAvailable, resolveMclModel } from "@/modules/ai/provider";
+import { resolveMclModel } from "@/modules/ai/provider";
 import {
   MCL_DATA_SILOS,
   getSiloCatalog,
@@ -137,7 +137,6 @@ export async function runMclAssistant(
   requestId: string,
   abortSignal?: AbortSignal,
 ): Promise<RagResponse> {
-  assertOidcRuntimeAvailable();
   const model = resolveMclModel();
   const tools = createMclTools(actor);
   const pseudonymousUser = createHash("sha256").update(actor.id).digest("hex").slice(0, 24);
@@ -206,10 +205,20 @@ function statusCodeFromUnknown(error: unknown) {
   return typeof value === "number" ? value : undefined;
 }
 
+function messageFromUnknown(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (!error || typeof error !== "object" || !("message" in error)) return "";
+  const value = (error as { message?: unknown }).message;
+  return typeof value === "string" ? value : "";
+}
+
 export function classifyMclAiError(error: unknown): MclAiServiceError {
   if (error instanceof MclAiServiceError) return error;
   const statusCode = statusCodeFromUnknown(error);
-  if (statusCode === 401 || statusCode === 403) {
+  const errorMessage = messageFromUnknown(error);
+  const isOidcAuthenticationFailure =
+    /x-vercel-oidc-token|vercel_oidc_token|oidc option enabled|unauthenticated|ai_gateway_api_key/i.test(errorMessage);
+  if (statusCode === 401 || statusCode === 403 || isOidcAuthenticationFailure) {
     return new MclAiServiceError(
       "AI_GATEWAY_AUTH_FAILED",
       "O AI Gateway recusou a identidade OIDC deste projeto. Verifique o vínculo e a habilitação do Gateway na Vercel.",

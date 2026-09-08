@@ -44,6 +44,14 @@ export async function POST(request: Request) {
     }
 
     const classified = classifyMclAiError(error);
+    console.error(JSON.stringify({
+      level: "error",
+      message: "Assistente IA falhou",
+      route: "/api/ai/chat",
+      requestId,
+      code: classified.code,
+      status: classified.status,
+    }));
     return NextResponse.json(
       {
         code: classified.code,

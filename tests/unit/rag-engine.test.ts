@@ -3,6 +3,7 @@ import { retrieveMclKnowledge } from "@/modules/ai/rag-engine";
 import { buildMclMessages, classifyMclAiError } from "@/modules/ai/agent";
 import { getSiloCatalog, queryMclData } from "@/modules/ai/silos";
 import { assertMclAiRateLimit, resetMclAiRateLimitsForTests } from "@/modules/ai/rate-limit";
+import { resolveMclModel } from "@/modules/ai/provider";
 
 describe("RAG e guardrails do Assistente IA MCL", () => {
   it("recupera conhecimento versionado com fonte e sem resposta numérica fabricada", () => {
@@ -62,6 +63,22 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     expect(error.code).toBe("AI_GATEWAY_BUDGET_EXHAUSTED");
     expect(error.status).toBe(503);
     expect(error.message).toContain("Nenhuma resposta substituta");
+  });
+
+  it("deixa o SDK resolver OIDC pelo contexto da requisição, sem bloquear pela ausência no process.env", () => {
+    const previousToken = process.env.VERCEL_OIDC_TOKEN;
+    delete process.env.VERCEL_OIDC_TOKEN;
+
+    expect(() => resolveMclModel()).not.toThrow();
+
+    if (previousToken) process.env.VERCEL_OIDC_TOKEN = previousToken;
+  });
+
+  it("classifica ausência do cabeçalho OIDC reportada pelo SDK como falha de autenticação", () => {
+    const error = classifyMclAiError(new Error("The 'x-vercel-oidc-token' header is missing from the request."));
+
+    expect(error.code).toBe("AI_GATEWAY_AUTH_FAILED");
+    expect(error.status).toBe(503);
   });
 
   it("limita o número de chamadas por usuário antes de gerar novos custos", () => {
