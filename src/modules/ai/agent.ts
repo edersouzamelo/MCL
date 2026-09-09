@@ -153,7 +153,6 @@ export async function runMclAssistant(
         sort: "cost",
         tags: ["mcl", "assistente-rag"],
         user: `mcl-${pseudonymousUser}`,
-        quotaEntityId: `mcl-${pseudonymousUser}`,
       },
     },
     prepareStep: async ({ stepNumber }) =>
