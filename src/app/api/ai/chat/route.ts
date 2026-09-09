@@ -24,6 +24,10 @@ function errorDiagnostics(error: unknown) {
     const message = typeof item.message === "string" ? item.message : "";
     const signals = Object.entries({
       oidc: /oidc|unauthenticated/i,
+      missing_oidc_header: /x-vercel-oidc-token.*missing|missing.*x-vercel-oidc-token/i,
+      invalid_token: /invalid.*token|token.*invalid|token.*expired|expired.*token/i,
+      access_denied: /forbidden|not authorized|permission|access denied/i,
+      api_key: /api.key/i,
       routing: /no (available|eligible|matching) provider|routing|no endpoints/i,
       retention: /zero.data.retention|data policy|training/i,
       model: /model.*(not found|not supported|unavailable|invalid)/i,
@@ -80,6 +84,11 @@ export async function POST(request: Request) {
     }
 
     const classified = classifyMclAiError(error);
+    const diagnostics = errorDiagnostics(error);
+    const diagnosticSummary = diagnostics.map((item) =>
+      [item.name, item.statusCode, ...(Array.isArray(item.signals) ? item.signals : [])]
+        .filter((value) => value !== undefined).join(" / ")
+    ).join(" → ");
     console.error(JSON.stringify({
       level: "error",
       message: "Assistente IA falhou",
@@ -87,12 +96,12 @@ export async function POST(request: Request) {
       requestId,
       code: classified.code,
       status: classified.status,
-      diagnostics: errorDiagnostics(error),
+      diagnostics,
     }));
     return NextResponse.json(
       {
         code: classified.code,
-        error: classified.message,
+        error: `${classified.message} Diagnóstico técnico: ${diagnosticSummary || "indisponível"}.`,
         retryable: classified.retryable,
         requestId,
       },
