@@ -9,6 +9,42 @@ import { getRouteActor } from "@/modules/auth/route-actor";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Keep provider payloads, messages, prompts, headers and tokens out of logs.
+// Walk wrappers because retries may hide the original HTTP status in cause.
+function errorDiagnostics(error: unknown) {
+  const seen = new Set<unknown>();
+  const entries: Record<string, unknown>[] = [];
+  const identifier = (value: unknown) =>
+    typeof value === "string" && /^[A-Za-z][A-Za-z0-9_]{0,80}$/.test(value)
+      ? value : undefined;
+  function visit(value: unknown, depth: number) {
+    if (!value || typeof value !== "object" || depth > 4 || seen.has(value) || entries.length >= 8) return;
+    seen.add(value);
+    const item = value as Record<string, unknown>;
+    const message = typeof item.message === "string" ? item.message : "";
+    const signals = Object.entries({
+      oidc: /oidc|unauthenticated/i,
+      routing: /no (available|eligible|matching) provider|routing|no endpoints/i,
+      retention: /zero.data.retention|data policy|training/i,
+      model: /model.*(not found|not supported|unavailable|invalid)/i,
+      schema: /schema|invalid.*(parameter|argument)|unsupported.*(parameter|setting)/i,
+      quota: /quota|budget|credit|payment/i,
+      timeout: /timeout|timed out|abort/i,
+      network: /fetch failed|network|ECONN|ENOTFOUND/i,
+    }).filter(([, pattern]) => pattern.test(message)).map(([signal]) => signal);
+    entries.push({
+      name: identifier(item.name), type: identifier(item.type), code: identifier(item.code),
+      statusCode: typeof item.statusCode === "number" ? item.statusCode : undefined,
+      signals,
+    });
+    visit(item.cause, depth + 1);
+    visit(item.lastError, depth + 1);
+    if (Array.isArray(item.errors)) item.errors.slice(0, 3).forEach((cause) => visit(cause, depth + 1));
+  }
+  visit(error, 0);
+  return entries;
+}
+
 export async function POST(request: Request) {
   const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
   const actor = await getRouteActor();
@@ -51,6 +87,7 @@ export async function POST(request: Request) {
       requestId,
       code: classified.code,
       status: classified.status,
+      diagnostics: errorDiagnostics(error),
     }));
     return NextResponse.json(
       {
