@@ -148,7 +148,8 @@ export async function runMclAssistant(
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     providerOptions: {
       gateway: {
-        zeroDataRetention: true,
+        // Owner authorized standard provider retention on 2026-09-09.
+        // Training remains prohibited; do not weaken this on retry.
         disallowPromptTraining: true,
         sort: "cost",
         tags: ["mcl", "assistente-rag"],
@@ -215,6 +216,14 @@ export function classifyMclAiError(error: unknown): MclAiServiceError {
   if (error instanceof MclAiServiceError) return error;
   const statusCode = statusCodeFromUnknown(error);
   const errorMessage = messageFromUnknown(error);
+  if (statusCode === 403 && /zero.data.retention|data policy|training/i.test(errorMessage)) {
+    return new MclAiServiceError(
+      "AI_GATEWAY_DATA_POLICY_BLOCKED",
+      "O Gateway bloqueou a chamada por uma política de retenção ou treinamento de dados. É necessário verificar uma rota compatível.",
+      503,
+      false,
+    );
+  }
   const isOidcAuthenticationFailure =
     /x-vercel-oidc-token|vercel_oidc_token|oidc option enabled|unauthenticated|ai_gateway_api_key/i.test(errorMessage);
   if (statusCode === 401 || statusCode === 403 || isOidcAuthenticationFailure) {
