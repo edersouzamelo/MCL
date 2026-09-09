@@ -63,7 +63,7 @@ function createMclTools(actor: MclAiActor) {
     }),
     consultarDadosMcl: tool({
       description:
-        "Consulta somente leitura aos silos persistidos autorizados, inclusive o último snapshot SAG de Créditos e Grupamento. Nunca substitua fonte ausente por números estimados.",
+        "Consulta somente leitura aos silos persistidos autorizados, Créditos da UASG usa TG via e-mail/Apps Script; somente Grupamento usa snapshot SAG. Nunca substitua fonte ausente por números estimados.",
       inputSchema: z.object({
         silo: z.enum(MCL_DATA_SILOS),
         search: z.string().trim().max(200).optional(),

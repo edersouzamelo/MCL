@@ -98,7 +98,7 @@ export function getSiloCatalog(databaseConfigured = Boolean(process.env.DATABASE
         { id: "DIVERGENCIAS", label: "Divergências", status: dbStatus, nature: "Persistido", reason: dbReason },
         { id: "CONECTORES", label: "Saúde dos conectores", status: dbStatus, nature: "Persistido", reason: dbReason },
         { id: "AUDITORIA", label: "Auditoria", status: dbStatus, nature: "Persistido e restrito por perfil", reason: dbReason },
-        { id: "CREDITOS", label: "Créditos/Tesouro Gerencial", status: dbStatus, nature: "SAG importado e persistido", reason: dbReason },
+        { id: "CREDITOS", label: "Créditos/Tesouro Gerencial", status: "UNAVAILABLE", nature: "Tesouro Gerencial via e-mail e Apps Script", reason: "Reconexão da fonte TG pendente; importações SAG do CCO não alimentam Créditos." },
         { id: "GRUPAMENTO", label: "SAG/Centro de Comando", status: dbStatus, nature: "SAG importado e persistido", reason: dbReason },
       ],
     },
@@ -508,6 +508,7 @@ export async function queryMclData(
 
   switch (input.silo) {
     case "CREDITOS":
+      return unavailable("A fonte do painel de Créditos da UASG é o Tesouro Gerencial via subscrição de e-mail e Apps Script. Sua reconexão está pendente. Não solicite importação SAG no CCO para obter esses créditos.", { records: [], source: "TESOURO_GERENCIAL", lastUpdatedAt: null });
     case "GRUPAMENTO":
       return queryFinancial(actor, input.search, limit);
     case "NECESSIDADES":

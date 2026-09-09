@@ -71,7 +71,7 @@ const KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
     id: "financial-silo",
     title: "Estado de confiança do módulo financeiro",
     text:
-      "Créditos e Grupamento consomem o mesmo snapshot SAG persistido por organização. Cada carga registra tipo de fonte, nome do arquivo, checksum, quantidade de linhas, horário e método de ingestão. Na ausência de carga validada, Painel e Assistente devem declarar indisponibilidade e não usar fallback demonstrativo.",
+      "Créditos da UASG é o dashboard inspirado no Power BI do Mendes, com Requisitante, RPCM, Metas, NCs, NEs e RPNP. Sua fonte é Tesouro Gerencial via subscrição de e-mail e Google Apps Script. O Escalão/CCO é uma ferramenta adicional de execução por classes com ETL SAG. As fontes são independentes. Nunca exigir importação SAG para consultar Créditos, nem substituir a fonte própria de RPNP. A reconexão TG está pendente; não inventar saldos ou atualização diária.",
     source: "src/modules/financial-snapshots/repository.ts",
     url: `${REPOSITORY_URL}/blob/main/src/modules/financial-snapshots/repository.ts`,
     keywords: ["credito", "creditos", "financeiro", "siafi", "tesouro", "empenho", "orcamento", "execucao"],

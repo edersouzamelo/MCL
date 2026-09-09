@@ -17,14 +17,14 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     expect(JSON.stringify(result)).not.toContain("R$ 142.500");
   });
 
-  it("classifica Créditos e Grupamento como silos persistidos quando há banco", () => {
+  it("separa Créditos TG pendente de Grupamento SAG consultável", () => {
     const catalog = getSiloCatalog(true);
     const creditos = catalog.data.silos.find((silo) => silo.id === "CREDITOS");
     const grupamento = catalog.data.silos.find((silo) => silo.id === "GRUPAMENTO");
 
-    expect(creditos?.status).toBe("AVAILABLE");
+    expect(creditos?.status).toBe("UNAVAILABLE");
     expect(grupamento?.status).toBe("AVAILABLE");
-    expect(creditos?.nature).toContain("persistido");
+    expect(creditos?.nature).toContain("Tesouro Gerencial");
   });
 
   it("nunca devolve números financeiros quando o banco está indisponível", async () => {

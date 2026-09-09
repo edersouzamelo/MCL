@@ -1,3 +1,7 @@
+# RETIFICAÇÃO — 9 SET 2026
+
+Este documento registrava uma associação incorreta entre TG e SAG. O script/webhook abaixo usa parsers SAG e NÃO está homologado para o dashboard de Créditos da UASG. Não instalar esse script como reparo de TG. Créditos e CCO são independentes. Ver CREDITS_RECOVERY_2026-09-09.md. O conteúdo abaixo é histórico, não uma instrução operacional vigente.
+
 # Ingestão financeira SAG/Tesouro Gerencial
 
 ## Fonte de verdade
