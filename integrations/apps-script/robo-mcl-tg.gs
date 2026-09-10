@@ -18,12 +18,21 @@ function enviarPlanilhaSiafiParaMCL() {
     threads.forEach(function(thread) { thread.getMessages().forEach(function(message) {
       if (message.getSubject().indexOf('MCL_MESTRE_EXERCICIO_2026') !== -1 && /(?:<|^)naoresponda@serpro\.gov\.br(?:>|$)/i.test(message.getFrom())) messages.push(message);
     }); });
-    messages.sort(function(a, b) { return a.getDate().getTime() - b.getDate().getTime(); });
+    // Snapshot diário: tente primeiro o e-mail mais recente. O código anterior
+    // reprocessava até 14 dias do mais antigo para o mais novo e podia atingir o
+    // limite de execução do Apps Script antes de enviar o arquivo atual.
+    messages.sort(function(a, b) { return b.getDate().getTime() - a.getDate().getTime(); });
     var failures = 0;
     var accepted = 0;
-    messages.forEach(function(message) {
-      message.getAttachments({ includeInlineImages: false }).forEach(function(attachment) {
-        if (!/^MCL_MESTRE_EXERCICIO_2026.*\.xlsx?$/i.test(attachment.getName())) return;
+    var attempted = 0;
+    var selectedEmailAt = null;
+    for (var messageIndex = 0; messageIndex < messages.length && attempted === 0; messageIndex++) {
+      var message = messages[messageIndex];
+      var attachments = message.getAttachments({ includeInlineImages: false });
+      for (var attachmentIndex = 0; attachmentIndex < attachments.length && attempted === 0; attachmentIndex++) {
+        var attachment = attachments[attachmentIndex];
+        if (!/^MCL_MESTRE_EXERCICIO_2026.*\.xlsx?$/i.test(attachment.getName())) continue;
+        attempted++;
         try {
           var response = UrlFetchApp.fetch('https://mcl-one.vercel.app/api/connectors/siafi/upload', {
             method: 'post', muteHttpExceptions: true,
@@ -35,11 +44,13 @@ function enviarPlanilhaSiafiParaMCL() {
           try { body = JSON.parse(response.getContentText()); } catch (_) { throw new Error('HTTP ' + status + ': resposta não JSON'); }
           if (status < 200 || status >= 300 || !body.success || !body.checksum || !body.persistedAt) throw new Error('HTTP ' + status + ': ' + (body.error || 'persistência não confirmada'));
           accepted++;
-          console.log(JSON.stringify({ status: 'TG_PERSISTIDO', file: attachment.getName(), rowCount: body.rowCount, checksum: body.checksum, persistedAt: body.persistedAt }));
+          selectedEmailAt = message.getDate().toISOString();
+          console.log(JSON.stringify({ status: 'TG_PERSISTIDO', file: attachment.getName(), emailReceivedAt: selectedEmailAt, rowCount: body.rowCount, checksum: body.checksum, persistedAt: body.persistedAt }));
         } catch (error) { failures++; console.error(String(error)); }
-      });
-    });
-    console.log(JSON.stringify({ accepted: accepted, failures: failures, matchedMessages: messages.length }));
+      }
+    }
+    console.log(JSON.stringify({ accepted: accepted, failures: failures, matchedMessages: messages.length, selectedEmailAt: selectedEmailAt }));
+    if (!accepted) throw new Error('Nenhum anexo TG válido foi persistido. Consulte os registros de execução.');
     if (failures) throw new Error(failures + ' anexo(s) não persistido(s). Consulte os registros de execução.');
   } finally { lock.releaseLock(); }
 }

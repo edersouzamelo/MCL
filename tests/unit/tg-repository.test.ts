@@ -10,14 +10,16 @@ describe("persistência TG independente", () => {
     expect(await getLatestTg("org-a")).toBeNull();
     expect(prisma.financialSourceImport.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: "org-a", sourceKind: "TG_MASTER_V1" } }));
   });
-  it("reenvio usa checksum e não atualiza artificialmente o horário do lote existente", async () => {
-    const report: TgReport = { schema: "TG_MASTER_V1", rows: [], metric: "Movim. Líquido", warnings: [], fileName: "fonte.xlsx", sourceDate: null };
+  it("reenvio usa checksum, reprocessa a projeção e não atualiza o horário do lote existente", async () => {
+    const report: TgReport = { schema: "TG_MASTER_V1", parserVersion: 2, rows: [], metric: "Movim. Líquido", warnings: [], fileName: "fonte.xlsx", sourceDate: null };
     const input = { organizationId: "org-a", report, buffer: new TextEncoder().encode("conteudo").buffer, actor: "apps-script", method: "APPS_SCRIPT_TG" as const };
     await persistTg(input);
     await persistTg(input);
     const calls = vi.mocked(prisma.financialSourceImport.upsert).mock.calls;
     expect(calls[0][0].where).toEqual(calls[1][0].where);
-    expect(calls[0][0].update).toEqual({});
+    expect(calls[0][0].update).toMatchObject({ rowCount: 0, payload: expect.objectContaining({ parserVersion: 2 }) });
+    expect(calls[0][0].update).not.toHaveProperty("importedAt");
+    expect(calls[0][0].update).not.toHaveProperty("ingestionMethod");
     expect(calls[0][0].create).toMatchObject({ organizationId: "org-a", sourceKind: TG_SOURCE_KIND });
   });
 });

@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       warnings: parsed.warnings,
     });
   } catch (error) {
-    console.error("Falha na ingestão automática SAG:", error);
+    console.error("Falha na ingestão automática SIAFI/TG:", error);
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Falha interna na ingestão." }, { status: 500 });
   }
 }
