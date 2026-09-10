@@ -1,5 +1,6 @@
 "use client";
 
+import { TechnicalGuideModal } from "./TechnicalGuideModal";
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Wallet,
@@ -609,7 +610,7 @@ export function CreditManagementClient() {
         </div>
       </div>
 
-      {isGuideOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setIsGuideOpen(false)}><section role="dialog" aria-modal="true" aria-labelledby="credit-guide-title" className="max-w-2xl rounded-2xl bg-white p-6 text-zinc-900 shadow-xl dark:bg-zinc-900 dark:text-white" onClick={event => event.stopPropagation()}><h2 id="credit-guide-title" className="text-xl font-bold">Guia do painel de Créditos</h2><p className="mt-4">Este painel mantém as visões Requisitante, RPCM e Metas, com NCs, NEs, RPNP e pregões SRP.</p><p className="mt-3">A fonte orçamentária prevista é o Tesouro Gerencial, recebido por subscrição de e-mail e processado pelo Google Apps Script. A publicação dos saldos exige arquivo validado, organização identificada e data de referência comprovada.</p><p className="mt-3">O CCO usa relatórios SAG para execução por classes. Carregar esses relatórios não preenche este painel. A fonte própria de RPNP deve ser preservada.</p><p className="mt-3">A reconexão da automação está pendente. Este guia não declara que ela já esteja funcionando.</p><button autoFocus className="mt-5 rounded-lg bg-sky-600 px-4 py-2 text-white" onClick={() => setIsGuideOpen(false)}>Fechar guia</button></section></div>}
+      <TechnicalGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </div>
   );
 }
