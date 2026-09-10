@@ -42,8 +42,9 @@ export async function POST(request: Request) {
     if (!kind && !isTg) return NextResponse.json({ success: false, error: "sourceKind deve ser CURRENT ou RPNP." }, { status: 400 });
     if (!organizationCode) return NextResponse.json({ success: false, error: "organizationCode é obrigatório." }, { status: 400 });
 
-    const organization = await prisma.organization.findUnique({ where: { code: organizationCode }, select: { id: true, code: true } });
-    if (!organization) return NextResponse.json({ success: false, error: "Organização não localizada." }, { status: 404 });
+    if (isTg && !/^\d{6}$/.test(organizationCode)) return NextResponse.json({ success: false, error: "Informe a UASG com seis dígitos em MCL_ORGANIZATION_CODE." }, { status: 400 });
+    const organization = await prisma.organization.findUnique({ where: isTg ? { uasg: organizationCode } : { code: organizationCode }, select: { id: true, code: true, active: true } });
+    if (!organization || !organization.active) return NextResponse.json({ success: false, error: isTg ? "UASG não vinculada a uma organização ativa. Vincule a UASG no painel de Créditos." : "Organização não localizada." }, { status: 404 });
 
     const extension = file.name.toLowerCase().split(".").pop();
     if (extension !== "xls" && extension !== "xlsx") {

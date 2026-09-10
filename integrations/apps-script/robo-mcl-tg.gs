@@ -1,13 +1,14 @@
 /** Recuperação do Robô_MCL. Mantém o nome usado pelo gatilho já instalado.
  * Propriedades do script: MCL_WEBHOOK_TOKEN (segredo já configurado no servidor)
- * e MCL_ORGANIZATION_CODE (código da organização no MCL).
+ * e MCL_ORGANIZATION_CODE (número da UASG, com seis dígitos).
  * Não recria gatilhos, não exclui mensagens e não altera a fonte de RPNP.
  */
 function enviarPlanilhaSiafiParaMCL() {
   var props = PropertiesService.getScriptProperties();
   var token = props.getProperty('MCL_WEBHOOK_TOKEN');
-  var organization = props.getProperty('MCL_ORGANIZATION_CODE');
+  var organization = (props.getProperty('MCL_ORGANIZATION_CODE') || '').trim();
   if (!token || !organization) throw new Error('Configure MCL_WEBHOOK_TOKEN e MCL_ORGANIZATION_CODE nas Propriedades do script.');
+  if (!/^\d{6}$/.test(organization)) throw new Error('MCL_ORGANIZATION_CODE deve conter a UASG com seis dígitos.');
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
   try {

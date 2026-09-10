@@ -114,6 +114,7 @@ model UserScope {
 }
 
 model Organization {
+  uasg      String?     @unique
   id        String      @id
   code      String      @unique
   name      String

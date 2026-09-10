@@ -21,7 +21,7 @@ Nas Propriedades do script, definir:
 
 - `MCL_WEBHOOK_URL`: `https://mcl-one.vercel.app/api/connectors/siafi/upload`
 - `MCL_WEBHOOK_TOKEN`: mesmo valor de `MCL_SIAFI_WEBHOOK_TOKEN` na Vercel
-- `MCL_ORGANIZATION_CODE`: código exato da organização no banco
+- `MCL_ORGANIZATION_CODE`: número da UASG com seis dígitos, vinculado à organização no painel de Créditos
 
 Executar uma vez `installHourlyMclTrigger()`. O trigger verifica e-mails marcados `[SIAFI-MCL]` a cada hora. Uma mensagem só recebe o rótulo `MCL_SIAFI_PROCESSADO` depois de o MCL confirmar `checksum` e `persistedAt`. Falhas recebem `MCL_SIAFI_ERRO`.
 
