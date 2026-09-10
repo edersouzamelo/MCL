@@ -71,7 +71,7 @@ const KNOWLEDGE_CHUNKS: KnowledgeChunk[] = [
     id: "financial-silo",
     title: "Estado de confiança do módulo financeiro",
     text:
-      "Créditos da UASG é o dashboard inspirado no Power BI do Mendes, com Requisitante, RPCM, Metas, NCs, NEs e RPNP. Sua fonte é Tesouro Gerencial via subscrição de e-mail e Google Apps Script. O Escalão/CCO é uma ferramenta adicional de execução por classes com ETL SAG. As fontes são independentes. Nunca exigir importação SAG para consultar Créditos, nem substituir a fonte própria de RPNP. A reconexão TG está pendente; não inventar saldos ou atualização diária.",
+      "Créditos da UASG é o dashboard inspirado no Power BI do Mendes, com Requisitante, RPCM, Metas, NCs, NEs e RPNP. Sua fonte é Tesouro Gerencial via subscrição de e-mail e Google Apps Script. O Escalão/CCO é uma ferramenta adicional de execução por classes com ETL SAG. As fontes são independentes. Nunca exigir importação SAG para consultar Créditos, nem substituir a fonte própria de RPNP. O contrato TG_MASTER_V1 permite consultar o relatório mestre persistido, com a medida original Movim. Líquido. Ele não identifica o Item Informação, NCs nem saldos disponível/liquidado. Não converter movimento em saldo, inferir RPNP do ano da NE ou tratar importação como data contábil.",
     source: "src/modules/financial-snapshots/repository.ts",
     url: `${REPOSITORY_URL}/blob/main/src/modules/financial-snapshots/repository.ts`,
     keywords: ["credito", "creditos", "financeiro", "siafi", "tesouro", "empenho", "orcamento", "execucao"],

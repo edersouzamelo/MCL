@@ -4,6 +4,8 @@ import { searchOfficialCatalog } from "@/modules/coverage/official-catalog";
 import type { Citation, MclAiActor, MclToolEnvelope } from "@/modules/ai/contracts";
 import { getLatestFinancialSnapshotPair } from "@/modules/financial-snapshots/repository";
 
+import { getLatestTg } from "@/modules/credits-tg/repository";
+
 export const MCL_DATA_SILOS = [
   "NECESSIDADES",
   "COBERTURA",
@@ -98,7 +100,7 @@ export function getSiloCatalog(databaseConfigured = Boolean(process.env.DATABASE
         { id: "DIVERGENCIAS", label: "Divergências", status: dbStatus, nature: "Persistido", reason: dbReason },
         { id: "CONECTORES", label: "Saúde dos conectores", status: dbStatus, nature: "Persistido", reason: dbReason },
         { id: "AUDITORIA", label: "Auditoria", status: dbStatus, nature: "Persistido e restrito por perfil", reason: dbReason },
-        { id: "CREDITOS", label: "Créditos/Tesouro Gerencial", status: "UNAVAILABLE", nature: "Tesouro Gerencial via e-mail e Apps Script", reason: "Reconexão da fonte TG pendente; importações SAG do CCO não alimentam Créditos." },
+        { id: "CREDITOS", label: "Créditos/Tesouro Gerencial", status: dbStatus, nature: "Tesouro Gerencial via e-mail e Apps Script", reason: "Consulta TG própria; presença e semântica dos registros dependem da carga. SAG não alimenta Créditos." },
         { id: "GRUPAMENTO", label: "SAG/Centro de Comando", status: dbStatus, nature: "SAG importado e persistido", reason: dbReason },
       ],
     },
@@ -508,7 +510,14 @@ export async function queryMclData(
 
   switch (input.silo) {
     case "CREDITOS":
-      return unavailable("A fonte do painel de Créditos da UASG é o Tesouro Gerencial via subscrição de e-mail e Apps Script. Sua reconexão está pendente. Não solicite importação SAG no CCO para obter esses créditos.", { records: [], source: "TESOURO_GERENCIAL", lastUpdatedAt: null });
+      if (!actor.organizationId) return unavailable("Organização ausente.", { records: [] });
+      const tg = await getLatestTg(actor.organizationId);
+      if (!tg) return unavailable("Nenhum relatório TG persistido para esta organização. A fonte é TG por e-mail/Apps Script; importar SAG no CCO não preenche Créditos.", { records: [] });
+      const matching = tg.rows.filter(row => !input.search || `${row.ug} ${row.pi ?? ""} ${row.ne ?? ""} ${row.nd ?? ""}`.toLowerCase().includes(input.search.toLowerCase()));
+      return { status: "AVAILABLE", dataNature: "PERSISTED_OPERATIONAL", asOf: tg.importedAt,
+        citations: [{ title: tg.fileName, source: "TESOURO_GERENCIAL", dataNature: "PERSISTED_OPERATIONAL", asOf: tg.importedAt }],
+        gaps: [...tg.warnings, ...(matching.length > limit ? ["Registros limitados; a amostra não representa um total financeiro."] : [])],
+        data: { metric: tg.metric, sourceDate: tg.sourceDate, importedAt: tg.importedAt, emailReceivedAt: tg.emailReceivedAt, matchedRecords: matching.length, records: matching.slice(0, limit).map(({ ug, pi, ne, nd, movementCents, sheet, sourceRow }) => ({ ug, pi, ne, nd, movementCents, sheet, sourceRow })) } };
     case "GRUPAMENTO":
       return queryFinancial(actor, input.search, limit);
     case "NECESSIDADES":

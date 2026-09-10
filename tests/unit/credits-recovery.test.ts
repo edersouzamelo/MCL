@@ -4,6 +4,8 @@ import { GET } from "@/app/api/creditos/route";
 import { getSiloCatalog, queryMclData } from "@/modules/ai/silos";
 import * as financial from "@/modules/financial-snapshots/repository";
 
+vi.mock("@/modules/credits-tg/repository", () => ({ getLatestTg: vi.fn().mockResolvedValue(null) }));
+
 vi.mock("next-auth", () => ({ getServerSession: vi.fn() }));
 vi.mock("@/modules/auth/options", () => ({ authOptions: {} }));
 
@@ -17,9 +19,9 @@ describe("separação Créditos TG e Escalão SAG", () => {
     expect(readSag).not.toHaveBeenCalled();
     expect(response.status).toBe("UNAVAILABLE");
     expect(response.dataNature).toBe("NONE");
-    expect(response.gaps.join(" ")).toContain("Tesouro Gerencial");
+    expect(response.gaps.join(" ")).toContain("TG");
     const catalog = getSiloCatalog(true).data.silos;
-    expect(catalog.find(item => item.id === "CREDITOS")?.status).toBe("UNAVAILABLE");
+    expect(catalog.find(item => item.id === "CREDITOS")?.status).toBe("AVAILABLE");
     expect(catalog.find(item => item.id === "GRUPAMENTO")?.status).toBe("AVAILABLE");
   });
   it("protege a API de Créditos sem sessão", async () => {

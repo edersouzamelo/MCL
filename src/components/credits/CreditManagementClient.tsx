@@ -1,5 +1,7 @@
 "use client";
 
+import { TgSourcePanel } from "./TgSourcePanel";
+import type { TgSnapshot } from "@/modules/credits-tg/repository";
 import { TechnicalGuideModal } from "./TechnicalGuideModal";
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
@@ -41,7 +43,8 @@ export function CreditManagementClient() {
   const [activeSubpage, setActiveSubpage] = useState<string>("req_nc");
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const lastSyncTime = "Não confirmada";
+  const [tgSnapshot, setTgSnapshot] = useState<TgSnapshot | null>(null);
+  const lastSyncTime = tgSnapshot ? `Importação: ${new Date(tgSnapshot.importedAt).toLocaleString("pt-BR")}; referência contábil não informada` : "Não confirmada";
   const [sourceMessage, setSourceMessage] = useState("Verificando disponibilidade da fonte Tesouro Gerencial…");
 
   const [selectedUg, setSelectedUg] = useState<string>("TODAS");
@@ -73,8 +76,10 @@ export function CreditManagementClient() {
     try {
       const response = await fetch("/api/creditos", { cache: "no-store" });
       const payload = await response.json();
-      setSourceMessage(payload.error ?? "Fonte TG ainda não validada para este painel.");
+      setTgSnapshot(response.ok ? payload.snapshot ?? null : null);
+      setSourceMessage(response.ok && payload.snapshot ? "Relatório TG persistido disponível para consulta abaixo. As medidas das visões dependem da identificação dos Itens Informação." : payload.error ?? "Fonte TG ainda não validada para este painel.");
     } catch {
+      setTgSnapshot(null);
       setSourceMessage("Não foi possível verificar a fonte Tesouro Gerencial. Tente atualizar a leitura.");
     } finally { setIsSyncing(false); }
   }, []);
@@ -123,10 +128,11 @@ export function CreditManagementClient() {
       </div>
 
       <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-200">
-        <p className="font-bold">Painel recuperado · conexão dos dados pendente</p>
+        <p className="font-bold">{tgSnapshot ? "Relatório TG recebido · classificação contábil pendente" : "Aguardando relatório Tesouro Gerencial"}</p>
         <p className="mt-1">{sourceMessage}</p>
         <p className="mt-1">Os campos sem fonte confirmada aparecem como —. Isso não representa saldo zero.</p>
       </div>
+      <TgSourcePanel snapshot={tgSnapshot} onImported={handleForceSync} />
       {/* Universal Filter Bar */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm dark:shadow-lg flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">

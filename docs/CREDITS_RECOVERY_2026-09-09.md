@@ -25,3 +25,14 @@ O parser antigo inferia colunas e preenchia UG/PI/ND/favorecido/ano ausentes, al
 O webhook /api/connectors/siafi/upload e o script versionado pela PR20 ainda usam parser SAG: NÃO homologados como ingestão TG. Permanecem pendentes de reconciliação com a automação original. Não executar/instalar esse script como solução para Créditos. Não apagar lotes RPNP existentes.
 
 Próxima etapa: recuperar script original, conferir gatilho e última execução, assunto da subscrição, destino, exemplos dos relatórios de cada seção; implementar persistência TG segregada; reconciliar saldos/NC/NE/PI com a fonte; conectar UI e Assistente ao mesmo serviço TG; comprovar atualização por ingestão real.
+
+
+## Continuação — 10 SET 2026
+
+Código do Robô_MCL original confirmado por captura do usuário: GmailApp.search MCL_MESTRE_EXERCICIO_2026, upload multipart somente file, sem Authorization. O webhook alterado exigia Bearer, organizationCode/sourceKind e interpretava SAG. O reparo adiciona reportType=TG_MASTER_V1 ao MESMO endpoint, com parser TG separado; preserva os caminhos SAG existentes e seus lotes CURRENT/RPNP.
+
+Implementado: leitura estrita de todas as abas do relatório mestre; propagação apenas de mesclas reais; valores em centavos com sinais; persistência por organização+TG_MASTER_V1+checksum; reenvio sem atualização artificial da data; consulta autenticada; validação/confirmacão manual por ADMIN/LOGISTICS_MANAGER; consulta do relatório original no painel, com busca/paginação; Assistente consulta a mesma fonte e expõe lacunas. Robô corrigido em integrations/apps-script/robo-mcl-tg.gs preserva o nome da função/gatilho e não toca em mensagens nem na fonte RPNP.
+
+Evidência: arquivo mestre real no Drive, versão de 17 AGO (não apresentado como atual): 2.517 registros em 160136, 160142 e 160513, incluindo 75 valores negativos. Arquivo privado não incluído no git. Parser testado com esse arquivo. Build concluído. Não há evidência de execução automática em produção nem de importação desse arquivo no banco operacional nesta etapa.
+
+A recuperação integral permanece ABERTA: o mestre não identifica Item Informação, NC, metas, Requisitante/RPCM nem saldos próprios RPNP. Não converter Movim. Líquido para esses campos. Os dez layouts permanecem, mas suas métricas continuam sem fonte comprovada. As APIs legadas de KPIs/empenhos ainda não foram homologadas. Próximos requisitos concretos: aplicar script no projeto existente, configurar suas propriedades com o segredo do servidor/código da organização e verificar execução; obter a seleção de Itens Informação do TG e fontes específicas das visões. Não restaurar percentuais, NCs ou registros gerados do store antigo.

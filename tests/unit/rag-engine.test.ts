@@ -22,7 +22,7 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     const creditos = catalog.data.silos.find((silo) => silo.id === "CREDITOS");
     const grupamento = catalog.data.silos.find((silo) => silo.id === "GRUPAMENTO");
 
-    expect(creditos?.status).toBe("UNAVAILABLE");
+    expect(creditos?.status).toBe("AVAILABLE");
     expect(grupamento?.status).toBe("AVAILABLE");
     expect(creditos?.nature).toContain("Tesouro Gerencial");
   });

@@ -32,7 +32,7 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
 4. Salve com o nome MCL_MESTRE_EXERCICIO_2026.
 5. Em Arquivo > Inscrever-se em > E-mail, selecione 'Todos os dias após a atualização dos dados', formato Excel (.xlsx), use o assunto MCL_MESTRE_EXERCICIO_2026 e confira que o filtro do Apps Script corresponde ao assunto recebido.
 6. Confira o projeto Apps Script existente na conta receptora e seu gatilho temporal. O script envia o anexo ao webhook autenticado; uma regra comum de encaminhamento do Gmail não substitui esse envio HTTP.
-7. Reconexão pendente: a implementação atual do webhook ainda usa parser SAG. Corrigir e homologar o contrato TG antes de ativar novos envios. Preservar a fonte própria de RPNP; TG e CCO/SAG são independentes.
+7. Use integrations/apps-script/robo-mcl-tg.gs no projeto Robô_MCL existente. Configure MCL_WEBHOOK_TOKEN e MCL_ORGANIZATION_CODE nas Propriedades do script. A função mantém o nome enviarPlanilhaSiafiParaMCL e envia reportType=TG_MASTER_V1 ao parser TG próprio. Preservar a fonte própria de RPNP; TG e CCO/SAG são independentes.
 8. Homologar os Itens Informação e os filtros do relatório antes de interpretar Movim. Líquido como saldo disponível, empenhado ou liquidado. Não gerar NC ausente nem somar subtotais e detalhes.
 9. Conferir uma execução completa: mensagem recebida, webhook aceito, checksum persistido, totais reconciliados e data da fonte exibida no painel.`;
     try { await navigator.clipboard.writeText(promptText); setCopied(true); }
@@ -44,10 +44,10 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
     const pluginSchema = {
       module: "MCL Budget Credits & SIAFI Integration Plugin",
       version: "1.0.1",
-      status: "TG_RECONNECTION_PENDING",
+      status: "TG_MASTER_SUPPORTED_BALANCE_MAPPING_PENDING",
       source: "TESOURO_GERENCIAL",
       excludes: ["SAG_CCO"],
-      validationRequired: ["Item Informação e filtros", "Fonte própria RPNP", "Contrato TG do webhook"],
+      validationRequired: ["Item Informação e filtros", "Fonte própria RPNP", "Execução do Robô_MCL em produção"],
       idealizer: "Edervaldo José De Souza Melo",
       contact: "edersouzamelo@gmail.com",
       supportedUGs: ["160136", "160142", "160513"],
@@ -111,7 +111,7 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
           <div role="status" className="rounded-xl border border-amber-500/40 bg-amber-950/40 p-4 text-xs text-amber-100 space-y-2">
             <p className="font-bold">Guia original recuperado do histórico c6fb455 · retificações de 9 SET</p>
             <p>O layout, as seções, o prompt copiável e a especificação JSON foram recuperados. A automação TG ainda não está reconectada. A entrega dos e-mails foi confirmada, mas a execução do Apps Script instalado ainda não foi inspecionada.</p>
-            <p>Correções identificadas: assunto real MCL_MESTRE_EXERCICIO_2026; domínio atual mcl-one.vercel.app; quantidade de linhas variável. O webhook atual usa parser SAG e exige correção antes da homologação TG. Este aviso não representa saldo zero nem conclusão da recuperação.</p>
+            <p>Correções identificadas: assunto real MCL_MESTRE_EXERCICIO_2026; domínio atual mcl-one.vercel.app; quantidade de linhas variável. O webhook aceita o relatório mestre pelo contrato TG_MASTER_V1, separado do SAG. O Robô_MCL precisa enviar esse contrato e a autenticação. Este aviso não representa saldo zero nem conclusão da recuperação.</p>
           </div>
           {/* Developer & Idealizer Callout Card */}
           <div className="bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-950 border border-emerald-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -186,6 +186,14 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
               </button>
             </div>
           </div>
+
+          <section className="rounded-xl border border-emerald-700 p-4 space-y-3">
+            <h3 className="font-bold text-white">Configuração do Robô_MCL existente</h3>
+            <p>Use o <a className="underline text-emerald-400" href="https://github.com/edersouzamelo/MCL/blob/main/integrations/apps-script/robo-mcl-tg.gs" target="_blank" rel="noreferrer">código de recuperação do Robô_MCL</a>. Ele preserva o nome enviarPlanilhaSiafiParaMCL, usado pelo gatilho existente. Não exclua nem recrie o gatilho sem verificar sua configuração.</p>
+            <p>Em Configurações do projeto → Propriedades do script, configure MCL_WEBHOOK_TOKEN com o mesmo segredo de MCL_SIAFI_WEBHOOK_TOKEN no servidor e MCL_ORGANIZATION_CODE com o código da organização cadastrada no MCL. Não coloque segredos no código nem no chat.</p>
+            <p>Execute a função uma vez e confira TG_PERSISTIDO, rowCount, checksum e persistedAt no Registro de execução. HTTP 401 indica autenticação; 404 indica organização; rejeição do arquivo exige conferir o relatório. Uma execução sem anexos não comprova ingestão.</p>
+            <p>Como contingência, o painel permite validar e confirmar a importação do XLSX pela sessão de administrador ou gestor. Isso não configura a atualização automática. A consulta do relatório preserva Movim. Líquido; as medidas de NC, NE, RPNP e metas dependem das fontes específicas.</p>
+          </section>
 
           {/* Section 2: Arquitetura de Segurança da Ponte de E-mail */}
           <div className="space-y-3 pt-4 border-t border-zinc-800">
