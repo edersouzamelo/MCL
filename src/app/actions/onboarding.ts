@@ -25,6 +25,7 @@ export async function completeOnboarding(formData: FormData) {
     militaryOrganization: formData.get("militaryOrganization") as string,
     termsAcceptedAt: new Date().toISOString(),
   };
+  const selectedUasg = String(formData.get("militaryOrganizationUasg") ?? "").trim();
 
   // Salva no banco se o banco estiver disponível
   const mode = persistenceMode();
@@ -44,6 +45,16 @@ export async function completeOnboarding(formData: FormData) {
           ...data,
         },
       });
+      if (session.user.organizationId && /^\d{6}$/.test(selectedUasg)) {
+        await prisma.organization.updateMany({
+          where: {
+            id: session.user.organizationId,
+            active: true,
+            OR: [{ uasg: null }, { uasg: selectedUasg }],
+          },
+          data: { uasg: selectedUasg },
+        });
+      }
     } catch (error) {
       console.error("Erro no banco de dados (completeOnboarding), usando fallback:", error);
     }

@@ -3,9 +3,6 @@ import { useMemo, useState } from "react";
 import type { TgSnapshot } from "@/modules/credits-tg/repository";
 
 export function TgSourcePanel({ snapshot, onImported }: { snapshot: TgSnapshot | null; onImported: () => Promise<void> }) {
-  const [uasg, setUasg] = useState("");
-  const [bindingMessage, setBindingMessage] = useState("");
-  const [bindingBusy, setBindingBusy] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<{ rows: number; ugs: string[]; warnings: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -13,16 +10,7 @@ export function TgSourcePanel({ snapshot, onImported }: { snapshot: TgSnapshot |
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const rows = useMemo(() => (snapshot?.rows ?? []).filter(row => `${row.ug} ${row.pi ?? ""} ${row.ne ?? ""} ${row.nd ?? ""} ${row.supplier ?? ""}`.toLowerCase().includes(query.toLowerCase())), [snapshot, query]);
-  async function bindUasg() {
-    setBindingBusy(true);
-    try {
-      const response = await fetch("/api/creditos/uasg", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uasg }) });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Falha ao vincular UASG.");
-      setBindingMessage(`UASG ${body.uasg} vinculada à organização desta sessão. Use esse número em MCL_ORGANIZATION_CODE no Apps Script.`);
-    } catch (error) { setBindingMessage(error instanceof Error ? error.message : "Falha ao vincular UASG."); }
-    finally { setBindingBusy(false); }
-  }
+  const sourceUgs = useMemo(() => [...new Set((snapshot?.rows ?? []).map(row => row.ug))].sort(), [snapshot]);
   async function upload(confirm: boolean) {
     if (!file || busy) return;
     setBusy(true); setMessage("");
@@ -39,10 +27,9 @@ export function TgSourcePanel({ snapshot, onImported }: { snapshot: TgSnapshot |
   return <details className="rounded-xl border border-sky-300 bg-white p-4 dark:bg-zinc-900" open>
     <summary className="cursor-pointer font-bold">Relatório original do Tesouro Gerencial</summary>
     <p className="my-2 text-sm">Consulte os registros recebidos com a medida original. O relatório mestre, isoladamente, não identifica os saldos das dez visões abaixo.</p>
-    <div className="my-3 rounded border p-3">
-      <label className="text-sm">UASG da organização desta sessão <input aria-label="UASG da organização" inputMode="numeric" maxLength={6} placeholder="Seis dígitos" value={uasg} onChange={e => setUasg(e.target.value.replace(/\D/g, ""))} className="mx-2 rounded border p-2 dark:bg-zinc-950" /></label>
-      <button disabled={bindingBusy || uasg.length !== 6} onClick={() => void bindUasg()} className="rounded bg-sky-700 px-3 py-2 text-white disabled:opacity-50">Vincular UASG</button>
-      <p role="status" className="mt-2 text-sm">{bindingMessage}</p>
+    <div className="my-3 rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+      <p className="font-bold">Escopo definido automaticamente pela organização do usuário.</p>
+      <p>Não é necessário informar ou vincular UASG nesta tela.{sourceUgs.length ? ` UG(s) presente(s) na fonte recebida: ${sourceUgs.join(", ")}.` : ""}</p>
     </div>
     <div className="flex flex-wrap items-center gap-3 my-3">
       <input aria-label="Relatório mestre TG" type="file" accept=".xls,.xlsx" disabled={busy} onChange={event => { setFile(event.target.files?.[0] ?? null); setPreview(null); setMessage(""); }} />
