@@ -7,6 +7,7 @@ import { getUserProfile } from "@/app/actions/onboarding";
 import { getDemoState } from "@/server/demo-store";
 import { getDiagnosticData, type SourceSystemCatalogEntry } from "@/modules/connectors/catalog";
 import { LOGISTICS_STAGES } from "@/modules/logistics/stages";
+import { COMPLEMENTARY_MODULES, SUPPLEMENTARY_MODULES } from "@/modules/system/module-registry";
 
 function getStageStatus(systems: SourceSystemCatalogEntry[]) {
   const relevant = systems.filter((system) => system.sourceKind !== "DEMO_SIMULATOR");
@@ -120,6 +121,38 @@ export default async function InicioPage() {
             <div className="ops-actions-card">
               <div className="ops-shortcuts"><Link href="/assistente">Assistente IA</Link><Link href="/auditoria">Auditoria</Link><Link href="/conectores">Conectores</Link></div>
               <Link className="ops-primary-action" href="/painel">Abrir situação geral <Arrow /></Link>
+            </div>
+          </section>
+
+          <section className="ops-support-layers" aria-label="Módulos de apoio do MCL">
+            <div className="ops-layer ops-layer-complementary">
+              <div className="ops-layer-heading">
+                <div><span>NÍVEL 02</span><h2>Módulos complementares</h2></div>
+                <p>Sustentam transversalmente as oito etapas.</p>
+              </div>
+              <div className="ops-module-grid">
+                {COMPLEMENTARY_MODULES.map((module) => (
+                  <Link className="ops-module-link" href={module.href} key={module.id}>
+                    <span><strong>{module.shortTitle}</strong><small>{module.description}</small></span>
+                    <i>{module.maturity}</i>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="ops-layer ops-layer-supplementary">
+              <div className="ops-layer-heading">
+                <div><span>NÍVEL 03</span><h2>Módulos suplementares</h2></div>
+                <p>Ampliam o núcleo, sem condicioná-lo.</p>
+              </div>
+              <div className="ops-module-grid">
+                {SUPPLEMENTARY_MODULES.map((module) => (
+                  <Link className="ops-module-link" href={module.href} key={module.id}>
+                    <span><strong>{module.shortTitle}</strong><small>{module.description}</small></span>
+                    <i>{module.maturity}</i>
+                  </Link>
+                ))}
+              </div>
             </div>
           </section>
         </div>
