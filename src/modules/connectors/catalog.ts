@@ -47,6 +47,8 @@ export type SourceSystemDomain =
   | "Recebimento"
   | "Estoque / armazém"
   | "Transporte / distribuição"
+  | "Manutenção"
+  | "Recolhimento"
   | "Documental"
   | "Local / derivado / contingência";
 
@@ -356,6 +358,38 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
         "Não realiza emissão de guias de transporte ou contratação de frete real."
       ],
       observation: "Capacidade nativa demonstrativa. Fluxo de remessa e entrega para piloto; não substitui sistema oficial."
+    },
+    {
+      id: "sgm-classe-vi",
+      name: "SGM (Classe VI)",
+      domain: "Manutenção",
+      sourceKind: "EXTERNAL_SYSTEM",
+      authority: "OFICIAL",
+      nature: "REAL_RESTRITA_NAO_INTEGRADA",
+      integrationMethod: "NAO_INTEGRADO",
+      maturity: "MAPEADO_NAO_INTEGRADO",
+      status: "NAO_INTEGRADO",
+      limitations: [
+        "Sistema especializado de Classe VI; não representa sozinho toda manutenção das demais classes.",
+        "Depende de autorização institucional e homologação do contrato de dados."
+      ],
+      observation: "Fonte indicada no mapa macro para manutenção de Classe VI. Escopo transversal ainda precisa ser detalhado por classe e processo."
+    },
+    {
+      id: "sigelog-odr",
+      name: "SIGELOG (ODR)",
+      domain: "Recolhimento",
+      sourceKind: "EXTERNAL_SYSTEM",
+      authority: "OFICIAL",
+      nature: "REAL_RESTRITA_NAO_INTEGRADA",
+      integrationMethod: "NAO_INTEGRADO",
+      maturity: "MAPEADO_NAO_INTEGRADO",
+      status: "NAO_INTEGRADO",
+      limitations: [
+        "O papel da ODR no fluxo reverso precisa ser homologado com o gestor funcional.",
+        "Não há endpoint ou contrato de integração autorizado no piloto."
+      ],
+      observation: "Fonte indicada no mapa macro para ordens de recolhimento. A integração permanece apenas mapeada."
     },
     // O) Controles locais / planilhas / relatórios
     {
