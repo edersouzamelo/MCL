@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -17,6 +17,8 @@ import {
   Menu,
   PackageCheck,
   PanelsTopLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Route,
   QrCode,
   Search,
@@ -72,6 +74,31 @@ const navigation = [
   },
 ] as const;
 
+const SIDEBAR_STORAGE_KEY = "mcl-sidebar-collapsed";
+const SIDEBAR_CHANGE_EVENT = "mcl-sidebar-change";
+
+function subscribeToSidebarPreference(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(SIDEBAR_CHANGE_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(SIDEBAR_CHANGE_EVENT, callback);
+  };
+}
+
+function getSidebarPreference() {
+  return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+}
+
+function getServerSidebarPreference() {
+  return false;
+}
+
+function saveSidebarPreference(collapsed: boolean) {
+  window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+  window.dispatchEvent(new Event(SIDEBAR_CHANGE_EVENT));
+}
+
 const routeNames: Array<[string, string]> = [
   ["/necessidades/", "Dossiê da necessidade"],
   ["/unidades/", "Passaporte logístico"],
@@ -110,10 +137,15 @@ function isRouteActive(pathname: string, href: string) {
 export function AppShellClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/painel";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeToSidebarPreference,
+    getSidebarPreference,
+    getServerSidebarPreference,
+  );
   const currentTitle = routeNames.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? "MCL";
 
   return (
-    <div className="mcl-app-shell">
+    <div className={`mcl-app-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
 
       <aside className={`mcl-sidebar ${mobileMenuOpen ? "is-open" : ""}`}>
         <div className="mcl-sidebar-head">
@@ -124,6 +156,16 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
               <small>CONTINUIDADE LOGÍSTICA</small>
             </span>
           </Link>
+          <button
+            type="button"
+            className="mcl-sidebar-toggle"
+            aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            onClick={() => saveSidebarPreference(!sidebarCollapsed)}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
+          </button>
           <button type="button" className="mcl-mobile-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>
             <X aria-hidden />
           </button>
@@ -141,6 +183,7 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     className={active ? "active" : undefined}
                     aria-current={active ? "page" : undefined}
+                    title={sidebarCollapsed ? item.label : undefined}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <item.icon aria-hidden />
