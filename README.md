@@ -2,7 +2,7 @@
 
 **AMBIENTE DEMONSTRATIVO - DADOS SINTETICOS - NAO CONSTITUI SISTEMA OFICIAL**
 
-Protótipo web demonstrativo do **Modelo de Continuidade Logística - MCL**, criado para materializar a continuidade informacional entre necessidade, cobertura, aquisição, crédito, estoque, unidade logística, remessa e entrega em um cenário sintético de suprimento Classe II.
+Protótipo web demonstrativo do **Modelo de Continuidade Logística - MCL**, criado para materializar a continuidade informacional em oito etapas macro: necessidade, crédito, aquisição, recebimento, armazenagem, entrega, manutenção e recolhimento. O piloto funcional permanece delimitado e não pressupõe que todas as fontes estejam integradas ou homologadas.
 
 Autor do modelo: **Edervaldo José de Souza Melo**  
 ORCID: **0009-0003-6835-135X**  
