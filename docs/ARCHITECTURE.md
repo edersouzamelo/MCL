@@ -6,6 +6,14 @@ Monólito modular em Next.js App Router.
 
 A interface e o catálogo adotam uma cadeia canônica de oito etapas: **Necessidade → Crédito → Aquisição → Recebimento → Armazenagem → Entrega → Manutenção → Recolhimento**. Essa macroestrutura expressa o ciclo logístico pretendido; não é uma declaração de maturidade técnica. Cada página deve distinguir capacidade nativa, fonte real integrada, fonte apenas mapeada e lacuna ainda não integrada.
 
+A taxonomia funcional possui três níveis visíveis e independentes:
+
+1. **Principais:** as oito etapas da cadeia logística.
+2. **Complementares:** usuários e perfis; UASG e escopos; identidade, acesso e segredos; Registro de Continuidade Logística; conectores; auditoria; importação e ETL.
+3. **Suplementares:** agente LLM com RAG; Painel do CCOL; guia técnico e expansão.
+
+O **Registro de Continuidade Logística** é a camada federada de eventos, vínculos, projeções e proveniência. Ele não é um banco central que copie ou substitua integralmente as bases de autoridade.
+
 ```mermaid
 flowchart LR
   U["Usuário demonstrativo"] --> UI["Interface Next.js"]
