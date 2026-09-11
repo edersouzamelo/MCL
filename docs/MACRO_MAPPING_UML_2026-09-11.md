@@ -6,6 +6,8 @@ Data de referência: 11 SET 2026.
 
 O mapa do autor é coerente com a tese central do artigo: o MCL funciona como meta-sistema federado, preserva os sistemas de autoridade e correlaciona a trajetória administrativa, financeira e física. As oito etapas do mapa passam a ser a macroestrutura canônica da interface: **Necessidade → Crédito → Aquisição → Recebimento → Armazenagem → Entrega → Manutenção → Recolhimento**.
 
+Também fica canônica a separação em três níveis: módulos **principais** (as oito etapas), **complementares** (governança e suporte transversal) e **suplementares** (ampliações que não condicionam o núcleo). A homepage e a navegação devem preservar essa diferença de peso e responsabilidade.
+
 Manutenção e Recolhimento ampliam o recorte de cinco domínios apresentado no artigo e prolongam o passaporte digital ao ciclo de disponibilidade e ao fluxo reverso. Isso é extensão compatível, não contradição, desde que não seja descrita como capacidade já validada.
 
 ## Correções necessárias no desenho
@@ -25,6 +27,8 @@ Manutenção e Recolhimento ampliam o recorte de cinco domínios apresentado no 
 
 - Uma única definição versionada contém as oito etapas, suas rotas, domínios e objetivos.
 - A página inicial e a navegação refletem as oito etapas.
+- A página inicial e a navegação exibem separadamente módulos principais, complementares e suplementares.
+- “Banco central de dados” foi materializado como **Registro de Continuidade Logística**, com superfície própria e limites federados explícitos.
 - Recebimento, Armazenagem, Entrega, Manutenção e Recolhimento têm superfícies próprias.
 - SGM (Classe VI) e SIGELOG (ODR) foram catalogados como fontes reais restritas e não integradas.
 - As páginas declaram maturidade e limitações; não simulam integrações inexistentes.
