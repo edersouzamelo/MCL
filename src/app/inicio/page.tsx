@@ -5,16 +5,8 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { getUserProfile } from "@/app/actions/onboarding";
 import { getDemoState } from "@/server/demo-store";
-import { getDiagnosticData, type SourceSystemCatalogEntry, type SourceSystemDomain } from "@/modules/connectors/catalog";
-
-const stages = [
-  { number: "01", title: "Necessidade", tone: "blue", description: "Demandas, catálogo oficial e atas disponíveis para análise.", meta: "2 acessos operacionais", glyph: "clipboard", href: "/necessidades", domain: "Necessidades" as SourceSystemDomain },
-  { number: "02", title: "Crédito", tone: "mint", description: "Gestão orçamentária e conexão com as fontes financeiras.", meta: "Cockpit financeiro", glyph: "credit", href: "/creditos", domain: "Orçamento e finanças" as SourceSystemDomain },
-  { number: "03", title: "Aquisição", tone: "amber", description: "Instrumentos públicos e conectores de aquisição correlacionados.", meta: "Fonte pública ativa", glyph: "cart", href: "/aquisicoes", domain: "Aquisições" as SourceSystemDomain },
-  { number: "04", title: "Recebimento", tone: "violet", description: "Notas, divergências e importações vinculadas ao recebimento.", meta: "3 acessos operacionais", glyph: "package", href: "/scanner", domain: "Recebimento" as SourceSystemDomain },
-  { number: "05", title: "Armazenagem", tone: "rose", description: "Estoque, endereçamento e auditoria da unidade logística.", meta: "Integração a concluir", glyph: "warehouse", href: "/painel", domain: "Estoque / armazém" as SourceSystemDomain },
-  { number: "06", title: "Entrega", tone: "cyan", description: "Expedição, transporte e confirmação da entrega final.", meta: "Fonte a mapear", glyph: "truck", href: "/conectores?dominio=transporte", domain: "Transporte / distribuição" as SourceSystemDomain },
-];
+import { getDiagnosticData, type SourceSystemCatalogEntry } from "@/modules/connectors/catalog";
+import { LOGISTICS_STAGES } from "@/modules/logistics/stages";
 
 function getStageStatus(systems: SourceSystemCatalogEntry[]) {
   const relevant = systems.filter((system) => system.sourceKind !== "DEMO_SIMULATOR");
@@ -34,6 +26,8 @@ function StageGlyph({ type }: { type: string }) {
     package: <><path d="M5 10l11-6 11 6v13l-11 6-11-6zM5 10l11 6 11-6M16 16v13" /><path d="M10 7l11 6v5" /></>,
     warehouse: <><path d="M4 13L16 5l12 8v15H4zM8 16h16M9 20h6v8M18 20h6v8" /><path d="M13 11h6" /></>,
     truck: <><path d="M3 8h15v15H3zM18 13h6l5 6v4H18zM8 23v4h4v-4M22 23v4h4v-4" /><path d="M24 14v5h5" /></>,
+    wrench: <><path d="M20 5a7 7 0 0 0-8 9L4 22l6 6 8-8a7 7 0 0 0 9-8l-5 5-5-2-2-5z" /><path d="M7 23l3 3" /></>,
+    return: <><path d="M11 8 5 14l6 6" /><path d="M6 14h12a9 9 0 0 1 9 9v4M18 6h9v7" /></>,
   };
   return (
     <svg className="ops-stage-icon-symbol" viewBox="0 0 32 32" aria-hidden="true">
@@ -51,7 +45,7 @@ export default async function InicioPage() {
   if (profile && !profile.termsAcceptedAt) redirect("/primeiro-acesso");
 
   const diagnosis = getDiagnosticData(getDemoState());
-  const resolvedStages = stages.map((stage) => ({
+  const resolvedStages = LOGISTICS_STAGES.map((stage) => ({
     ...stage,
     status: getStageStatus(diagnosis.systems.filter((system) => system.domain === stage.domain)),
   }));
@@ -86,19 +80,19 @@ export default async function InicioPage() {
             <div className="ops-overview" aria-label="Resumo da situação da cadeia">
               <div className="ops-overview-head"><span>Situação da cadeia</span><strong><i /> Em implantação</strong></div>
               <div className="ops-metrics">
-                <div><strong>06</strong><span>etapas mapeadas</span></div>
+                <div><strong>{String(LOGISTICS_STAGES.length).padStart(2, "0")}</strong><span>etapas mapeadas</span></div>
                 <div><strong>{String(functionalStages).padStart(2, "0")}</strong><span>capacidades funcionais</span></div>
                 <div><strong>{String(diagnosis.systems.length).padStart(2, "0")}</strong><span>fontes catalogadas</span></div>
                 <div className="attention"><strong>{String(pendingStages).padStart(2, "0")}</strong><span>pontos pendentes</span></div>
               </div>
-              <div className="ops-progress"><span style={{ width: `${Math.round((functionalStages / 6) * 100)}%` }} /></div>
-              <p>{functionalStages} de 6 etapas possuem alguma capacidade funcional no ambiente atual.</p>
+              <div className="ops-progress"><span style={{ width: `${Math.round((functionalStages / LOGISTICS_STAGES.length) * 100)}%` }} /></div>
+              <p>{functionalStages} de {LOGISTICS_STAGES.length} etapas possuem alguma capacidade funcional no ambiente atual.</p>
             </div>
           </section>
 
           <section className="ops-journey" aria-labelledby="journey-title">
             <div className="ops-section-head">
-              <div><span className="ops-section-code">CADEIA 01 — 06</span><h2 id="journey-title">Cadeia informacional</h2></div>
+              <div><span className="ops-section-code">CADEIA 01 — 08</span><h2 id="journey-title">Cadeia informacional</h2></div>
               <div className="ops-legend"><span><i className="active" /> Capacidade ativa</span><span><i /> Pendente</span></div>
             </div>
 
@@ -120,7 +114,7 @@ export default async function InicioPage() {
           <section className="ops-bottom">
             <div className="ops-attention-card">
               <span className="ops-attention-mark">!</span>
-              <div><small>Ponto de atenção</small><strong>Crédito, armazenagem e entrega dependem de integrações ainda pendentes.</strong></div>
+              <div><small>Ponto de atenção</small><strong>As etapas mapeadas possuem níveis distintos de integração e homologação.</strong></div>
               <Link href="/conectores">Revisar conectores <Arrow /></Link>
             </div>
             <div className="ops-actions-card">
