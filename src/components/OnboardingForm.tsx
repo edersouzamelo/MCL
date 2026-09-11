@@ -30,11 +30,10 @@ function SubmitButton() {
 }
 
 export default function OnboardingForm({ initialName }: { initialName: string }) {
-  const [oms, setOms] = useState<{ id: string; name: string; uasg?: string }[]>([]);
+  const [oms, setOms] = useState<{ id: string; name: string }[]>([]);
   const [omSearch, setOmSearch] = useState("");
   const [showOmDropdown, setShowOmDropdown] = useState(false);
   const [selectedOm, setSelectedOm] = useState("");
-  const [selectedUasg, setSelectedUasg] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   useEffect(() => {
@@ -119,13 +118,11 @@ export default function OnboardingForm({ initialName }: { initialName: string })
               setOmSearch(e.target.value);
               setShowOmDropdown(true);
               setSelectedOm("");
-              setSelectedUasg("");
             }}
             onFocus={() => setShowOmDropdown(true)}
             className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm placeholder-zinc-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
           />
           <input type="hidden" name="militaryOrganization" value={selectedOm} required />
-          <input type="hidden" name="militaryOrganizationUasg" value={selectedUasg} />
           
           {showOmDropdown && omSearch && (
             <div className="absolute z-20 mt-1.5 w-full bg-white dark:bg-zinc-950 shadow-2xl max-h-60 rounded-lg py-1 border border-zinc-200 dark:border-zinc-800 overflow-auto focus:outline-none sm:text-sm custom-scrollbar">
@@ -140,7 +137,6 @@ export default function OnboardingForm({ initialName }: { initialName: string })
                       className="cursor-pointer select-none relative py-2.5 pl-3 pr-9 hover:bg-emerald-600/20 hover:text-emerald-600 dark:hover:text-emerald-400 text-zinc-900 dark:text-zinc-100 font-medium transition-colors flex items-center justify-between gap-2"
                       onClick={() => {
                         setSelectedOm(omLabel);
-                        setSelectedUasg(om.uasg ?? "");
                         setOmSearch(omLabel);
                         setShowOmDropdown(false);
                       }}
