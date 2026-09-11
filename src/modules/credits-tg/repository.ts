@@ -8,12 +8,16 @@ export const TG_SOURCE_KIND = "TG_MASTER_V1";
 export type TgSnapshot = TgReport & { checksum: string; importedAt: string; emailReceivedAt: string | null; ingestionMethod: string };
 export async function persistTg(input: { organizationId: string; report: TgReport; buffer: ArrayBuffer; actor: string; method: "APPS_SCRIPT_TG" | "MANUAL_TG"; emailReceivedAt?: string | null }) {
   const checksum = createHash("sha256").update(Buffer.from(input.buffer)).digest("hex");
+  const payload = JSON.parse(JSON.stringify({ ...input.report, emailReceivedAt: input.emailReceivedAt ?? null })) as Prisma.InputJsonValue;
   return prisma.financialSourceImport.upsert({
     where: { organizationId_sourceKind_checksum: { organizationId: input.organizationId, sourceKind: TG_SOURCE_KIND, checksum } },
-    update: {},
+    // The checksum still identifies the immutable source file. Rebuild only the
+    // parsed projection so a corrected parser can repair an existing import;
+    // importedAt and ingestion provenance remain unchanged.
+    update: { fileName: input.report.fileName, rowCount: input.report.rows.length, payload, warnings: input.report.warnings },
     create: { organizationId: input.organizationId, sourceKind: TG_SOURCE_KIND, checksum,
       fileName: input.report.fileName, rowCount: input.report.rows.length,
-      payload: JSON.parse(JSON.stringify({ ...input.report, emailReceivedAt: input.emailReceivedAt ?? null })) as Prisma.InputJsonValue,
+      payload,
       warnings: input.report.warnings, ingestionMethod: input.method, importedBy: input.actor },
   });
 }

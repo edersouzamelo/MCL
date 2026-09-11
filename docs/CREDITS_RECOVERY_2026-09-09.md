@@ -36,3 +36,13 @@ Implementado: leitura estrita de todas as abas do relatório mestre; propagaçã
 Evidência: arquivo mestre real no Drive, versão de 17 AGO (não apresentado como atual): 2.517 registros em 160136, 160142 e 160513, incluindo 75 valores negativos. Arquivo privado não incluído no git. Parser testado com esse arquivo. Build concluído. Não há evidência de execução automática em produção nem de importação desse arquivo no banco operacional nesta etapa.
 
 A recuperação integral permanece ABERTA: o mestre não identifica Item Informação, NC, metas, Requisitante/RPCM nem saldos próprios RPNP. Não converter Movim. Líquido para esses campos. Os dez layouts permanecem, mas suas métricas continuam sem fonte comprovada. As APIs legadas de KPIs/empenhos ainda não foram homologadas. Próximos requisitos concretos: aplicar script no projeto existente, configurar suas propriedades com o segredo do servidor/código da organização e verificar execução; obter a seleção de Itens Informação do TG e fontes específicas das visões. Não restaurar percentuais, NCs ou registros gerados do store antigo.
+
+## Auditoria do Power BI e do fluxo — 10 SET 2026
+
+As dez páginas do Power BI público do Mendes foram percorridas e seus indicadores, colunas e relações foram registrados em `docs/CREDITS_ACCOUNTING_CONTRACT.md`. As relações de crédito disponível, empenhado a liquidar e RPNP a liquidar foram reconciliadas numericamente com os valores exibidos. Essas relações estão implementadas em funções puras testadas; não dependem de percentuais fixos.
+
+O Gmail confirma 16 entregas reais do SERPRO com o assunto `MCL_MESTRE_EXERCICIO_2026`, entre 17 AGO e 10 SET 2026. Foi identificado um bloqueio no robô: ele reprocessava até 14 dias em ordem crescente, podendo atingir o limite do Apps Script antes de enviar o snapshot mais recente. O script agora seleciona primeiro o e-mail mais novo e encerra após uma persistência confirmada.
+
+Também foi identificada inconsistência de autenticação: `/creditos` não estava no `matcher` do middleware, embora `/api/creditos` exija sessão. Assim, a página podia abrir com a moldura demonstrativa enquanto a consulta retornava HTTP 401. A rota foi incluída na proteção.
+
+O parser V2 do mesmo contrato recompõe PI/NE suprimidos pelo formato hierárquico do TG, reinicia NE ao mudar de PI, preserva sinais e marca cada linha como resumo de PI ou detalhe de NE. Cargas V1 já persistidas não são reinterpretadas; precisam ser reenviadas para reprocessamento verificável.

@@ -5,10 +5,11 @@ export type TgRow = {
   pi: string | null; piDescription: string | null; ne: string | null;
   year: string | null; supplier: string | null; nd: string | null;
   ndDescription: string | null; movementCents: number;
+  level: "PI_SUMMARY" | "NE_DETAIL"; piExplicit: boolean; neExplicit: boolean;
 };
 export type TgReport = {
   schema: "TG_MASTER_V1"; fileName: string; sourceDate: null;
-  metric: string; rows: TgRow[]; warnings: string[];
+  parserVersion: 2; metric: string; rows: TgRow[]; warnings: string[];
 };
 const clean = (v: unknown) => String(v ?? "").trim();
 const nullable = (v: unknown) => !clean(v) || /^'?\-9$/.test(clean(v)) || clean(v) === "NAO SE APLICA" ? null : clean(v);
@@ -28,7 +29,10 @@ export function parseTgWorkbook(buffer: ArrayBuffer, fileName: string): TgReport
     const ugText = matrix.slice(0, header).flat().map(clean).find(v => /^UG Executora:/.test(v));
     const ugMatch = ugText?.match(/^UG Executora:\s*(\d{6})\s*:\s*(.+)$/);
     if (!ugMatch) throw new Error(`Aba ${sheetName}: UG Executora não identificada na fonte.`);
-    // Only actual Excel merges propagate identifiers; never fill unrelated blank cells.
+    const explicitPiRows = new Set(matrix.flatMap((row, index) => index > header && clean(row[0]) ? [index] : []));
+    const explicitNeRows = new Set(matrix.flatMap((row, index) => index > header && nullable(row[2]) ? [index] : []));
+    // Preserve actual merges first. The TG export also suppresses repeated hierarchy
+    // labels without creating Excel merges; those are handled by the ordered state below.
     for (const merge of sheet["!merges"] ?? []) {
       if (merge.s.r <= header) continue;
       if (merge.e.r > range.e.r || merge.e.c > range.e.c) throw new Error("Mesclagem TG fora dos limites da planilha.");
@@ -40,6 +44,11 @@ export function parseTgWorkbook(buffer: ArrayBuffer, fileName: string): TgReport
         }
       }
     }
+    let currentPi: string | null = null;
+    let currentPiDescription: string | null = null;
+    let currentNe: string | null = null;
+    let currentYear: string | null = null;
+    let currentSupplier: string | null = null;
     for (let r = header + 1; r < matrix.length; r++) {
       const row = matrix[r];
       if (!row || row.every(v => v == null || v === "")) continue;
@@ -48,15 +57,34 @@ export function parseTgWorkbook(buffer: ArrayBuffer, fileName: string): TgReport
       if (typeof value !== "number" || !Number.isFinite(value)) throw new Error(`Aba ${sheetName}, linha ${r + 1}: valor monetário inválido.`);
       const cents = Math.round(value * 100);
       if (!Number.isSafeInteger(cents)) throw new Error("Valor TG fora da precisão monetária suportada.");
+
+      const piExplicit = explicitPiRows.has(r);
+      if (piExplicit) {
+        currentPi = nullable(row[0]);
+        currentPiDescription = nullable(row[1]);
+        // A new PI starts a new hierarchy branch. An omitted NE below it must
+        // never inherit the last NE from the preceding PI.
+        currentNe = null;
+        currentYear = null;
+        currentSupplier = null;
+      }
+      const neExplicit = explicitNeRows.has(r);
+      if (neExplicit) {
+        currentNe = nullable(row[2]);
+        currentYear = nullable(row[3]);
+        currentSupplier = nullable(row[5]);
+      }
       rows.push({ id: `${sheetName}:${r + 1}`, sheet: sheetName, sourceRow: r + 1,
-        ug: ugMatch[1], om: ugMatch[2], pi: nullable(row[0]), piDescription: nullable(row[1]),
-        ne: nullable(row[2]), year: nullable(row[3]), supplier: nullable(row[5]),
-        nd: nullable(row[6]), ndDescription: nullable(row[7]), movementCents: cents });
+        ug: ugMatch[1], om: ugMatch[2], pi: currentPi, piDescription: currentPiDescription,
+        ne: currentNe, year: currentYear, supplier: currentSupplier,
+        nd: nullable(row[6]), ndDescription: nullable(row[7]), movementCents: cents,
+        level: currentNe ? "NE_DETAIL" : "PI_SUMMARY", piExplicit, neExplicit });
     }
   }
   if (!rows.length) throw new Error("Relatório TG sem registros.");
-  return { schema: "TG_MASTER_V1", fileName, sourceDate: null, metric, rows, warnings: [
+  return { schema: "TG_MASTER_V1", parserVersion: 2, fileName, sourceDate: null, metric, rows, warnings: [
     "O relatório informa Movim. Líquido. O Item Informação selecionado não está identificado; não interpretar como crédito disponível, empenhado, liquidado ou pago.",
+    "O arquivo contém níveis hierárquicos PI e NE. Somar linhas de níveis diferentes duplica subtotais; use level e os marcadores de origem na apuração.",
     "NC, classificação Requisitante/RPCM, metas e saldos próprios de RPNP não são fornecidos por este contrato.",
     "Data de referência contábil não identificada no arquivo; recebimento do e-mail e importação não comprovam atualização dos saldos.",
   ] };
