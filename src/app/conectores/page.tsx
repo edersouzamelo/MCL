@@ -15,6 +15,8 @@ const DOMAIN_ORDER: SourceSystemDomain[] = [
   "Recebimento",
   "Estoque / armazém",
   "Transporte / distribuição",
+  "Manutenção",
+  "Recolhimento",
   "Documental",
   "Local / derivado / contingência"
 ];
@@ -55,6 +57,21 @@ const DOMAIN_CONTEXTS: { [key: string]: DomainContext } = {
     title: "Transporte e Distribuição",
     description: "Roteirização, expedição de remessas e rastreamento de entregas, conciliando simuladores locais e lacunas a mapear.",
     domainName: "Transporte / distribuição",
+  },
+  entrega: {
+    title: "Entrega e Distribuição",
+    description: "Separação, expedição, transporte e confirmação da entrega ao destino.",
+    domainName: "Transporte / distribuição",
+  },
+  manutencao: {
+    title: "Manutenção",
+    description: "Sistemas e eventos do ciclo de indisponibilidade, intervenção e retorno ao emprego.",
+    domainName: "Manutenção",
+  },
+  recolhimento: {
+    title: "Recolhimento",
+    description: "Fluxo reverso, ordens de recolhimento, transferência, descarga e destinação do material.",
+    domainName: "Recolhimento",
   },
 };
 

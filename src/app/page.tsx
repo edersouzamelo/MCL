@@ -40,7 +40,7 @@ export default function Home() {
             <div className={styles.warehouseBackground} />
             <div className={styles.logoCenter}><HoneycombLogo /></div>
             <p className={styles.stageCaption} aria-hidden="true">
-              <span>Cadeia informacional</span><span>01 — 06</span>
+              <span>Cadeia informacional</span><span>01 — 08</span>
             </p>
           </div>
 
@@ -53,9 +53,9 @@ export default function Home() {
             >
               <div className={styles.panelHalo} />
               <div className={styles.eyebrow}><span>Plataforma logística</span><span className={styles.eyebrowLine} /></div>
-              <h1 className={styles.title}>Da necessidade à entrega,<span> uma única cadeia informacional.</span></h1>
+              <h1 className={styles.title}>Da necessidade ao recolhimento,<span> uma única cadeia informacional.</span></h1>
               <p className={styles.lead}>
-                Acompanhe aquisição, crédito, estoque, unidade logística, remessa e entrega
+                Acompanhe necessidade, crédito, aquisição, recebimento, armazenagem, entrega, manutenção e recolhimento
                 com continuidade, contexto e origem preservados.
               </p>
 

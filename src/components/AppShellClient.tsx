@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -12,12 +12,21 @@ import {
   Gauge,
   History,
   Home,
+  KeyRound,
   Landmark,
   Menu,
+  PackageCheck,
   PanelsTopLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Route,
   QrCode,
   Search,
+  Truck,
+  Undo2,
   Wallet,
+  Warehouse,
+  Wrench,
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -30,35 +39,65 @@ const navigation = [
     items: [
       { href: "/inicio", label: "Início", icon: Home },
       { href: "/painel", label: "Situação geral", icon: Gauge },
-      { href: "/grupamento", label: "Escalão / CCO", icon: PanelsTopLeft },
-      { href: "/assistente", label: "Assistente IA", icon: Bot },
     ],
   },
   {
-    label: "Planejamento",
+    label: "Módulos principais",
     items: [
       { href: "/necessidades", label: "Necessidades", icon: ClipboardList },
-      { href: "/analises/materiais", label: "CATMAT e Atas", icon: Search },
-      { href: "/aquisicoes", label: "Aquisições", icon: Landmark },
       { href: "/creditos", label: "Créditos", icon: Wallet },
+      { href: "/aquisicoes", label: "Aquisições", icon: Landmark },
+      { href: "/recebimento", label: "Recebimento", icon: PackageCheck },
+      { href: "/armazenagem", label: "Armazenagem", icon: Warehouse },
+      { href: "/entrega", label: "Entrega", icon: Truck },
+      { href: "/manutencao", label: "Manutenção", icon: Wrench },
+      { href: "/recolhimento", label: "Recolhimento", icon: Undo2 },
     ],
   },
   {
-    label: "Execução",
+    label: "Módulos complementares",
     items: [
-      { href: "/scanner", label: "Scanner", icon: QrCode },
-      { href: "/importacao", label: "Importação", icon: FileInput },
-    ],
-  },
-  {
-    label: "Governança",
-    items: [
+      { href: "/registro-continuidade", label: "Registro de continuidade", icon: Route },
       { href: "/conectores", label: "Conectores", icon: Activity },
-      { href: "/divergencias", label: "Divergências", icon: AlertTriangle },
+      { href: "/importacao", label: "Importação e ETL", icon: FileInput },
       { href: "/auditoria", label: "Auditoria", icon: History },
+      { href: "/admin/usuarios", label: "Usuários, UASG e acesso", icon: KeyRound },
+    ],
+  },
+  {
+    label: "Módulos suplementares",
+    items: [
+      { href: "/assistente", label: "Assistente IA", icon: Bot },
+      { href: "/grupamento", label: "Painel do CCOL", icon: PanelsTopLeft },
+      { href: "/guia-tecnico", label: "Guia técnico", icon: QrCode },
     ],
   },
 ] as const;
+
+const SIDEBAR_STORAGE_KEY = "mcl-sidebar-collapsed";
+const SIDEBAR_CHANGE_EVENT = "mcl-sidebar-change";
+
+function subscribeToSidebarPreference(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(SIDEBAR_CHANGE_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(SIDEBAR_CHANGE_EVENT, callback);
+  };
+}
+
+function getSidebarPreference() {
+  return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+}
+
+function getServerSidebarPreference() {
+  return false;
+}
+
+function saveSidebarPreference(collapsed: boolean) {
+  window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+  window.dispatchEvent(new Event(SIDEBAR_CHANGE_EVENT));
+}
 
 const routeNames: Array<[string, string]> = [
   ["/necessidades/", "Dossiê da necessidade"],
@@ -66,6 +105,8 @@ const routeNames: Array<[string, string]> = [
   ["/etiquetas/", "Etiqueta logística"],
   ["/catalogo", "CATMAT e Atas"],
   ["/admin/usuarios", "Gestão de usuários"],
+  ["/registro-continuidade", "Registro de Continuidade Logística"],
+  ["/guia-tecnico", "Guia técnico e expansão"],
   ["/grupamento", "Escalão / CCO"],
   ["/painel", "Situação geral"],
   ["/assistente", "Assistente IA"],
@@ -73,6 +114,11 @@ const routeNames: Array<[string, string]> = [
   ["/analises/materiais", "CATMAT e Atas"],
   ["/aquisicoes", "Aquisições"],
   ["/creditos", "Gestão de créditos"],
+  ["/recebimento", "Recebimento"],
+  ["/armazenagem", "Armazenagem"],
+  ["/entrega", "Entrega"],
+  ["/manutencao", "Manutenção"],
+  ["/recolhimento", "Recolhimento"],
   ["/scanner", "Scanner"],
   ["/importacao", "Importação"],
   ["/conectores", "Conectores"],
@@ -91,10 +137,15 @@ function isRouteActive(pathname: string, href: string) {
 export function AppShellClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/painel";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeToSidebarPreference,
+    getSidebarPreference,
+    getServerSidebarPreference,
+  );
   const currentTitle = routeNames.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? "MCL";
 
   return (
-    <div className="mcl-app-shell">
+    <div className={`mcl-app-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
 
       <aside className={`mcl-sidebar ${mobileMenuOpen ? "is-open" : ""}`}>
         <div className="mcl-sidebar-head">
@@ -105,6 +156,16 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
               <small>CONTINUIDADE LOGÍSTICA</small>
             </span>
           </Link>
+          <button
+            type="button"
+            className="mcl-sidebar-toggle"
+            aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            onClick={() => saveSidebarPreference(!sidebarCollapsed)}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen aria-hidden /> : <PanelLeftClose aria-hidden />}
+          </button>
           <button type="button" className="mcl-mobile-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>
             <X aria-hidden />
           </button>
@@ -122,6 +183,7 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     className={active ? "active" : undefined}
                     aria-current={active ? "page" : undefined}
+                    title={sidebarCollapsed ? item.label : undefined}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <item.icon aria-hidden />
