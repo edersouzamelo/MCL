@@ -27,14 +27,15 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
   const handleCopyPrompt = async () => {
     const promptText = `Manual de Configuração e Replicação do Módulo de Créditos Orçamentários MCL para IAs e Gestores:
 1. Acesse o Tesouro Gerencial (tesourogerencial.tesouro.gov.br).
-2. Crie um relatório em branco com as colunas: UG Executora | PI | NE CCor | NE CCor - Ano Emissão | NE CCor - Favorecido | Natureza Despesa Detalhada | Movim. Líquido - R$ (Item Informação).
-3. Aplique os filtros: UG Executora Na Lista (cód. das suas UGs) E Mês Lançamento = Mês da Última Carga.
-4. Salve com o nome MCL_MESTRE_EXERCICIO_2026.
-5. Em Arquivo > Inscrever-se em > E-mail, selecione 'Todos os dias após a atualização dos dados', formato Excel (.xlsx), use o assunto MCL_MESTRE_EXERCICIO_2026 e confira que o filtro do Apps Script corresponde ao assunto recebido.
-6. Confira o projeto Apps Script existente na conta receptora e seu gatilho temporal. O script envia o anexo ao webhook autenticado; uma regra comum de encaminhamento do Gmail não substitui esse envio HTTP.
-7. Use integrations/apps-script/robo-mcl-tg.gs no projeto Robô_MCL existente. Configure MCL_WEBHOOK_TOKEN e MCL_ORGANIZATION_CODE nas Propriedades do script. A função mantém o nome enviarPlanilhaSiafiParaMCL e envia reportType=TG_MASTER_V1 ao parser TG próprio. Preservar a fonte própria de RPNP; TG e CCO/SAG são independentes.
-8. Homologar os Itens Informação e os filtros do relatório antes de interpretar Movim. Líquido como saldo disponível, empenhado ou liquidado. Não gerar NC ausente nem somar subtotais e detalhes.
-9. Conferir uma execução completa: mensagem recebida, webhook aceito, checksum persistido, totais reconciliados e data da fonte exibida no painel.`;
+2. Use o contrato V2 homologado: UG Executora, PI, Ação Governo, Fonte Recursos, UGR - Gestão, PTRES, Item Informação, ND detalhada, campos de NE, NC, RO, Documento e Movim. Líquido.
+3. Preserve os 17 Itens Informação homologados: 15, 16, 19, 29, 30, 31, 32, 34, 40 a 47 e 91. Doc - Valor é apenas documental e nunca compõe os saldos.
+4. Aplique os filtros: UG Executora Na Lista (todas as UGs administrativas da Grande Unidade) E Ano Lançamento = exercício desejado.
+5. Salve com o nome MCL_MESTRE_EXERCICIO_2026.
+6. Em Arquivo > Inscrever-se em > E-mail, selecione 'Todos os dias após a atualização dos dados', formato Excel (.xlsx), use o assunto MCL_MESTRE_EXERCICIO_2026 e confira que o filtro do Apps Script corresponde ao assunto recebido.
+7. Confira o projeto Apps Script existente na conta receptora e seu gatilho temporal. O script envia o anexo ao webhook autenticado; uma regra comum de encaminhamento do Gmail não substitui esse envio HTTP.
+8. Use integrations/apps-script/robo-mcl-tg.gs no projeto Robô_MCL existente. Configure MCL_WEBHOOK_TOKEN e MCL_ORGANIZATION_CODE nas Propriedades do script. A função mantém o nome enviarPlanilhaSiafiParaMCL e envia o arquivo ao parser TG próprio. TG e CCO/SAG são independentes.
+9. A UG Executora é administrativa; não a transforme em OM beneficiária/requisitante. Essa classificação depende de dado próprio do MCL/SAG.
+10. Conferir uma execução completa: mensagem recebida, webhook aceito, checksum persistido, totais reconciliados e data da fonte exibida no painel.`;
     try { await navigator.clipboard.writeText(promptText); setCopied(true); }
     catch { setCopied(false); return; }
     setTimeout(() => setCopied(false), 2000);
@@ -44,19 +45,24 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
     const pluginSchema = {
       module: "MCL Budget Credits & SIAFI Integration Plugin",
       version: "1.0.1",
-      status: "TG_MASTER_SUPPORTED_BALANCE_MAPPING_PENDING",
+      status: "TG_MASTER_V2_HOMOLOGATED",
       source: "TESOURO_GERENCIAL",
       excludes: ["SAG_CCO"],
-      validationRequired: ["Item Informação e filtros", "Fonte própria RPNP", "Execução do Robô_MCL em produção"],
+      validationRequired: ["OM beneficiária/requisitante", "Metas", "Pregões SRP", "Execução do Robô_MCL em produção"],
       idealizer: "Edervaldo José De Souza Melo",
       contact: "edersouzamelo@gmail.com",
-      supportedUGs: ["160136", "160142", "160513"],
+      supportedUGs: ["160136", "160142", "160513", "167136", "167142", "167513"],
       targetSystem: "MCL - Modelo de Continuidade Logística",
       extractionSchema: {
         reportName: "MCL_MESTRE_EXERCICIO_2026",
         columns: [
           "UG Executora",
+          "Ação Governo",
+          "Fonte Recursos",
+          "UGR - Gestão",
+          "PTRES",
           "PI (Plano Interno)",
+          "Item Informação",
           "NE CCor",
           "NE CCor - Ano Emissão",
           "NE CCor - Favorecido",
@@ -109,9 +115,9 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
         {/* Content Body */}
         <div className="p-6 space-y-6 overflow-y-auto text-sm text-zinc-300">
           <div role="status" className="rounded-xl border border-amber-500/40 bg-amber-950/40 p-4 text-xs text-amber-100 space-y-2">
-            <p className="font-bold">Guia original recuperado do histórico c6fb455 · retificações de 9 SET</p>
-            <p>O layout, as seções, o prompt copiável e a especificação JSON foram recuperados. A automação TG ainda não está reconectada. A entrega dos e-mails foi confirmada, mas a execução do Apps Script instalado ainda não foi inspecionada.</p>
-            <p>Correções identificadas: assunto real MCL_MESTRE_EXERCICIO_2026; domínio atual mcl-one.vercel.app; quantidade de linhas variável. O webhook aceita o relatório mestre pelo contrato TG_MASTER_V1, separado do SAG. O Robô_MCL precisa enviar esse contrato e a autenticação. Este aviso não representa saldo zero nem conclusão da recuperação.</p>
+            <p className="font-bold">Contrato contábil V2 homologado em 11 SET</p>
+            <p>O XLSX final contém 50 colunas, 36.773 linhas e Item Informação por registro. O parser distingue provisão, empenho, liquidação, pagamento, NC e RPNP.</p>
+            <p>A visão macro mantém todas as UGs administrativas. OM beneficiária/requisitante, metas e pregões SRP continuam sendo dimensões/fontes próprias e não são inferidos.</p>
           </div>
           {/* Developer & Idealizer Callout Card */}
           <div className="bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-950 border border-emerald-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -151,7 +157,7 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
                 </span>
                 <h4 className="font-bold text-white text-xs">Criar Relatório Mestre no TG</h4>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  No TG em branco, monte a tabela com: <code className="text-emerald-400">UG Executora</code>, <code className="text-emerald-400">PI</code>, <code className="text-emerald-400">NE CCor</code>, <code className="text-emerald-400">NE CCor - Ano Emissão</code>, <code className="text-emerald-400">NE CCor - Favorecido</code>, <code className="text-emerald-400">Natureza Despesa Detalhada</code> e a métrica <code className="text-emerald-400">Movim. Líquido - R$</code>.
+                  Use o contrato V2 com <code className="text-emerald-400">UG Executora</code>, ação, fonte, UGR, PTRES, PI, <code className="text-emerald-400">Item Informação</code>, ND e os campos de NE, NC, RO e Documento. Não remova as UGs sem empenho recente: elas preservam a visão histórica da Grande Unidade.
                 </p>
               </div>
 
@@ -161,7 +167,7 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
                 </span>
                 <h4 className="font-bold text-white text-xs">Filtros Dinâmicos</h4>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Aplique os filtros: <code className="text-emerald-400">UG Executora Na Lista</code> (com as UGs da OM) e <code className="text-emerald-400">Mês Lançamento = Mês da Última Carga</code>. Salve como <code className="text-emerald-400">MCL_MESTRE_EXERCICIO_2026</code>.
+                  Aplique <code className="text-emerald-400">UG Executora Na Lista</code> com todas as UGs da Grande Unidade e <code className="text-emerald-400">Ano Lançamento = exercício</code>. Salve como <code className="text-emerald-400">MCL_MESTRE_EXERCICIO_2026</code>.
                 </p>
               </div>
 
@@ -190,9 +196,9 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
           <section className="rounded-xl border border-emerald-700 p-4 space-y-3">
             <h3 className="font-bold text-white">Configuração do Robô_MCL existente</h3>
             <p>Use o <a className="underline text-emerald-400" href="https://github.com/edersouzamelo/MCL/blob/main/integrations/apps-script/robo-mcl-tg.gs" target="_blank" rel="noreferrer">código de recuperação do Robô_MCL</a>. Ele preserva o nome enviarPlanilhaSiafiParaMCL, usado pelo gatilho existente. Não exclua nem recrie o gatilho sem verificar sua configuração.</p>
-            <p>Em Configurações do projeto → Propriedades do script, configure MCL_WEBHOOK_TOKEN com o mesmo segredo de MCL_SIAFI_WEBHOOK_TOKEN no servidor e MCL_ORGANIZATION_CODE com o número da UASG com seis dígitos, previamente vinculado no painel de Créditos. Não coloque segredos no código nem no chat.</p>
+            <p>Em Configurações do projeto → Propriedades do script, configure MCL_WEBHOOK_TOKEN com o mesmo segredo de MCL_SIAFI_WEBHOOK_TOKEN no servidor e MCL_ORGANIZATION_CODE com o número da UASG da organização cadastrada. O usuário não precisa informar nem vincular UASG no módulo. Não coloque segredos no código nem no chat.</p>
             <p>Execute a função uma vez e confira TG_PERSISTIDO, rowCount, checksum e persistedAt no Registro de execução. HTTP 401 indica autenticação; 404 indica organização; rejeição do arquivo exige conferir o relatório. Uma execução sem anexos não comprova ingestão.</p>
-            <p>Como contingência, o painel permite validar e confirmar a importação do XLSX pela sessão de administrador ou gestor. Isso não configura a atualização automática. A consulta do relatório preserva Movim. Líquido; as medidas de NC, NE, RPNP e metas dependem das fontes específicas.</p>
+            <p>Como contingência, o painel permite validar e confirmar a importação do XLSX pela sessão de administrador ou gestor. O V2 projeta NC, NE e RPNP pelo Item Informação. Metas, SRP e OM beneficiária/requisitante continuam dependendo de fontes próprias.</p>
           </section>
 
           {/* Section 2: Arquitetura de Segurança da Ponte de E-mail */}
@@ -231,7 +237,7 @@ export function TechnicalGuideModal({ isOpen, onClose }: TechnicalGuideModalProp
                   <div>
                     <strong className="text-white">3. Atualização Passiva de 10 Telas no MCL</strong>
                     <p className="text-zinc-400 text-[11px]">
-                      Após a reconexão e homologação, o servidor deve validar os registros do arquivo, persistir no PostgreSQL com checksum e data da fonte e disponibilizá-los às telas correspondentes. A implementação atual ainda não cumpre esse fluxo TG. Não existe volumetria fixa de 1.833 linhas nem atualização instantânea comprovada.
+                      O servidor valida o arquivo, preserva o bruto no PostgreSQL com checksum e envia ao navegador apenas projeções consolidadas de indicadores, NC, NE e RPNP. Não existe volumetria fixa: cada carga pode conter quantidade diferente de linhas.
                     </p>
                   </div>
                 </div>

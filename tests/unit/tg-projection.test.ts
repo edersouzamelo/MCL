@@ -7,9 +7,21 @@ const row = (partial: Partial<TgRow>): TgRow => ({
   piDescription: "Descrição", ne: null, year: null, supplier: null, nd: "33903023",
   ndDescription: "Uniformes", movementCents: 100, level: "PI_SUMMARY", piExplicit: true,
   neExplicit: false, ...partial,
-});
+} as TgRow);
 
 describe("projeção operacional do mestre TG", () => {
+  it("calcula indicadores pelo Item Informação sem usar o valor documental", () => {
+    const rows = [
+      row({ id: "provision", itemCode: "91", movementCents: 100_00, documentValueCents: 999_00 }),
+      row({ id: "committed", itemCode: "29", movementCents: 60_00 }),
+      row({ id: "available", itemCode: "19", movementCents: 40_00 }),
+      row({ id: "liquidated", itemCode: "31", movementCents: 20_00 }),
+      row({ id: "to-liquidate", itemCode: "30", movementCents: 40_00 }),
+    ];
+    const result = projectTgOperational({ rows });
+    expect(result.kpis).toMatchObject({ provisionUpdatedCents: 100_00, committedCents: 60_00, availableCreditCents: 40_00, liquidatedCents: 20_00, committedToLiquidateCents: 40_00, availableReconciliationCents: 0 });
+  });
+
   it("separa PI/ND de NE e não soma linhas agregadoras", () => {
     const result = projectTgOperational({ rows: [
       row({ id: "pi", movementCents: 100 }),

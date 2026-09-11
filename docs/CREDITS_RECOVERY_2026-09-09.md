@@ -46,3 +46,13 @@ O Gmail confirma 16 entregas reais do SERPRO com o assunto `MCL_MESTRE_EXERCICIO
 Também foi identificada inconsistência de autenticação: `/creditos` não estava no `matcher` do middleware, embora `/api/creditos` exija sessão. Assim, a página podia abrir com a moldura demonstrativa enquanto a consulta retornava HTTP 401. A rota foi incluída na proteção.
 
 O parser V2 do mesmo contrato recompõe PI/NE suprimidos pelo formato hierárquico do TG, reinicia NE ao mudar de PI, preserva sinais e marca cada linha como resumo de PI ou detalhe de NE. Cargas V1 já persistidas não são reinterpretadas; precisam ser reenviadas para reprocessamento verificável.
+
+## Homologação do contrato V2 — 11 SET 2026
+
+A exportação final `MCL_MESTRE_CREDITOS_V2_TESTE (2).xlsx` foi validada com 36.773 registros e 50 colunas. O contrato tornou explícitos UG Executora, PI, Ação Governo, Fonte Recursos, UGR-Gestão, PTRES, Item Informação, ND, NE, NC, RO, Documento e Movim. Líquido. Os Itens Informação homologados são 15, 16, 19, 29, 30, 31, 32, 34, 40–47 e 91.
+
+Mapeamento: 91 provisão atualizada; 19 crédito disponível; 29 empenhado; 30 empenhado a liquidar; 31 liquidado; 32 liquidado a pagar; 34 pago; 40/41 inscrito e reinscrito; 42 cancelado; 43 a liquidar; 44 liquidado; 45 liquidado a pagar; 46 pago; 47 a pagar. Os códigos 15 e 16 preservam provisões recebida e concedida. `Doc - Valor` é somente documental e não participa dos indicadores.
+
+A visão padrão é macro da Grande Unidade e mantém todas as UGs administrativas, inclusive as que não realizam novos empenhos. UG Executora não equivale a OM beneficiária/requisitante: OMDS sem autonomia podem executar por UG central, e essa classificação depende de dado próprio do MCL/SAG.
+
+A assinatura do relatório antigo não é atualizada automaticamente. É obrigatório criar/alterar a inscrição diária do relatório V2 definitivo no TG, manter assunto compatível com o Robô_MCL e validar ao menos uma entrega antes de desativar a assinatura anterior.

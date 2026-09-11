@@ -1,7 +1,7 @@
 "use client";
 
 import { TgSourcePanel } from "./TgSourcePanel";
-import type { TgSnapshot } from "@/modules/credits-tg/repository";
+import type { TgSnapshotMetadata } from "@/modules/credits-tg/repository";
 import { projectTgOperational } from "@/modules/credits-tg/projection";
 import { TechnicalGuideModal } from "./TechnicalGuideModal";
 import React, { useState, useMemo, useEffect, useCallback } from "react";
@@ -25,14 +25,9 @@ const formatCurrency = (val: number) =>
 const formatNumber = (val: number) =>
   new Intl.NumberFormat("pt-BR").format(val || 0);
 
-// Presentation restored from c6fb455. No source records are embedded in this component.
-type Nc = { id: string; om: string; data: string; acao: string; ncRef: string; ro: string; finalidade: string; pi: string; nd: string; provAtlz: number; credDisp: number; ug?: string };
-type Rpn = { id: string; om: string; uge: string; ne: string; favorecido: string; nd: string; pi: string; rpnpInsc: number; rpnpAliq: number };
 type Srp = { id: string; ugg: string; numCompra: string; fornecedor: string; numAtaAno: string; item: string; vigencia: string; valorUnt: number; percQtdEmp: string; qtdDisponivel: number; valorDispRs: number };
 type Rpcm = { id: string; om: string; codigo: string; pi: string; nd: string; justificativa: string; saldo: number; ug?: string };
 // Empty sections mean unavailable source, never a zero financial balance.
-const NC_REFERENCIA_DATA: Nc[] = [];
-const RPNP_DATA: Rpn[] = [];
 const PREGOES_SRP: Srp[] = [];
 const RPCM_NC_DATA: Rpcm[] = [];
 const RPCM_NE_DATA: Rpcm[] = [];
@@ -42,14 +37,14 @@ export function CreditManagementClient() {
   const [activeSubpage, setActiveSubpage] = useState<string>("tg_movements");
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [tgSnapshot, setTgSnapshot] = useState<TgSnapshot | null>(null);
+  const [tgSnapshot, setTgSnapshot] = useState<TgSnapshotMetadata | null>(null);
   const lastSyncTime = tgSnapshot ? `Importação: ${new Date(tgSnapshot.importedAt).toLocaleString("pt-BR")}; referência contábil não informada` : "Não confirmada";
   const [sourceMessage, setSourceMessage] = useState("Verificando disponibilidade da fonte Tesouro Gerencial…");
 
   const [selectedUg, setSelectedUg] = useState<string>("TODAS");
   const [selectedNd, setSelectedNd] = useState<string>("TODAS");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const operational = useMemo(() => projectTgOperational(tgSnapshot), [tgSnapshot]);
+  const [operational, setOperational] = useState(() => projectTgOperational(null));
 
   const matches = useCallback((row: object) => {
     const fields = row as Record<string, unknown>;
@@ -58,18 +53,26 @@ export function CreditManagementClient() {
       && (selectedNd === "TODAS" || fields.nd === selectedNd)
       && Object.values(fields).join(" ").toLocaleLowerCase("pt-BR").includes(searchQuery.trim().toLocaleLowerCase("pt-BR"));
   }, [selectedUg, selectedNd, searchQuery]);
-  const filteredNCs = useMemo(() => NC_REFERENCIA_DATA.filter(matches), [matches]);
+  const filteredNCs = useMemo(() => operational.ncMovements.filter(matches), [operational.ncMovements, matches]);
   const filteredPiNd = useMemo(() => operational.piNdMovements.filter(matches), [operational.piNdMovements, matches]);
-  const filteredNEs = useMemo(() => operational.neMovements.filter(matches), [operational.neMovements, matches]);
-  const filteredRPNPs = useMemo(() => RPNP_DATA.filter(matches), [matches]);
+  const filteredNEs = useMemo(() => operational.neExecution.filter(matches), [operational.neExecution, matches]);
+  const filteredRPNPs = useMemo(() => operational.rpnpMovements.filter(matches), [operational.rpnpMovements, matches]);
   const filteredSRP = useMemo(() => PREGOES_SRP.filter(matches), [matches]);
   const filteredRpcm = useMemo(() => (activeSubpage === "rpcm_nc" ? RPCM_NC_DATA : activeSubpage === "rpcm_rpnp" ? RPCM_RPNP_DATA : RPCM_NE_DATA).filter(matches), [activeSubpage, matches]);
-  const totalNCsProv = useMemo(() => filteredNCs.reduce((acc, curr) => acc + curr.provAtlz, 0), [filteredNCs]);
-  const totalNCsCred = useMemo(() => filteredNCs.reduce((acc, curr) => acc + curr.credDisp, 0), [filteredNCs]);
+  const totalNCsProv = useMemo(() => filteredNCs.reduce((acc, curr) => acc + curr.provisionUpdatedCents, 0) / 100, [filteredNCs]);
+  const totalNCsCred = useMemo(() => filteredNCs.reduce((acc, curr) => acc + curr.availableCreditCents, 0) / 100, [filteredNCs]);
   const totalPiNdMovement = useMemo(() => filteredPiNd.reduce((acc, curr) => acc + curr.movementCents, 0) / 100, [filteredPiNd]);
-  const totalNeMovement = useMemo(() => filteredNEs.reduce((acc, curr) => acc + curr.movementCents, 0) / 100, [filteredNEs]);
-  const totalRPNPInsc = useMemo(() => filteredRPNPs.reduce((acc, curr) => acc + curr.rpnpInsc, 0), [filteredRPNPs]);
-  const totalRPNPAliq = useMemo(() => filteredRPNPs.reduce((acc, curr) => acc + curr.rpnpAliq, 0), [filteredRPNPs]);
+  const totalNeMovement = useMemo(() => filteredNEs.reduce((acc, curr) => acc + curr.committedCents, 0) / 100, [filteredNEs]);
+  const totalRPNPInsc = useMemo(() => filteredRPNPs.reduce((acc, curr) => acc + curr.registeredCents + curr.reinscribedCents, 0) / 100, [filteredRPNPs]);
+  const totalRPNPAliq = useMemo(() => filteredRPNPs.reduce((acc, curr) => acc + curr.toLiquidateCents, 0) / 100, [filteredRPNPs]);
+  const scopeKpis = useMemo(() => ({
+    provisionUpdatedCents: filteredNCs.reduce((sum, row) => sum + row.provisionUpdatedCents, 0),
+    availableCreditCents: filteredNCs.reduce((sum, row) => sum + row.availableCreditCents, 0),
+    committedCents: filteredNEs.reduce((sum, row) => sum + row.committedCents, 0),
+    liquidatedCents: filteredNEs.reduce((sum, row) => sum + row.liquidatedCents, 0),
+    committedToLiquidateCents: filteredNEs.reduce((sum, row) => sum + row.committedToLiquidateCents, 0),
+    paidCents: filteredNEs.reduce((sum, row) => sum + row.paidCents, 0),
+  }), [filteredNCs, filteredNEs]);
 
   const handleForceSync = useCallback(async () => {
     setIsSyncing(true);
@@ -77,9 +80,11 @@ export function CreditManagementClient() {
       const response = await fetch("/api/creditos", { cache: "no-store" });
       const payload = await response.json();
       setTgSnapshot(response.ok ? payload.snapshot ?? null : null);
-      setSourceMessage(response.ok && payload.snapshot ? "Relatório TG persistido e projetado nas visões reais de PI/ND e NE. Provisão, empenho, liquidação e RPNP continuam dependentes da dimensão Item Informação." : payload.error ?? "Fonte TG ainda não validada para este painel.");
+      setOperational(response.ok && payload.operational ? payload.operational : projectTgOperational(null));
+      setSourceMessage(response.ok && payload.snapshot ? "Relatório TG V2 projetado: provisão, crédito disponível, execução, NC, NE e RPNP disponíveis por UG executora." : payload.error ?? "Fonte TG ainda não validada para este painel.");
     } catch {
       setTgSnapshot(null);
+      setOperational(projectTgOperational(null));
       setSourceMessage("Não foi possível verificar a fonte Tesouro Gerencial. Tente atualizar a leitura.");
     } finally { setIsSyncing(false); }
   }, []);
@@ -98,7 +103,7 @@ export function CreditManagementClient() {
               <ShieldCheck className="h-3.5 w-3.5" /> SIAFI (TG) + Compras.gov.br (PNCP/SIASG)
             </span>
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-mono">
-              Créditos da UASG · Fonte TG em recuperação
+              Créditos da Grande Unidade · TG V2 homologado
             </span>
           </div>
           <h1 className="text-xl font-extrabold text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -144,14 +149,12 @@ export function CreditManagementClient() {
               onChange={(e) => setSelectedUg(e.target.value)}
               className="bg-transparent text-zinc-900 dark:text-white font-bold outline-none cursor-pointer"
             >
-              <option value="TODAS" className="bg-white dark:bg-zinc-900">Todas as UGs</option>
-              <option value="160136" className="bg-white dark:bg-zinc-900">160136 - Cmdo 9º Gpt Log</option>
-              <option value="160142" className="bg-white dark:bg-zinc-900">160142 - 9º B Sup</option>
-              <option value="160513" className="bg-white dark:bg-zinc-900">160513 - 9º B Mnt</option>
+              <option value="TODAS" className="bg-white dark:bg-zinc-900">Visão macro · todas as UGs</option>
+              {operational.ugOptions.map(option => <option key={option.ug} value={option.ug} className="bg-white dark:bg-zinc-900">{option.ug} - {option.om}</option>)}
             </select>
           </div>
 
-          <label className="text-xs">ND <select aria-label="Natureza de despesa" value={selectedNd} onChange={(event) => setSelectedNd(event.target.value)} className="rounded border bg-white p-2 dark:bg-zinc-900"><option value="TODAS">Todas</option>{Array.from(new Set((tgSnapshot?.rows ?? []).flatMap(row => row.nd ? [row.nd] : []))).sort().map(nd => <option key={nd}>{nd}</option>)}</select></label>
+          <label className="text-xs">ND <select aria-label="Natureza de despesa" value={selectedNd} onChange={(event) => setSelectedNd(event.target.value)} className="rounded border bg-white p-2 dark:bg-zinc-900"><option value="TODAS">Todas</option>{operational.ndOptions.map(nd => <option key={nd}>{nd}</option>)}</select></label>
           <div className="relative flex-1 min-w-[200px]">
             <Search className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -283,7 +286,7 @@ export function CreditManagementClient() {
                   </thead>
                   <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-zinc-800 dark:text-zinc-200">
                     {!filteredPiNd.length && <tr><td colSpan={8} className="p-6 text-center text-zinc-500">Nenhuma linha PI/ND disponível para os filtros selecionados.</td></tr>}
-                    {filteredPiNd.map(row => (
+                    {filteredPiNd.slice(0, 500).map(row => (
                       <tr key={row.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                         <td className="py-2.5 px-3 font-bold">{row.ug}</td>
                         <td className="py-2.5 px-3 font-sans text-[11px]">{row.om}</td>
@@ -306,20 +309,20 @@ export function CreditManagementClient() {
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">UGs recebidas</span>
-                  <span className="text-2xl font-bold text-zinc-900 dark:text-white block mt-1 font-mono">{tgSnapshot ? formatNumber(operational.ugCount) : "—"}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Provisão atualizada</span>
+                  <span className="text-2xl font-bold text-zinc-900 dark:text-white block mt-1 font-mono">{tgSnapshot ? formatCurrency(scopeKpis.provisionUpdatedCents / 100) : "—"}</span>
                 </div>
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">PIs identificados</span>
-                  <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 block mt-1 font-mono">{tgSnapshot ? formatNumber(operational.piCount) : "—"}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Despesas empenhadas</span>
+                  <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 block mt-1 font-mono">{tgSnapshot ? formatCurrency(scopeKpis.committedCents / 100) : "—"}</span>
                 </div>
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">NEs do exercício {operational.currentYear ?? ""}</span>
-                  <span className="text-2xl font-bold text-sky-600 dark:text-sky-400 block mt-1">{tgSnapshot ? formatNumber(operational.neCount) : "—"}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Crédito disponível</span>
+                  <span className="text-2xl font-bold text-sky-600 dark:text-sky-400 block mt-1">{tgSnapshot ? formatCurrency(scopeKpis.availableCreditCents / 100) : "—"}</span>
                 </div>
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm">
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Linhas da fonte</span>
-                  <span className="text-2xl font-bold text-sky-600 dark:text-sky-400 block mt-1 font-mono">{tgSnapshot ? formatNumber(operational.sourceRowCount) : "—"}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold block uppercase">Despesas liquidadas</span>
+                  <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 block mt-1 font-mono">{tgSnapshot ? formatCurrency(scopeKpis.liquidatedCents / 100) : "—"}</span>
                 </div>
               </div>
 
@@ -328,7 +331,7 @@ export function CreditManagementClient() {
                   <PieIcon className="h-5 w-5 text-sky-600 dark:text-sky-400" /> RESUMO GERAL DO FORTE LOGÍSTICO 2026
                 </h3>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                  A fonte diária já alimenta a exploração real de PI/ND e as NEs do exercício. Os KPIs de provisão, empenho, liquidação e crédito disponível só serão habilitados quando o Item Informação vier identificado no arquivo.
+                  Visão das UGs executoras selecionadas. A fonte identifica {operational.piCount} PIs e {operational.neCount} NEs. Empenhado a liquidar: {formatCurrency(scopeKpis.committedToLiquidateCents / 100)}; pago no exercício: {formatCurrency(scopeKpis.paidCents / 100)}. A OM beneficiária/requisitante não é inferida da UG administrativa.
                 </p>
               </div>
             </div>
@@ -360,19 +363,19 @@ export function CreditManagementClient() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-zinc-800 dark:text-zinc-200">
-                    <tr><td colSpan={10} className="p-6 text-center text-zinc-500">Aguardando fonte validada desta seção.</td></tr>
-                    {filteredNCs.map((nc) => (
+                    {!filteredNCs.length && <tr><td colSpan={10} className="p-6 text-center text-zinc-500">Nenhuma NC disponível para os filtros selecionados.</td></tr>}
+                    {filteredNCs.slice(0, 500).map((nc) => (
                       <tr key={nc.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                         <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">{nc.om}</td>
-                        <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{nc.data}</td>
-                        <td className="py-2.5 px-3">{nc.acao}</td>
-                        <td className="py-2.5 px-3 font-bold text-cyan-600 dark:text-cyan-400">{nc.ncRef}</td>
+                        <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{nc.date}</td>
+                        <td className="py-2.5 px-3">{nc.action}</td>
+                        <td className="py-2.5 px-3 font-bold text-cyan-600 dark:text-cyan-400">{nc.nc}</td>
                         <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{nc.ro}</td>
-                        <td className="py-2.5 px-3 font-sans max-w-xs text-[11px] leading-tight text-zinc-700 dark:text-zinc-300">{nc.finalidade}</td>
+                        <td className="py-2.5 px-3 font-sans max-w-xs text-[11px] leading-tight text-zinc-700 dark:text-zinc-300">{nc.purpose}</td>
                         <td className="py-2.5 px-3 font-bold">{nc.pi}</td>
                         <td className="py-2.5 px-3">{nc.nd}</td>
-                        <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(nc.provAtlz)}</td>
-                        <td className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">{formatCurrency(nc.credDisp)}</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(nc.provisionUpdatedCents / 100)}</td>
+                        <td className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">{formatCurrency(nc.availableCreditCents / 100)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -392,7 +395,7 @@ export function CreditManagementClient() {
           {activeSubpage === "req_ne" && (
             <div className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-2xl p-4 shadow-sm dark:shadow-xl border border-zinc-200 dark:border-zinc-800 space-y-3">
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                <div><span className="font-black text-base uppercase text-zinc-900 dark:text-white">NE(s) DO EXERCÍCIO {operational.currentYear ?? "CORRENTE"}</span><p className="text-[11px] text-zinc-500">Valor preservado como Movim. Líquido; não rotulado artificialmente como empenhado ou liquidado.</p></div>
+                <div><span className="font-black text-base uppercase text-zinc-900 dark:text-white">NE(s) DO EXERCÍCIO {operational.currentYear ?? "CORRENTE"}</span><p className="text-[11px] text-zinc-500">Valores identificados pelos Itens Informação 29, 30, 31, 32 e 34.</p></div>
                 <span className="text-xs font-bold bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-full text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-mono">
                   Exibindo {formatNumber(filteredNEs.length)} Registros
                 </span>
@@ -407,13 +410,13 @@ export function CreditManagementClient() {
                       <th className="py-2.5 px-3">PI</th>
                       <th className="py-2.5 px-3">ND</th>
                       <th className="py-2.5 px-3">Descrição da ND</th>
-                      <th className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">Movim. Líquido</th>
-                      <th className="py-2.5 px-3">Rastro</th>
+                      <th className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">Empenhado</th>
+                      <th className="py-2.5 px-3">Processo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-zinc-800 dark:text-zinc-200">
                     {!filteredNEs.length && <tr><td colSpan={8} className="p-6 text-center text-zinc-500">Nenhuma NE disponível para os filtros selecionados.</td></tr>}
-                    {filteredNEs.map((ne) => (
+                    {filteredNEs.slice(0, 500).map((ne) => (
                       <tr key={ne.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                         <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">{ne.om}</td>
                         <td className="py-2.5 px-3 font-bold text-cyan-600 dark:text-cyan-400">{ne.ne}</td>
@@ -421,14 +424,14 @@ export function CreditManagementClient() {
                         <td className="py-2.5 px-3 font-bold">{ne.pi ?? "—"}</td>
                         <td className="py-2.5 px-3">{ne.nd}</td>
                         <td className="py-2.5 px-3 font-sans text-[11px]">{ne.ndDescription ?? "—"}</td>
-                        <td className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">{formatCurrency(ne.movementCents / 100)}</td>
-                        <td className="py-2.5 px-3 text-zinc-500">{ne.sheet}/{ne.sourceRow}</td>
+                        <td className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">{formatCurrency(ne.committedCents / 100)}</td>
+                        <td className="py-2.5 px-3 text-zinc-500">{ne.processNumber}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="bg-zinc-100 dark:bg-zinc-800 font-extrabold border-t-2 border-zinc-300 dark:border-zinc-700 sticky bottom-0 z-10">
                     <tr>
-                      <td colSpan={6} className="py-3 px-3 uppercase text-zinc-900 dark:text-white">Total das linhas específicas de NE/ND</td>
+                      <td colSpan={6} className="py-3 px-3 uppercase text-zinc-900 dark:text-white">Total empenhado das NEs</td>
                       <td className="py-3 px-3 text-right bg-zinc-900 dark:bg-black text-white font-mono font-black text-sm">{filteredNEs.length ? formatCurrency(totalNeMovement) : "—"}</td>
                       <td />
                     </tr>
@@ -462,17 +465,17 @@ export function CreditManagementClient() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-zinc-800 dark:text-zinc-200">
-                    <tr><td colSpan={10} className="p-6 text-center text-zinc-500">Aguardando fonte validada desta seção.</td></tr>
-                    {filteredRPNPs.map((r) => (
+                    {!filteredRPNPs.length && <tr><td colSpan={8} className="p-6 text-center text-zinc-500">Nenhum RPNP disponível para os filtros selecionados.</td></tr>}
+                    {filteredRPNPs.slice(0, 500).map((r) => (
                       <tr key={r.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                         <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">{r.om}</td>
-                        <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{r.uge}</td>
+                        <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{r.ug}</td>
                         <td className="py-2.5 px-3 font-bold text-cyan-600 dark:text-cyan-400">{r.ne}</td>
-                        <td className="py-2.5 px-3 font-sans max-w-xs text-[11px]">{r.favorecido}</td>
+                        <td className="py-2.5 px-3 font-sans max-w-xs text-[11px]">{r.supplier}</td>
                         <td className="py-2.5 px-3">{r.nd}</td>
                         <td className="py-2.5 px-3 font-bold">{r.pi}</td>
-                        <td className="py-2.5 px-3 text-right font-medium">{formatCurrency(r.rpnpInsc)}</td>
-                        <td className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">{formatCurrency(r.rpnpAliq)}</td>
+                        <td className="py-2.5 px-3 text-right font-medium">{formatCurrency((r.registeredCents + r.reinscribedCents) / 100)}</td>
+                        <td className="py-2.5 px-3 text-right bg-zinc-900 dark:bg-black text-white font-black">{formatCurrency(r.toLiquidateCents / 100)}</td>
                       </tr>
                     ))}
                   </tbody>
