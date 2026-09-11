@@ -14,9 +14,10 @@ function enviarPlanilhaSiafiParaMCL() {
   try {
     var messages = [];
     // Includes archived mail. Never excludes a thread because an older message was processed.
-    var threads = GmailApp.search('from:naoresponda@serpro.gov.br subject:MCL_MESTRE_EXERCICIO_2026 has:attachment newer_than:14d', 0, 100);
+    var reportNamePattern = /(?:MCL_MESTRE_EXERCICIO_2026(?:_V2)?|MCL_MESTRE_CREDITOS_V2_TESTE)/i;
+    var threads = GmailApp.search('from:naoresponda@serpro.gov.br {subject:MCL_MESTRE_EXERCICIO_2026 subject:MCL_MESTRE_EXERCICIO_2026_V2 subject:MCL_MESTRE_CREDITOS_V2_TESTE} has:attachment newer_than:14d', 0, 100);
     threads.forEach(function(thread) { thread.getMessages().forEach(function(message) {
-      if (message.getSubject().indexOf('MCL_MESTRE_EXERCICIO_2026') !== -1 && /(?:<|^)naoresponda@serpro\.gov\.br(?:>|$)/i.test(message.getFrom())) messages.push(message);
+      if (reportNamePattern.test(message.getSubject()) && /(?:<|^)naoresponda@serpro\.gov\.br(?:>|$)/i.test(message.getFrom())) messages.push(message);
     }); });
     // Snapshot diário: tente primeiro o e-mail mais recente. O código anterior
     // reprocessava até 14 dias do mais antigo para o mais novo e podia atingir o
@@ -31,7 +32,7 @@ function enviarPlanilhaSiafiParaMCL() {
       var attachments = message.getAttachments({ includeInlineImages: false });
       for (var attachmentIndex = 0; attachmentIndex < attachments.length && attempted === 0; attachmentIndex++) {
         var attachment = attachments[attachmentIndex];
-        if (!/^MCL_MESTRE_EXERCICIO_2026.*\.xlsx?$/i.test(attachment.getName())) continue;
+        if (!reportNamePattern.test(attachment.getName()) || !/\.xlsx?$/i.test(attachment.getName())) continue;
         attempted++;
         try {
           var response = UrlFetchApp.fetch('https://mcl-one.vercel.app/api/connectors/siafi/upload', {
