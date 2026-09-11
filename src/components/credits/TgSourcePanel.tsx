@@ -24,8 +24,8 @@ export function TgSourcePanel({ snapshot, onImported }: { snapshot: TgSnapshot |
     } catch (error) { setMessage(error instanceof Error ? error.message : "Falha na importação."); }
     finally { setBusy(false); }
   }
-  return <details className="rounded-xl border border-sky-300 bg-white p-4 dark:bg-zinc-900" open>
-    <summary className="cursor-pointer font-bold">Relatório original do Tesouro Gerencial</summary>
+  return <details className="credit-source-panel rounded-xl border border-sky-300 bg-white p-4 dark:bg-zinc-900">
+    <summary className="cursor-pointer font-bold">Fonte e ingestão · relatório original do Tesouro Gerencial</summary>
     <p className="my-2 text-sm">Consulte os registros recebidos com a medida original. O relatório mestre, isoladamente, não identifica os saldos das dez visões abaixo.</p>
     <div className="my-3 rounded border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
       <p className="font-bold">Escopo definido automaticamente pela organização do usuário.</p>
