@@ -4,7 +4,7 @@ import { searchOfficialCatalog } from "@/modules/coverage/official-catalog";
 import type { Citation, MclAiActor, MclToolEnvelope } from "@/modules/ai/contracts";
 import { getLatestFinancialSnapshotPair } from "@/modules/financial-snapshots/repository";
 
-import { getLatestTg } from "@/modules/credits-tg/repository";
+import { getLatestTgProjection, type TgDashboardProjection } from "@/modules/credits-tg/repository";
 
 export const MCL_DATA_SILOS = [
   "NECESSIDADES",
@@ -495,6 +495,69 @@ async function queryFinancial(actor: MclAiActor, search: string | undefined, lim
   };
 }
 
+export function projectCreditsForAssistant(
+  projection: TgDashboardProjection,
+  search: string | undefined,
+  limit: number,
+) {
+  const normalized = search?.trim().toLocaleLowerCase("pt-BR");
+  const matchingUgs = projection.operational.ugOptions.filter((option) =>
+    !normalized || `${option.ug} ${option.om}`.toLocaleLowerCase("pt-BR").includes(normalized)
+  );
+  const allowedUgs = new Set(matchingUgs.map((option) => option.ug));
+  const ncRows = projection.operational.ncMovements.filter((row) => !normalized || allowedUgs.has(row.ug));
+  const neRows = projection.operational.neExecution.filter((row) => !normalized || allowedUgs.has(row.ug));
+  const rpnpRows = projection.operational.rpnpMovements.filter((row) => !normalized || allowedUgs.has(row.ug));
+  const byUg = matchingUgs.map((option) => {
+    const ugNcs = projection.operational.ncMovements.filter((row) => row.ug === option.ug);
+    const ugNes = projection.operational.neExecution.filter((row) => row.ug === option.ug);
+    const ugRpnps = projection.operational.rpnpMovements.filter((row) => row.ug === option.ug);
+    const provisionUpdatedCents = ugNcs.reduce((sum, row) => sum + row.provisionUpdatedCents, 0);
+    const committedCents = ugNes.reduce((sum, row) => sum + row.committedCents, 0);
+    return {
+      ug: option.ug,
+      om: option.om,
+      provisionUpdatedCents,
+      committedCents,
+      availableCreditCents: provisionUpdatedCents - committedCents,
+      liquidatedCents: ugNes.reduce((sum, row) => sum + row.liquidatedCents, 0),
+      committedToLiquidateCents: ugNes.reduce((sum, row) => sum + row.committedToLiquidateCents, 0),
+      paidCents: ugNes.reduce((sum, row) => sum + row.paidCents, 0),
+      rpnpRegisteredAndReinscribedCents: ugRpnps.reduce((sum, row) => sum + row.registeredCents + row.reinscribedCents, 0),
+      rpnpToLiquidateCents: ugRpnps.reduce((sum, row) => sum + row.toLiquidateCents, 0),
+      ncCount: ugNcs.length,
+      neCount: ugNes.length,
+      rpnpCount: ugRpnps.length,
+    };
+  }).slice(0, limit);
+  const provisionUpdatedCents = ncRows.reduce((sum, row) => sum + row.provisionUpdatedCents, 0);
+  const committedCents = neRows.reduce((sum, row) => sum + row.committedCents, 0);
+
+  return {
+    source: {
+      fileName: projection.snapshot.fileName,
+      importedAt: projection.snapshot.importedAt,
+      emailReceivedAt: projection.snapshot.emailReceivedAt,
+      rowCount: projection.snapshot.rowCount,
+      checksum: projection.snapshot.checksum,
+    },
+    scope: normalized ? { search, matchedUgs: matchingUgs.length } : { search: null, matchedUgs: matchingUgs.length },
+    totals: {
+      provisionUpdatedCents,
+      committedCents,
+      availableCreditCents: provisionUpdatedCents - committedCents,
+      liquidatedCents: neRows.reduce((sum, row) => sum + row.liquidatedCents, 0),
+      committedToLiquidateCents: neRows.reduce((sum, row) => sum + row.committedToLiquidateCents, 0),
+      paidCents: neRows.reduce((sum, row) => sum + row.paidCents, 0),
+      rpnpRegisteredAndReinscribedCents: rpnpRows.reduce((sum, row) => sum + row.registeredCents + row.reinscribedCents, 0),
+      rpnpLiquidatedCents: rpnpRows.reduce((sum, row) => sum + row.liquidatedCents, 0),
+      rpnpCancelledCents: rpnpRows.reduce((sum, row) => sum + row.cancelledCents, 0),
+      rpnpToLiquidateCents: rpnpRows.reduce((sum, row) => sum + row.toLiquidateCents, 0),
+    },
+    byUg,
+  };
+}
+
 export async function queryMclData(
   actor: MclAiActor,
   input: { silo: MclDataSilo; search?: string; limit?: number },
@@ -511,13 +574,13 @@ export async function queryMclData(
   switch (input.silo) {
     case "CREDITOS":
       if (!actor.organizationId) return unavailable("Organização ausente.", { records: [] });
-      const tg = await getLatestTg(actor.organizationId);
-      if (!tg) return unavailable("Nenhum relatório TG persistido para esta organização. A fonte é TG por e-mail/Apps Script; importar SAG no CCO não preenche Créditos.", { records: [] });
-      const matching = tg.rows.filter(row => !input.search || `${row.ug} ${row.pi ?? ""} ${row.ne ?? ""} ${row.nd ?? ""}`.toLowerCase().includes(input.search.toLowerCase()));
-      return { status: "AVAILABLE", dataNature: "PERSISTED_OPERATIONAL", asOf: tg.importedAt,
-        citations: [{ title: tg.fileName, source: "TESOURO_GERENCIAL", dataNature: "PERSISTED_OPERATIONAL", asOf: tg.importedAt }],
-        gaps: [...tg.warnings, ...(matching.length > limit ? ["Registros limitados; a amostra não representa um total financeiro."] : [])],
-        data: { metric: tg.metric, sourceDate: tg.sourceDate, importedAt: tg.importedAt, emailReceivedAt: tg.emailReceivedAt, matchedRecords: matching.length, records: matching.slice(0, limit).map(({ ug, pi, ne, nd, movementCents, sheet, sourceRow }) => ({ ug, pi, ne, nd, movementCents, sheet, sourceRow })) } };
+      const tg = await getLatestTgProjection(actor.organizationId);
+      if (!tg) return unavailable("Nenhuma projeção TG persistida para esta organização. A fonte é TG por e-mail/Apps Script; importar SAG no CCO não preenche Créditos.", { records: [] });
+      const data = projectCreditsForAssistant(tg, input.search, limit);
+      return { status: "AVAILABLE", dataNature: "CALCULATED_FROM_PERSISTED", asOf: tg.snapshot.importedAt,
+        citations: [{ title: tg.snapshot.fileName, source: "TESOURO_GERENCIAL", dataNature: "PERSISTED_OPERATIONAL", asOf: tg.snapshot.importedAt }],
+        gaps: [...tg.snapshot.warnings, ...(input.search && data.scope.matchedUgs === 0 ? [`Nenhuma UASG/OM corresponde a '${input.search}'.`] : [])],
+        data };
     case "GRUPAMENTO":
       return queryFinancial(actor, input.search, limit);
     case "NECESSIDADES":
