@@ -37,6 +37,27 @@ export function isDirectCreditAvailabilityQuestion(prompt: string) {
   return /\bcredito(s)?\b/.test(normalized) && /\b(disponivel|saldo|quanto|valor)\b/.test(normalized);
 }
 
+const normalizeIntentText = (value: string) =>
+  value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+
+export function isDirectCreditAvailabilityRequest(input: MclChatRequest) {
+  if (isDirectCreditAvailabilityQuestion(input.prompt)) return true;
+
+  const current = normalizeIntentText(input.prompt);
+  const isCreditBreakdownFollowUp =
+    /\b(ug|uasg|oms?|unidades?|subordinad[ao]s?|cada|todas|detalh(?:e|ar|amento)|distribui(?:cao|r))\b/.test(current) ||
+    /^e\b/.test(current);
+  if (!isCreditBreakdownFollowUp) return false;
+
+  return input.history.some((message) => {
+    const content = normalizeIntentText(message.content);
+    return isDirectCreditAvailabilityQuestion(content) ||
+      content.includes("credito disponivel total da grande unidade") ||
+      content.includes("provisao atualizada menos despesa empenhada") ||
+      content.includes("detalhamento por uasg/om");
+  });
+}
+
 function formatCreditAvailabilityAnswer(prompt: string, data: AssistantCreditProjection) {
   const normalized = prompt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
   const commandUnit = data.byUg.find((row) =>
@@ -48,18 +69,19 @@ function formatCreditAvailabilityAnswer(prompt: string, data: AssistantCreditPro
   if (/9.?\s*(gpt|grupamento)/.test(normalized) && commandUnit) {
     lines.unshift(`Na UASG ${commandUnit.ug} — ${commandUnit.om}, o crédito disponível é ${currencyFromCents(commandUnit.availableCreditCents)}.`);
   }
-  if (/\b(todas|oms?|gu|unidades?)\b/.test(normalized)) {
+  if (/\b(cada|todas|ugs?|uasgs?|oms?|gu|unidades?|subordinad[ao]s?|detalh(?:e|ar|amento)|distribui(?:cao|r))\b/.test(normalized)) {
     lines.push("", "Detalhamento por UASG/OM:");
     for (const row of data.byUg) {
       lines.push(`- ${row.ug} — ${row.om}: ${currencyFromCents(row.availableCreditCents)}`);
     }
+    lines.push("", "As unidades acima são as UGs executoras identificadas no relatório do Tesouro Gerencial; o MCL não transforma UG executora em OM beneficiária por inferência.");
   }
   lines.push("", `Fonte: ${data.source.fileName}, importada em ${new Date(data.source.importedAt).toLocaleString("pt-BR")}. O disponível é reconciliado como provisão atualizada menos despesa empenhada.`);
   return lines.join("\n");
 }
 
 async function tryDirectCreditResponse(input: MclChatRequest, actor: MclAiActor, requestId: string): Promise<RagResponse | null> {
-  if (!isDirectCreditAvailabilityQuestion(input.prompt)) return null;
+  if (!isDirectCreditAvailabilityRequest(input)) return null;
   const envelope = await queryMclData(actor, { silo: "CREDITOS", limit: 20 });
   if (envelope.status !== "AVAILABLE") {
     return {
@@ -78,7 +100,7 @@ async function tryDirectCreditResponse(input: MclChatRequest, actor: MclAiActor,
     answer: formatCreditAvailabilityAnswer(input.prompt, data),
     citations: envelope.citations,
     suggestedQuestions: ["Qual é a provisão atualizada por UASG?", "Quanto foi empenhado e liquidado por OM?"],
-    warnings: envelope.gaps,
+    warnings: [],
     requestId,
     provider: "mcl-deterministic",
     model: "consulta-financeira-direta",
