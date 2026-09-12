@@ -565,6 +565,7 @@ export type CreditAnalyticsInput = {
   nd?: string;
   pi?: string;
   groupBy?: "TOTAL" | "UG" | "ND" | "PI";
+  includeFinalities?: boolean;
   limit?: number;
 };
 
@@ -696,9 +697,11 @@ export function projectCreditAnalytics(
     totals: summarize(ncRows, neRows),
     groupBy,
     groups,
-    finalities: [...purposeGroups.values()]
-      .sort((left, right) => right.provisionUpdatedCents - left.provisionUpdatedCents)
-      .slice(0, limit),
+    finalities: input.includeFinalities
+      ? [...purposeGroups.values()]
+        .sort((left, right) => right.provisionUpdatedCents - left.provisionUpdatedCents)
+        .slice(0, limit)
+      : [],
     interpretationNotes: [
       "Crédito disponível é calculado como provisão atualizada menos despesa empenhada no mesmo filtro de UASG, ND e PI.",
       "O valor calculado é comparado ao Item Informação 19 no mesmo filtro; availableReconciliationCents informa eventual divergência.",
