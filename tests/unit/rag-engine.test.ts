@@ -3,10 +3,9 @@ import { retrieveMclKnowledge } from "@/modules/ai/rag-engine";
 import {
   buildMclMessages,
   classifyMclAiError,
-  isDirectCreditAvailabilityQuestion,
-  isDirectCreditAvailabilityRequest,
+  isCreditAnalyticsConversation,
 } from "@/modules/ai/agent";
-import { getSiloCatalog, projectCreditsForAssistant, queryMclData } from "@/modules/ai/silos";
+import { getSiloCatalog, projectCreditAnalytics, projectCreditsForAssistant, queryMclData } from "@/modules/ai/silos";
 import type { TgDashboardProjection } from "@/modules/credits-tg/repository";
 import { assertMclAiRateLimit, resetMclAiRateLimitsForTests } from "@/modules/ai/rate-limit";
 import { resolveMclModel } from "@/modules/ai/provider";
@@ -104,6 +103,22 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     });
   });
 
+  it("não injeta o seletor visual como filtro de uma conversa financeira", () => {
+    const messages = buildMclMessages({
+      prompt: "mas na ND 339030?",
+      scope: "Piloto Classe II",
+      history: [
+        { role: "user", content: "Quanto de crédito tem o 9 BSUP?" },
+        { role: "assistant", content: "Vou consultar os dados do Tesouro Gerencial." },
+      ],
+    });
+    const current = messages.at(-1);
+
+    expect(current).toEqual(expect.objectContaining({ role: "user" }));
+    expect(String(current?.content)).toContain("Domínio detectado: Créditos do Tesouro Gerencial");
+    expect(String(current?.content)).not.toContain("Piloto Classe II");
+  });
+
   it("mapeia cobrança esgotada do Gateway sem criar fallback textual", () => {
     const error = classifyMclAiError({ statusCode: 402 });
 
@@ -123,13 +138,8 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     });
   });
 
-  it("desvia perguntas objetivas de crédito disponível para consulta determinística", () => {
-    expect(isDirectCreditAvailabilityQuestion("Quanto de crédito disponível tem na UASG do 9º Gpt Log?")).toBe(true);
-    expect(isDirectCreditAvailabilityQuestion("Explique a arquitetura do MCL")).toBe(false);
-  });
-
-  it("mantém continuações por UG no fluxo determinístico de créditos", () => {
-    expect(isDirectCreditAvailabilityRequest({
+  it("mantém perguntas e continuações financeiras no domínio analítico de créditos", () => {
+    expect(isCreditAnalyticsConversation({
       prompt: "e de cada UG?",
       scope: "Piloto Classe II",
       history: [
@@ -138,8 +148,8 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
       ],
     })).toBe(true);
 
-    expect(isDirectCreditAvailabilityRequest({
-      prompt: "me refiro às UG subordinadas ao 9 Gpt Log.",
+    expect(isCreditAnalyticsConversation({
+      prompt: "mas na ND 339030?",
       scope: "Piloto Classe II",
       history: [
         { role: "user", content: "quanto de crédito temos disponível?" },
@@ -150,12 +160,52 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     })).toBe(true);
   });
 
-  it("não transforma uma continuação sem contexto financeiro em consulta de créditos", () => {
-    expect(isDirectCreditAvailabilityRequest({
+  it("não transforma uma conversa sem contexto financeiro em consulta de créditos", () => {
+    expect(isCreditAnalyticsConversation({
       prompt: "e de cada unidade?",
       scope: "Piloto Classe II",
       history: [{ role: "user", content: "Explique a arquitetura do MCL" }],
     })).toBe(false);
+  });
+
+  it("filtra crédito por unidade e prefixo de ND sem busca textual composta", () => {
+    const projection = {
+      snapshot: {
+        fileName: "MCL_MESTRE_CREDITOS_V2_TESTE.xlsx",
+        importedAt: "2026-09-12T01:00:00.000Z",
+        rowCount: 4,
+        checksum: "checksum",
+      },
+      operational: {
+        ugOptions: [
+          { ug: "160142", om: "9 BATALHAO DE SUPRIMENTO" },
+          { ug: "167142", om: "9 BATALHAO DE SUPRIMENTO" },
+          { ug: "160136", om: "COMANDO DO 9 GRUPAMENTO LOGISTICO" },
+        ],
+        ncMovements: [
+          { ug: "160142", om: "9 BATALHAO DE SUPRIMENTO", nc: "NC1", date: "2026-01-01", action: "A1", ro: "RO1", purpose: "Material de consumo", pi: "PI-A", nd: "33903023", provisionUpdatedCents: 100_00, provisionReceivedCents: 100_00, provisionGrantedCents: 0, availableCreditCents: 40_00 },
+          { ug: "167142", om: "9 BATALHAO DE SUPRIMENTO", nc: "NC2", date: "2026-01-01", action: "A2", ro: "RO2", purpose: "Fardamento", pi: "PI-B", nd: "33903023", provisionUpdatedCents: 50_00, provisionReceivedCents: 50_00, provisionGrantedCents: 0, availableCreditCents: 50_00 },
+          { ug: "160136", om: "COMANDO", nc: "NC3", date: "2026-01-01", action: "A3", ro: "RO3", purpose: "Outra unidade", pi: "PI-C", nd: "33903023", provisionUpdatedCents: 999_00, provisionReceivedCents: 999_00, provisionGrantedCents: 0, availableCreditCents: 999_00 },
+        ],
+        neExecution: [
+          { ug: "160142", om: "9 BATALHAO DE SUPRIMENTO", ne: "NE1", year: "2026", date: "2026-01-02", supplier: "Fornecedor", pi: "PI-A", nd: "33903023", ndDescription: "Material", description: "Compra", processNumber: "P1", biddingModality: "Pregão", committedCents: 60_00, committedToLiquidateCents: 40_00, liquidatedCents: 20_00, liquidatedToPayCents: 0, paidCents: 20_00 },
+        ],
+        rpnpMovements: [],
+      },
+    } as unknown as TgDashboardProjection;
+
+    const result = projectCreditAnalytics(projection, { ug: "9 BSUP", nd: "339030", groupBy: "UG" });
+
+    expect(result.filters.matchedUgs.map((item) => item.ug)).toEqual(["160142", "167142"]);
+    expect(result.totals).toMatchObject({
+      provisionUpdatedCents: 150_00,
+      committedCents: 60_00,
+      availableCreditCents: 90_00,
+      reportedAvailableCreditCents: 90_00,
+      availableReconciliationCents: 0,
+    });
+    expect(result.groups).toHaveLength(2);
+    expect(result.finalities.map((item) => item.purpose)).toEqual(["Material de consumo", "Fardamento"]);
   });
 
   it("deixa o SDK resolver OIDC pelo contexto da requisição, sem bloquear pela ausência no process.env", () => {
