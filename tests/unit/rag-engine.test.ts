@@ -194,7 +194,12 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
       },
     } as unknown as TgDashboardProjection;
 
-    const result = projectCreditAnalytics(projection, { ug: "9 BSUP", nd: "339030", groupBy: "UG" });
+    const result = projectCreditAnalytics(projection, {
+      ug: "9 BSUP",
+      nd: "339030",
+      groupBy: "UG",
+      includeFinalities: true,
+    });
 
     expect(result.filters.matchedUgs.map((item) => item.ug)).toEqual(["160142", "167142"]);
     expect(result.totals).toMatchObject({
