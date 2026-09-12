@@ -19,6 +19,7 @@ import { retrieveMclKnowledge } from "@/modules/ai/knowledge-base";
 import { resolveMclModel } from "@/modules/ai/provider";
 import {
   MCL_DATA_SILOS,
+  type AssistantCreditProjection,
   getSiloCatalog,
   queryMclData,
   queryOfficialCatmat,
@@ -27,6 +28,63 @@ import {
 const AGENT_TIMEOUT_MS = 30_000;
 const MAX_AGENT_STEPS = 6;
 const MAX_OUTPUT_TOKENS = 1_200;
+
+const currencyFromCents = (value: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value / 100);
+
+export function isDirectCreditAvailabilityQuestion(prompt: string) {
+  const normalized = prompt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+  return /\bcredito(s)?\b/.test(normalized) && /\b(disponivel|saldo|quanto|valor)\b/.test(normalized);
+}
+
+function formatCreditAvailabilityAnswer(prompt: string, data: AssistantCreditProjection) {
+  const normalized = prompt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+  const commandUnit = data.byUg.find((row) =>
+    row.ug === "160136" || row.om.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").includes("comando do 9")
+  );
+  const lines = [
+    `O crédito disponível total da Grande Unidade é **${currencyFromCents(data.totals.availableCreditCents)}**.`,
+  ];
+  if (/9.?\s*(gpt|grupamento)/.test(normalized) && commandUnit) {
+    lines.unshift(`Na UASG **${commandUnit.ug} — ${commandUnit.om}**, o crédito disponível é **${currencyFromCents(commandUnit.availableCreditCents)}**.`);
+  }
+  if (/\b(todas|oms?|gu|unidades?)\b/.test(normalized)) {
+    lines.push("", "**Detalhamento por UASG/OM:**");
+    for (const row of data.byUg) {
+      lines.push(`- ${row.ug} — ${row.om}: **${currencyFromCents(row.availableCreditCents)}**`);
+    }
+  }
+  lines.push("", `Fonte: ${data.source.fileName}, importada em ${new Date(data.source.importedAt).toLocaleString("pt-BR")}. O disponível é reconciliado como provisão atualizada menos despesa empenhada.`);
+  return lines.join("\n");
+}
+
+async function tryDirectCreditResponse(input: MclChatRequest, actor: MclAiActor, requestId: string): Promise<RagResponse | null> {
+  if (!isDirectCreditAvailabilityQuestion(input.prompt)) return null;
+  const envelope = await queryMclData(actor, { silo: "CREDITOS", limit: 20 });
+  if (envelope.status !== "AVAILABLE") {
+    return {
+      answer: envelope.gaps.join(" ") || "Os dados de créditos não estão disponíveis para o escopo autorizado.",
+      citations: envelope.citations,
+      suggestedQuestions: ["Quais fontes financeiras estão disponíveis agora?"],
+      warnings: envelope.gaps,
+      requestId,
+      provider: "mcl-deterministic",
+      model: "consulta-financeira-direta",
+      authMode: "session-rbac",
+    };
+  }
+  const data = envelope.data as AssistantCreditProjection;
+  return {
+    answer: formatCreditAvailabilityAnswer(input.prompt, data),
+    citations: envelope.citations,
+    suggestedQuestions: ["Qual é a provisão atualizada por UASG?", "Quanto foi empenhado e liquidado por OM?"],
+    warnings: envelope.gaps,
+    requestId,
+    provider: "mcl-deterministic",
+    model: "consulta-financeira-direta",
+    authMode: "session-rbac",
+  };
+}
 
 const AGENT_INSTRUCTIONS = `Você é o Assistente de Inteligência Logística do MCL.
 
@@ -137,6 +195,8 @@ export async function runMclAssistant(
   requestId: string,
   abortSignal?: AbortSignal,
 ): Promise<RagResponse> {
+  const directResponse = await tryDirectCreditResponse(input, actor, requestId);
+  if (directResponse) return directResponse;
   const model = resolveMclModel();
   const tools = createMclTools(actor);
   const pseudonymousUser = createHash("sha256").update(actor.id).digest("hex").slice(0, 24);
