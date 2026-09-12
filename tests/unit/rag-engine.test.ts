@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { retrieveMclKnowledge } from "@/modules/ai/rag-engine";
-import { buildMclMessages, classifyMclAiError } from "@/modules/ai/agent";
+import { buildMclMessages, classifyMclAiError, isDirectCreditAvailabilityQuestion } from "@/modules/ai/agent";
 import { getSiloCatalog, projectCreditsForAssistant, queryMclData } from "@/modules/ai/silos";
 import type { TgDashboardProjection } from "@/modules/credits-tg/repository";
 import { assertMclAiRateLimit, resetMclAiRateLimitsForTests } from "@/modules/ai/rate-limit";
@@ -116,6 +116,11 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
       status: 504,
       retryable: true,
     });
+  });
+
+  it("desvia perguntas objetivas de crédito disponível para consulta determinística", () => {
+    expect(isDirectCreditAvailabilityQuestion("Quanto de crédito disponível tem na UASG do 9º Gpt Log?")).toBe(true);
+    expect(isDirectCreditAvailabilityQuestion("Explique a arquitetura do MCL")).toBe(false);
   });
 
   it("deixa o SDK resolver OIDC pelo contexto da requisição, sem bloquear pela ausência no process.env", () => {
