@@ -18,14 +18,14 @@ export type TgNcProjection = {
   provisionUpdatedCents: number; availableCreditCents: number;
 };
 export type TgNeProjection = {
-  id: string; ug: string; om: string; ne: string; year: string;
+  id: string; ug: string; om: string; ne: string; year: string; date: string;
   supplier: string; pi: string; nd: string; ndDescription: string;
   description: string; processNumber: string; biddingModality: string;
   committedCents: number; committedToLiquidateCents: number;
   liquidatedCents: number; liquidatedToPayCents: number; paidCents: number;
 };
 export type TgRpnpProjection = {
-  id: string; ug: string; om: string; ne: string; supplier: string;
+  id: string; ug: string; om: string; ne: string; supplier: string; date: string;
   pi: string; nd: string; registeredCents: number; reinscribedCents: number;
   cancelledCents: number; toLiquidateCents: number; liquidatedCents: number;
   liquidatedToPayCents: number; paidCents: number; payableCents: number;
@@ -68,7 +68,7 @@ export function projectTgOperational(report: Pick<TgReport, "rows"> | null) {
   const neExecution = group(rows.filter(row => row.ne && row.itemCode && neCodes.has(row.itemCode)),
     row => [row.ug, row.ne, row.pi, row.nd].join("|"),
     (items, first, id): TgNeProjection => ({
-      id, ug: first.ug, om: first.om, ne: text(first.ne), year: text(first.year),
+      id, ug: first.ug, om: first.om, ne: text(first.ne), year: text(first.year), date: text(first.neDay ?? first.documentDay),
       supplier: text(first.supplier), pi: text(first.pi), nd: text(first.nd),
       ndDescription: text(first.ndDescription), description: text(first.neDescription),
       processNumber: text(first.processNumber), biddingModality: text(first.biddingModality),
@@ -83,7 +83,7 @@ export function projectTgOperational(report: Pick<TgReport, "rows"> | null) {
   const rpnpMovements = group(rows.filter(row => row.itemCode && rpnpCodes.has(row.itemCode)),
     row => [row.ug, row.ne, row.pi, row.nd].join("|"),
     (items, first, id): TgRpnpProjection => ({
-      id, ug: first.ug, om: first.om, ne: text(first.ne), supplier: text(first.supplier),
+      id, ug: first.ug, om: first.om, ne: text(first.ne), supplier: text(first.supplier), date: text(first.documentDay ?? first.neDay),
       pi: text(first.pi), nd: text(first.nd),
       registeredCents: sum(items, TG_ITEM.rpnpRegistered), reinscribedCents: sum(items, TG_ITEM.rpnpReinscribed),
       cancelledCents: sum(items, TG_ITEM.rpnpCancelled), toLiquidateCents: sum(items, TG_ITEM.rpnpToLiquidate),
