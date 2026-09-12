@@ -149,6 +149,22 @@ model FinancialSourceImport {
   @@index([organizationId, sourceKind, importedAt])
 }
 
+// Buffer temporário para anexos TG maiores que o limite de requisição da Vercel.
+// Os blocos são removidos assim que a carga é persistida e também expiram no
+// recebimento de uma nova execução do robô.
+model TgUploadChunk {
+  uploadId        String
+  chunkIndex      Int
+  chunkCount      Int
+  fileName        String
+  emailReceivedAt DateTime?
+  data            Bytes
+  createdAt       DateTime @default(now())
+
+  @@id([uploadId, chunkIndex])
+  @@index([createdAt])
+}
+
 model SupplyItem {
   id              String        @id
   persistentCode  String        @unique
