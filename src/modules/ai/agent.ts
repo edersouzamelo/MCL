@@ -205,6 +205,12 @@ function statusCodeFromUnknown(error: unknown) {
   return typeof value === "number" ? value : undefined;
 }
 
+function nameFromUnknown(error: unknown) {
+  if (!error || typeof error !== "object" || !("name" in error)) return "";
+  const value = (error as { name?: unknown }).name;
+  return typeof value === "string" ? value : "";
+}
+
 function messageFromUnknown(error: unknown) {
   if (error instanceof Error) return error.message;
   if (!error || typeof error !== "object" || !("message" in error)) return "";
@@ -216,6 +222,7 @@ export function classifyMclAiError(error: unknown): MclAiServiceError {
   if (error instanceof MclAiServiceError) return error;
   const statusCode = statusCodeFromUnknown(error);
   const errorMessage = messageFromUnknown(error);
+  const errorName = nameFromUnknown(error);
   if (statusCode === 403 && /zero.data.retention|data policy|training/i.test(errorMessage)) {
     return new MclAiServiceError(
       "AI_GATEWAY_DATA_POLICY_BLOCKED",
@@ -242,7 +249,7 @@ export function classifyMclAiError(error: unknown): MclAiServiceError {
       false,
     );
   }
-  if (statusCode === 408) {
+  if (statusCode === 408 || errorName === "AbortError" || /timeout|timed out/i.test(errorMessage)) {
     return new MclAiServiceError(
       "AI_GATEWAY_TIMEOUT",
       "O AI Gateway excedeu o tempo limite da consulta.",
