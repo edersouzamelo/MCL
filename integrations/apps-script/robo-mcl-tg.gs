@@ -35,15 +35,24 @@ function enviarPlanilhaSiafiParaMCL() {
         if (!reportNamePattern.test(attachment.getName()) || !/\.xlsx?$/i.test(attachment.getName())) continue;
         attempted++;
         try {
-          var response = UrlFetchApp.fetch('https://mcl-one.vercel.app/api/connectors/siafi/upload', {
-            method: 'post', muteHttpExceptions: true,
-            headers: { Authorization: 'Bearer ' + token },
-            payload: { file: attachment.copyBlob(), reportType: 'TG_MASTER_V1', organizationCode: organization, emailReceivedAt: message.getDate().toISOString() }
-          });
-          var status = response.getResponseCode();
-          var body;
-          try { body = JSON.parse(response.getContentText()); } catch (_) { throw new Error('HTTP ' + status + ': resposta não JSON'); }
-          if (status < 200 || status >= 300 || !body.success || !body.checksum || !body.persistedAt) throw new Error('HTTP ' + status + ': ' + (body.error || 'persistência não confirmada'));
+          var bytes = attachment.getBytes();
+          var chunkSize = 2000000;
+          var chunkCount = Math.ceil(bytes.length / chunkSize);
+          var uploadId = Utilities.getUuid();
+          var body = null;
+          for (var chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+            var start = chunkIndex * chunkSize;
+            var chunk = Utilities.newBlob(bytes.slice(start, Math.min(start + chunkSize, bytes.length)), 'application/octet-stream', 'chunk-' + chunkIndex + '.bin');
+            var response = UrlFetchApp.fetch('https://mcl-one.vercel.app/api/connectors/siafi/upload', {
+              method: 'post', muteHttpExceptions: true,
+              headers: { Authorization: 'Bearer ' + token },
+              payload: { file: chunk, reportType: 'TG_MASTER_V1', organizationCode: organization, emailReceivedAt: message.getDate().toISOString(), uploadId: uploadId, chunkIndex: String(chunkIndex), chunkCount: String(chunkCount), originalFileName: attachment.getName() }
+            });
+            var status = response.getResponseCode();
+            try { body = JSON.parse(response.getContentText()); } catch (_) { throw new Error('HTTP ' + status + ': resposta não JSON no bloco ' + (chunkIndex + 1)); }
+            if (status < 200 || status >= 300 || !body.success) throw new Error('HTTP ' + status + ' no bloco ' + (chunkIndex + 1) + ': ' + (body.error || 'envio não confirmado'));
+          }
+          if (!body || !body.checksum || !body.persistedAt) throw new Error('O servidor recebeu os blocos, mas não confirmou a persistência.');
           accepted++;
           selectedEmailAt = message.getDate().toISOString();
           console.log(JSON.stringify({ status: 'TG_PERSISTIDO', file: attachment.getName(), emailReceivedAt: selectedEmailAt, rowCount: body.rowCount, checksum: body.checksum, persistedAt: body.persistedAt }));
