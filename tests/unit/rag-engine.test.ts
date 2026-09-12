@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { retrieveMclKnowledge } from "@/modules/ai/rag-engine";
-import { buildMclMessages, classifyMclAiError, isDirectCreditAvailabilityQuestion } from "@/modules/ai/agent";
+import {
+  buildMclMessages,
+  classifyMclAiError,
+  isDirectCreditAvailabilityQuestion,
+  isDirectCreditAvailabilityRequest,
+} from "@/modules/ai/agent";
 import { getSiloCatalog, projectCreditsForAssistant, queryMclData } from "@/modules/ai/silos";
 import type { TgDashboardProjection } from "@/modules/credits-tg/repository";
 import { assertMclAiRateLimit, resetMclAiRateLimitsForTests } from "@/modules/ai/rate-limit";
@@ -121,6 +126,36 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
   it("desvia perguntas objetivas de crédito disponível para consulta determinística", () => {
     expect(isDirectCreditAvailabilityQuestion("Quanto de crédito disponível tem na UASG do 9º Gpt Log?")).toBe(true);
     expect(isDirectCreditAvailabilityQuestion("Explique a arquitetura do MCL")).toBe(false);
+  });
+
+  it("mantém continuações por UG no fluxo determinístico de créditos", () => {
+    expect(isDirectCreditAvailabilityRequest({
+      prompt: "e de cada UG?",
+      scope: "Piloto Classe II",
+      history: [
+        { role: "user", content: "quanto de crédito temos disponível?" },
+        { role: "assistant", content: "O crédito disponível total da Grande Unidade é R$ 3.583.901,97." },
+      ],
+    })).toBe(true);
+
+    expect(isDirectCreditAvailabilityRequest({
+      prompt: "me refiro às UG subordinadas ao 9 Gpt Log.",
+      scope: "Piloto Classe II",
+      history: [
+        { role: "user", content: "quanto de crédito temos disponível?" },
+        { role: "assistant", content: "O disponível é reconciliado como provisão atualizada menos despesa empenhada." },
+        { role: "user", content: "e de cada UG?" },
+        { role: "assistant", content: "Não há dados por UG para o escopo Piloto Classe II." },
+      ],
+    })).toBe(true);
+  });
+
+  it("não transforma uma continuação sem contexto financeiro em consulta de créditos", () => {
+    expect(isDirectCreditAvailabilityRequest({
+      prompt: "e de cada unidade?",
+      scope: "Piloto Classe II",
+      history: [{ role: "user", content: "Explique a arquitetura do MCL" }],
+    })).toBe(false);
   });
 
   it("deixa o SDK resolver OIDC pelo contexto da requisição, sem bloquear pela ausência no process.env", () => {
