@@ -163,12 +163,6 @@ export function CreditManagementClient() {
         </div>
       </div>
 
-      <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-200">
-        <p className="font-bold">{tgSnapshot ? "Relatório TG recebido · dados reais disponíveis" : "Aguardando relatório Tesouro Gerencial"}</p>
-        <p className="mt-1">{sourceMessage}</p>
-        <p className="mt-1">Movim. Líquido é exibido sem renomeação contábil. Campos sem fonte confirmada aparecem como — e não representam saldo zero.</p>
-      </div>
-      <TgSourcePanel snapshot={tgSnapshot} onImported={handleForceSync} />
       {/* Universal Filter Bar */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-sm dark:shadow-lg flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
@@ -708,6 +702,20 @@ export function CreditManagementClient() {
           </div>
         </div>
       </div>
+
+      <details className="group rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <summary className="cursor-pointer list-none px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-zinc-600 dark:text-zinc-300">
+          Fonte, auditoria e detalhes técnicos
+        </summary>
+        <div className="space-y-3 border-t border-zinc-200 p-4 dark:border-zinc-800">
+          <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="font-bold">{tgSnapshot ? "Relatório TG recebido · dados reais disponíveis" : "Aguardando relatório Tesouro Gerencial"}</p>
+            <p className="mt-1">{sourceMessage}</p>
+            <p className="mt-1">Movim. Líquido é exibido sem renomeação contábil. Campos sem fonte confirmada aparecem como — e não representam saldo zero.</p>
+          </div>
+          <TgSourcePanel snapshot={tgSnapshot} onImported={handleForceSync} />
+        </div>
+      </details>
 
       <TechnicalGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </div>
