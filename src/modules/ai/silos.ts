@@ -558,6 +558,8 @@ export function projectCreditsForAssistant(
   };
 }
 
+export type AssistantCreditProjection = ReturnType<typeof projectCreditsForAssistant>;
+
 export async function queryMclData(
   actor: MclAiActor,
   input: { silo: MclDataSilo; search?: string; limit?: number },

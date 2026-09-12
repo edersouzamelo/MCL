@@ -603,7 +603,7 @@ export function AssistenteIaClient({
                             </span>
                             {msg.response && (
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-                                {msg.response.model} · Gateway OIDC
+                                {msg.response.model} · {msg.response.authMode === "oidc" ? "Gateway OIDC" : "consulta autorizada direta"}
                               </span>
                             )}
                             {msg.errorCode && (
