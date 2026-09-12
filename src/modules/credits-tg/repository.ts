@@ -1,27 +1,47 @@
 import { createHash } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import type { TgReport } from "./parser";
+import { projectTgOperational } from "./projection";
 
 // Separate source kind: queries for SAG CURRENT/RPNP cannot consume this payload.
 // Stable database discriminator. The payload itself declares V1 or V2.
 export const TG_SOURCE_KIND = "TG_MASTER_V1";
 export type TgSnapshot = TgReport & { checksum: string; importedAt: string; emailReceivedAt: string | null; ingestionMethod: string };
 export type TgSnapshotMetadata = Omit<TgSnapshot, "rows"> & { rowCount: number };
+export type TgDashboardProjection = { snapshot: TgSnapshotMetadata; operational: ReturnType<typeof projectTgOperational> };
 export async function persistTg(input: { organizationId: string; report: TgReport; buffer: ArrayBuffer; actor: string; method: "APPS_SCRIPT_TG" | "MANUAL_TG"; emailReceivedAt?: string | null }) {
   const checksum = createHash("sha256").update(Buffer.from(input.buffer)).digest("hex");
   const payload = JSON.parse(JSON.stringify({ ...input.report, emailReceivedAt: input.emailReceivedAt ?? null })) as Prisma.InputJsonValue;
+  const projection = JSON.parse(JSON.stringify({
+    snapshot: { schema: input.report.schema, parserVersion: input.report.parserVersion, fileName: input.report.fileName,
+      sourceDate: input.report.sourceDate, metric: input.report.metric, warnings: input.report.warnings,
+      checksum, importedAt: new Date().toISOString(), emailReceivedAt: input.emailReceivedAt ?? null,
+      ingestionMethod: input.method, rowCount: input.report.rows.length },
+    operational: projectTgOperational(input.report),
+  })) as Prisma.InputJsonValue;
   return prisma.financialSourceImport.upsert({
     where: { organizationId_sourceKind_checksum: { organizationId: input.organizationId, sourceKind: TG_SOURCE_KIND, checksum } },
     // The checksum still identifies the immutable source file. Rebuild only the
     // parsed projection so a corrected parser can repair an existing import;
     // importedAt and ingestion provenance remain unchanged.
-    update: { fileName: input.report.fileName, rowCount: input.report.rows.length, payload, warnings: input.report.warnings },
+    update: { fileName: input.report.fileName, rowCount: input.report.rows.length, payload, projection, warnings: input.report.warnings },
     create: { organizationId: input.organizationId, sourceKind: TG_SOURCE_KIND, checksum,
       fileName: input.report.fileName, rowCount: input.report.rows.length,
-      payload,
+      payload, projection,
       warnings: input.report.warnings, ingestionMethod: input.method, importedBy: input.actor },
   });
+}
+export async function getLatestTgProjection(organizationId: string): Promise<TgDashboardProjection | null> {
+  const record = await prisma.financialSourceImport.findFirst({
+    where: { organizationId, sourceKind: TG_SOURCE_KIND, projection: { not: Prisma.DbNull } },
+    orderBy: [{ importedAt: "desc" }, { id: "desc" }],
+    select: { projection: true, importedAt: true },
+  });
+  if (!record?.projection) return null;
+  const result = record.projection as unknown as TgDashboardProjection;
+  result.snapshot.importedAt = record.importedAt.toISOString();
+  return result;
 }
 export async function getLatestTg(organizationId: string): Promise<TgSnapshot | null> {
   const record = await prisma.financialSourceImport.findFirst({ where: { organizationId, sourceKind: TG_SOURCE_KIND }, orderBy: [{ importedAt: "desc" }, { id: "desc" }] });
