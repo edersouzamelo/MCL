@@ -7,6 +7,7 @@ import * as financial from "@/modules/financial-snapshots/repository";
 vi.mock("@/modules/credits-tg/repository", () => ({
   getLatestTg: vi.fn().mockResolvedValue(null),
   getLatestTgProjection: vi.fn().mockResolvedValue(null),
+  saveTgProjection: vi.fn(),
 }));
 
 vi.mock("next-auth", () => ({ getServerSession: vi.fn() }));
