@@ -43,6 +43,18 @@ export async function getLatestTgProjection(organizationId: string): Promise<TgD
   result.snapshot.importedAt = record.importedAt.toISOString();
   return result;
 }
+export async function saveTgProjection(organizationId: string, snapshot: TgSnapshot): Promise<TgDashboardProjection> {
+  const { rows, ...metadata } = snapshot;
+  const projection = JSON.parse(JSON.stringify({
+    snapshot: { ...metadata, rowCount: rows.length },
+    operational: projectTgOperational(snapshot),
+  })) as Prisma.InputJsonValue;
+  await prisma.financialSourceImport.update({
+    where: { organizationId_sourceKind_checksum: { organizationId, sourceKind: TG_SOURCE_KIND, checksum: snapshot.checksum } },
+    data: { projection },
+  });
+  return projection as unknown as TgDashboardProjection;
+}
 export async function getLatestTg(organizationId: string): Promise<TgSnapshot | null> {
   const record = await prisma.financialSourceImport.findFirst({ where: { organizationId, sourceKind: TG_SOURCE_KIND }, orderBy: [{ importedAt: "desc" }, { id: "desc" }] });
   if (!record) return null;
