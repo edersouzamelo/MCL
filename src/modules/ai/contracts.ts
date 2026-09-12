@@ -41,9 +41,9 @@ export type RagResponse = {
   suggestedQuestions: string[];
   warnings: string[];
   requestId: string;
-  provider: "vercel-ai-gateway";
+  provider: "vercel-ai-gateway" | "mcl-deterministic";
   model: string;
-  authMode: "oidc";
+  authMode: "oidc" | "session-rbac";
   usage?: AiUsage;
 };
 
