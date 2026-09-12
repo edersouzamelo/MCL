@@ -1,1 +1,1 @@
-ALTER TABLE "FinancialSourceImport" ADD COLUMN "projection" JSONB;
+ALTER TABLE "FinancialSourceImport" ADD COLUMN IF NOT EXISTS "projection" JSONB;
