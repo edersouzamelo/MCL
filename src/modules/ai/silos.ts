@@ -560,6 +560,186 @@ export function projectCreditsForAssistant(
 
 export type AssistantCreditProjection = ReturnType<typeof projectCreditsForAssistant>;
 
+export type CreditAnalyticsInput = {
+  ug?: string;
+  nd?: string;
+  pi?: string;
+  groupBy?: "TOTAL" | "UG" | "ND" | "PI";
+  limit?: number;
+};
+
+const normalizeCreditText = (value: string) => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase("pt-BR")
+  .replace(/\b9[ºo]?\b/g, "9")
+  .replace(/\bb\s*sup\b|\bbsup\b/g, "batalhao de suprimento")
+  .replace(/\bgpt\s*log\b/g, "grupamento logistico")
+  .replace(/\bb\s*mnt\b/g, "batalhao de manutencao")
+  .replace(/[^a-z0-9]+/g, " ")
+  .trim();
+
+const creditSum = <T>(rows: T[], value: (row: T) => number) =>
+  rows.reduce((total, row) => total + value(row), 0);
+
+function matchesCreditUg(option: { ug: string; om: string }, query?: string) {
+  if (!query?.trim()) return true;
+  const normalizedQuery = normalizeCreditText(query);
+  const normalizedOption = normalizeCreditText(`${option.ug} ${option.om}`);
+  const queryTokens = normalizedQuery.split(" ").filter((token) => token.length > 1);
+  return normalizedOption.includes(normalizedQuery) || queryTokens.every((token) => normalizedOption.includes(token));
+}
+
+function matchesCreditNd(value: string, query?: string) {
+  if (!query?.trim()) return true;
+  const digits = query.replace(/\D/g, "");
+  if (!digits) return normalizeCreditText(value).includes(normalizeCreditText(query));
+  if (digits.length === 2) return value.replace(/\D/g, "").slice(4, 6) === digits;
+  return value.replace(/\D/g, "").startsWith(digits);
+}
+
+function matchesCreditPi(value: string, query?: string) {
+  return !query?.trim() || normalizeCreditText(value).includes(normalizeCreditText(query));
+}
+
+export function projectCreditAnalytics(
+  projection: TgDashboardProjection,
+  input: CreditAnalyticsInput,
+) {
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 50);
+  const matchingUgs = projection.operational.ugOptions.filter((option) => matchesCreditUg(option, input.ug));
+  const allowedUgs = new Set(matchingUgs.map((option) => option.ug));
+  const ncRows = projection.operational.ncMovements.filter((row) =>
+    allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi)
+  );
+  const neRows = projection.operational.neExecution.filter((row) =>
+    allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi)
+  );
+
+  const summarize = (
+    scopedNcs: typeof ncRows,
+    scopedNes: typeof neRows,
+  ) => {
+    const provisionUpdatedCents = creditSum(scopedNcs, (row) => row.provisionUpdatedCents);
+    const committedCents = creditSum(scopedNes, (row) => row.committedCents);
+    const reportedAvailableCreditCents = creditSum(scopedNcs, (row) => row.availableCreditCents);
+    const availableCreditCents = provisionUpdatedCents - committedCents;
+    return {
+      provisionUpdatedCents,
+      committedCents,
+      availableCreditCents,
+      reportedAvailableCreditCents,
+      availableReconciliationCents: reportedAvailableCreditCents - availableCreditCents,
+      liquidatedCents: creditSum(scopedNes, (row) => row.liquidatedCents),
+      committedToLiquidateCents: creditSum(scopedNes, (row) => row.committedToLiquidateCents),
+      paidCents: creditSum(scopedNes, (row) => row.paidCents),
+      ncCount: scopedNcs.length,
+      neCount: scopedNes.length,
+    };
+  };
+
+  const groupBy = input.groupBy ?? "TOTAL";
+  const groupKeys = new Map<string, { key: string; label: string }>();
+  const registerGroup = (key: string, label: string) => groupKeys.set(key, { key, label });
+  if (groupBy === "UG") {
+    matchingUgs.forEach((option) => registerGroup(option.ug, `${option.ug}: ${option.om}`));
+  } else if (groupBy === "ND") {
+    [...ncRows, ...neRows].forEach((row) => registerGroup(row.nd, row.nd));
+  } else if (groupBy === "PI") {
+    [...ncRows, ...neRows].forEach((row) => registerGroup(row.pi, row.pi));
+  } else {
+    registerGroup("TOTAL", "Total do filtro");
+  }
+
+  const groups = [...groupKeys.values()].map((group) => {
+    const groupNcs = groupBy === "TOTAL" ? ncRows : ncRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
+    const groupNes = groupBy === "TOTAL" ? neRows : neRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
+    return { ...group, ...summarize(groupNcs, groupNes) };
+  }).sort((left, right) => right.availableCreditCents - left.availableCreditCents).slice(0, limit);
+
+  const purposeGroups = new Map<string, {
+    purpose: string;
+    action: string;
+    ro: string;
+    pi: string;
+    nd: string;
+    provisionUpdatedCents: number;
+    ncCount: number;
+  }>();
+  for (const row of ncRows) {
+    const key = [row.purpose, row.action, row.ro, row.pi, row.nd].join("|");
+    const current = purposeGroups.get(key);
+    purposeGroups.set(key, {
+      purpose: row.purpose,
+      action: row.action,
+      ro: row.ro,
+      pi: row.pi,
+      nd: row.nd,
+      provisionUpdatedCents: (current?.provisionUpdatedCents ?? 0) + row.provisionUpdatedCents,
+      ncCount: (current?.ncCount ?? 0) + 1,
+    });
+  }
+
+  return {
+    source: {
+      fileName: projection.snapshot.fileName,
+      importedAt: projection.snapshot.importedAt,
+      rowCount: projection.snapshot.rowCount,
+      checksum: projection.snapshot.checksum,
+    },
+    filters: {
+      ug: input.ug ?? null,
+      nd: input.nd ?? null,
+      pi: input.pi ?? null,
+      matchedUgs: matchingUgs,
+    },
+    totals: summarize(ncRows, neRows),
+    groupBy,
+    groups,
+    finalities: [...purposeGroups.values()]
+      .sort((left, right) => right.provisionUpdatedCents - left.provisionUpdatedCents)
+      .slice(0, limit),
+    interpretationNotes: [
+      "Crédito disponível é calculado como provisão atualizada menos despesa empenhada no mesmo filtro de UASG, ND e PI.",
+      "O valor calculado é comparado ao Item Informação 19 no mesmo filtro; availableReconciliationCents informa eventual divergência.",
+      "Finalidade vem da descrição da NC. O saldo disponível não é rateado por finalidade quando compromissos distintos compartilham UASG, PI e ND.",
+      "UG Executora não é convertida em OM beneficiária por inferência.",
+    ],
+  };
+}
+
+export async function queryTgCreditAnalytics(
+  actor: MclAiActor,
+  input: CreditAnalyticsInput,
+): Promise<MclToolEnvelope<unknown>> {
+  if (!process.env.DATABASE_URL) {
+    return unavailable("DATABASE_URL não está configurada. O Assistente não usa dados demonstrativos.", { records: [] });
+  }
+  if (!actor.organizationId) return unavailable("Organização ausente.", { records: [] });
+  const projection = await getLatestTgProjection(actor.organizationId);
+  if (!projection) return unavailable("Nenhuma projeção TG persistida para esta organização.", { records: [] });
+  const data = projectCreditAnalytics(projection, input);
+  const gaps = [
+    ...(input.ug && data.filters.matchedUgs.length === 0 ? [`Nenhuma UASG corresponde ao filtro '${input.ug}'.`] : []),
+    ...((input.nd || input.pi) && data.totals.ncCount === 0 && data.totals.neCount === 0
+      ? ["Nenhum movimento contábil corresponde à combinação de filtros informada."]
+      : []),
+  ];
+  return {
+    status: "AVAILABLE",
+    dataNature: "CALCULATED_FROM_PERSISTED",
+    asOf: projection.snapshot.importedAt,
+    citations: [{
+      title: projection.snapshot.fileName,
+      source: "TESOURO_GERENCIAL",
+      dataNature: "PERSISTED_OPERATIONAL",
+      asOf: projection.snapshot.importedAt,
+    }],
+    gaps,
+    data,
+  };
+}
+
 export async function queryMclData(
   actor: MclAiActor,
   input: { silo: MclDataSilo; search?: string; limit?: number },
