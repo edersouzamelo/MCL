@@ -43,15 +43,15 @@ function formatCreditAvailabilityAnswer(prompt: string, data: AssistantCreditPro
     row.ug === "160136" || row.om.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").includes("comando do 9")
   );
   const lines = [
-    `O crédito disponível total da Grande Unidade é **${currencyFromCents(data.totals.availableCreditCents)}**.`,
+    `O crédito disponível total da Grande Unidade é ${currencyFromCents(data.totals.availableCreditCents)}.`,
   ];
   if (/9.?\s*(gpt|grupamento)/.test(normalized) && commandUnit) {
-    lines.unshift(`Na UASG **${commandUnit.ug} — ${commandUnit.om}**, o crédito disponível é **${currencyFromCents(commandUnit.availableCreditCents)}**.`);
+    lines.unshift(`Na UASG ${commandUnit.ug} — ${commandUnit.om}, o crédito disponível é ${currencyFromCents(commandUnit.availableCreditCents)}.`);
   }
   if (/\b(todas|oms?|gu|unidades?)\b/.test(normalized)) {
-    lines.push("", "**Detalhamento por UASG/OM:**");
+    lines.push("", "Detalhamento por UASG/OM:");
     for (const row of data.byUg) {
-      lines.push(`- ${row.ug} — ${row.om}: **${currencyFromCents(row.availableCreditCents)}**`);
+      lines.push(`- ${row.ug} — ${row.om}: ${currencyFromCents(row.availableCreditCents)}`);
     }
   }
   lines.push("", `Fonte: ${data.source.fileName}, importada em ${new Date(data.source.importedAt).toLocaleString("pt-BR")}. O disponível é reconciliado como provisão atualizada menos despesa empenhada.`);
