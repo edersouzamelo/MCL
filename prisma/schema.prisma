@@ -139,6 +139,7 @@ model FinancialSourceImport {
   checksum        String
   rowCount        Int
   payload         Json
+  projection      Json?
   warnings        Json
   ingestionMethod String
   importedBy      String?

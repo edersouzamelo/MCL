@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
 
-import { getLatestTg } from "@/modules/credits-tg/repository";
-import { projectTgOperational } from "@/modules/credits-tg/projection";
+import { getLatestTg, getLatestTgProjection, saveTgProjection } from "@/modules/credits-tg/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +11,22 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: "Autenticação obrigatória." }, { status: 401 });
   if (!session.user.organizationId) return NextResponse.json({ error: "Sessão sem organização." }, { status: 422 });
   try {
-    const snapshot = await getLatestTg(session.user.organizationId);
-    if (snapshot) {
-      const { rows, ...metadata } = snapshot;
+    const projected = await getLatestTgProjection(session.user.organizationId);
+    if (projected) {
       return NextResponse.json({
         success: true, source: "TESOURO_GERENCIAL", dataNature: "PERSISTED_IMPORTED",
-        lastUpdatedAt: snapshot.sourceDate,
-        snapshot: { ...metadata, rowCount: rows.length },
-        operational: projectTgOperational(snapshot),
+        lastUpdatedAt: projected.snapshot.sourceDate,
+        snapshot: projected.snapshot,
+        operational: projected.operational,
       }, { headers: { "Cache-Control": "no-store" } });
+    }
+    // One-time repair for the latest import created before compact projections.
+    const legacy = await getLatestTg(session.user.organizationId);
+    if (legacy) {
+      const repaired = await saveTgProjection(session.user.organizationId, legacy);
+      return NextResponse.json({ success: true, source: "TESOURO_GERENCIAL", dataNature: "PERSISTED_IMPORTED",
+        lastUpdatedAt: repaired.snapshot.sourceDate, snapshot: repaired.snapshot, operational: repaired.operational },
+      { headers: { "Cache-Control": "no-store" } });
     }
   } catch {
     return NextResponse.json({ success: false, error: "Não foi possível consultar a fonte TG persistida.", code: "TG_READ_FAILED" }, { status: 503, headers: { "Cache-Control": "no-store" } });

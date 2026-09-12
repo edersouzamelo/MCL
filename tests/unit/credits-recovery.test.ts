@@ -4,7 +4,11 @@ import { GET } from "@/app/api/creditos/route";
 import { getSiloCatalog, queryMclData } from "@/modules/ai/silos";
 import * as financial from "@/modules/financial-snapshots/repository";
 
-vi.mock("@/modules/credits-tg/repository", () => ({ getLatestTg: vi.fn().mockResolvedValue(null) }));
+vi.mock("@/modules/credits-tg/repository", () => ({
+  getLatestTg: vi.fn().mockResolvedValue(null),
+  getLatestTgProjection: vi.fn().mockResolvedValue(null),
+  saveTgProjection: vi.fn(),
+}));
 
 vi.mock("next-auth", () => ({ getServerSession: vi.fn() }));
 vi.mock("@/modules/auth/options", () => ({ authOptions: {} }));
