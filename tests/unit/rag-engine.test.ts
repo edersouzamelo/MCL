@@ -5,6 +5,7 @@ import {
   classifyMclAiError,
   isCreditAnalyticsConversation,
 } from "@/modules/ai/agent";
+import { formatCreditAnalyticsAnswer, resolveCreditAnalyticsIntent } from "@/modules/ai/credit-analytics";
 import { getSiloCatalog, projectCreditAnalytics, projectCreditsForAssistant, queryMclData } from "@/modules/ai/silos";
 import type { TgDashboardProjection } from "@/modules/credits-tg/repository";
 import { assertMclAiRateLimit, resetMclAiRateLimitsForTests } from "@/modules/ai/rate-limit";
@@ -211,6 +212,78 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     });
     expect(result.groups).toHaveLength(2);
     expect(result.finalities.map((item) => item.purpose)).toEqual(["Material de consumo", "Fardamento"]);
+  });
+
+  it("resolve a continuação por ND preservando UG e métrica do histórico", () => {
+    const intent = resolveCreditAnalyticsIntent({
+      prompt: "desse tanto, quanto que era de ND 339039?",
+      scope: "Piloto Classe II",
+      history: [{ role: "user", content: "Quanto que a UASG do 9 BSUP já empenhou este ano?" }],
+    });
+
+    expect(intent).toMatchObject({
+      ug: "9 BSUP",
+      nd: "339039",
+      metric: "COMMITTED",
+      groupBy: "UG",
+      answerable: true,
+    });
+  });
+
+  it("transforma busca textual e ranking em consultas estruturadas", () => {
+    expect(resolveCreditAnalyticsIntent({
+      prompt: "já foi empenhado coturno este ano?",
+      scope: "Todos os Dados",
+      history: [],
+    })).toMatchObject({ metric: "COMMITTED", search: "coturno", groupBy: "NE", answerable: true });
+
+    expect(resolveCreditAnalyticsIntent({
+      prompt: "quais empenhos foram os mais caros do 9º BSUP?",
+      scope: "Todos os Dados",
+      history: [],
+    })).toMatchObject({ metric: "COMMITTED", ug: "9 BSUP", groupBy: "NE", sort: "VALUE_DESC", ranking: true });
+  });
+
+  it("filtra descrição de empenho e ordena NEs pela métrica solicitada", () => {
+    const projection = {
+      snapshot: { fileName: "TG.xlsx", importedAt: "2026-09-12T01:00:00.000Z", rowCount: 3, checksum: "checksum" },
+      operational: {
+        ugOptions: [{ ug: "160142", om: "9 BATALHAO DE SUPRIMENTO" }],
+        ncMovements: [],
+        neExecution: [
+          { id: "a", ug: "160142", om: "9 BATALHAO DE SUPRIMENTO", ne: "2026NE1", year: "2026", date: "2026-01-02", supplier: "A", pi: "PI-A", nd: "33903023", ndDescription: "Uniformes", description: "Aquisição de coturno", processNumber: "P1", biddingModality: "Pregão", committedCents: 90_00, committedToLiquidateCents: 70_00, liquidatedCents: 20_00, liquidatedToPayCents: 0, paidCents: 20_00 },
+          { id: "b", ug: "160142", om: "9 BATALHAO DE SUPRIMENTO", ne: "2026NE2", year: "2026", date: "2026-01-03", supplier: "B", pi: "PI-B", nd: "33903916", ndDescription: "Serviços", description: "Manutenção predial", processNumber: "P2", biddingModality: "Pregão", committedCents: 150_00, committedToLiquidateCents: 100_00, liquidatedCents: 50_00, liquidatedToPayCents: 0, paidCents: 50_00 },
+        ],
+        rpnpMovements: [],
+      },
+    } as unknown as TgDashboardProjection;
+
+    const search = projectCreditAnalytics(projection, { ug: "9 BSUP", search: "coturno", metric: "COMMITTED", groupBy: "NE" });
+    expect(search.totals).toMatchObject({ committedCents: 90_00, metricValueCents: 90_00, neCount: 1 });
+    expect(search.groups.map((group) => group.ne)).toEqual(["2026NE1"]);
+
+    const ranking = projectCreditAnalytics(projection, { ug: "9 BSUP", metric: "COMMITTED", groupBy: "NE", sort: "VALUE_DESC" });
+    expect(ranking.groups.map((group) => group.ne)).toEqual(["2026NE2", "2026NE1"]);
+    expect(formatCreditAnalyticsAnswer(ranking, { metric: "COMMITTED", groupBy: "NE", sort: "VALUE_DESC", ranking: true, answerable: true })).toContain("2026NE2");
+  });
+
+  it("reconhece 429 aninhado dentro do erro de retentativa", () => {
+    const error = { name: "AI_RetryError", errors: [{ name: "GatewayRateLimitError", statusCode: 429, message: "quota" }] };
+    expect(classifyMclAiError(error)).toMatchObject({ code: "AI_GATEWAY_RATE_LIMITED", status: 429, retryable: true });
+  });
+
+  it("não apresenta saldo zero quando o filtro de UASG não corresponde", () => {
+    const answer = formatCreditAnalyticsAnswer({
+      source: { fileName: "TG.xlsx", importedAt: "2026-09-12T01:00:00.000Z" },
+      filters: { ug: "unidade inexistente", nd: null, pi: null, search: null, matchedUgs: [] },
+      metric: "COMMITTED",
+      totals: { metricValueCents: 0, neCount: 0, ncCount: 0 },
+      groups: [],
+      finalities: [],
+    }, { ug: "unidade inexistente", metric: "COMMITTED", ranking: false, answerable: true });
+
+    expect(answer).toContain("Nenhuma UASG corresponde");
+    expect(answer).toContain("ausência de correspondência não equivale a saldo zero");
   });
 
   it("deixa o SDK resolver OIDC pelo contexto da requisição, sem bloquear pela ausência no process.env", () => {

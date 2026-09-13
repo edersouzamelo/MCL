@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { classifyMclAiError, runMclAssistant } from "@/modules/ai/agent";
-import { mclChatRequestSchema } from "@/modules/ai/contracts";
+import { runCreditAnalyticsContingency } from "@/modules/ai/credit-analytics";
+import { mclChatRequestSchema, type MclChatRequest } from "@/modules/ai/contracts";
 import { assertMclAiRateLimit } from "@/modules/ai/rate-limit";
 import { getRouteActor } from "@/modules/auth/route-actor";
 
@@ -51,6 +52,7 @@ function errorDiagnostics(error: unknown) {
 
 export async function POST(request: Request) {
   const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
+  const startedAt = Date.now();
   const actor = await getRouteActor();
   if (!actor) {
     return NextResponse.json(
@@ -64,10 +66,25 @@ export async function POST(request: Request) {
     );
   }
 
+  let input: MclChatRequest | undefined;
   try {
-    const input = mclChatRequestSchema.parse(await request.json());
+    input = mclChatRequestSchema.parse(await request.json());
     assertMclAiRateLimit(actor.id);
+    console.info(JSON.stringify({
+      level: "info",
+      message: "Assistente IA iniciou consulta",
+      route: "/api/ai/chat",
+      requestId,
+    }));
     const response = await runMclAssistant(input, actor, requestId, request.signal);
+    console.info(JSON.stringify({
+      level: "info",
+      message: "Assistente IA concluiu consulta",
+      route: "/api/ai/chat",
+      requestId,
+      provider: response.provider,
+      durationMs: Date.now() - startedAt,
+    }));
     return NextResponse.json(response);
   } catch (error) {
     if (error instanceof ZodError) {
@@ -84,6 +101,31 @@ export async function POST(request: Request) {
     }
 
     const classified = classifyMclAiError(error);
+    if (input && ["AI_GATEWAY_RATE_LIMITED", "AI_GATEWAY_TIMEOUT", "AI_GATEWAY_UNAVAILABLE", "AI_GATEWAY_BUDGET_EXHAUSTED", "AI_EMPTY_RESPONSE"].includes(classified.code)) {
+      try {
+        const contingency = await runCreditAnalyticsContingency(input, actor, requestId, classified.code);
+        if (contingency) {
+          console.warn(JSON.stringify({
+            level: "warning",
+            message: "Assistente IA concluiu consulta financeira pelo motor de contingência",
+            route: "/api/ai/chat",
+            requestId,
+            gatewayCode: classified.code,
+            durationMs: Date.now() - startedAt,
+          }));
+          return NextResponse.json(contingency);
+        }
+      } catch (contingencyError) {
+        console.error(JSON.stringify({
+          level: "error",
+          message: "Contingência financeira do Assistente falhou",
+          route: "/api/ai/chat",
+          requestId,
+          gatewayCode: classified.code,
+          contingencyError: contingencyError instanceof Error ? contingencyError.name : "UnknownError",
+        }));
+      }
+    }
     const diagnostics = errorDiagnostics(error);
     const diagnosticSummary = diagnostics.map((item) =>
       [item.name, item.statusCode, ...(Array.isArray(item.signals) ? item.signals : [])]

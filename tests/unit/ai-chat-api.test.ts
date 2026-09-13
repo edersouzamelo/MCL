@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MclAiServiceError, type RagResponse } from "@/modules/ai/contracts";
 import { getRouteActor } from "@/modules/auth/route-actor";
 import { runMclAssistant } from "@/modules/ai/agent";
+import { runCreditAnalyticsContingency } from "@/modules/ai/credit-analytics";
 import { POST } from "@/app/api/ai/chat/route";
 
 vi.mock("@/modules/auth/route-actor", () => ({
@@ -11,6 +12,11 @@ vi.mock("@/modules/auth/route-actor", () => ({
 vi.mock("@/modules/ai/agent", async () => {
   const actual = await vi.importActual<typeof import("@/modules/ai/agent")>("@/modules/ai/agent");
   return { ...actual, runMclAssistant: vi.fn() };
+});
+
+vi.mock("@/modules/ai/credit-analytics", async () => {
+  const actual = await vi.importActual<typeof import("@/modules/ai/credit-analytics")>("@/modules/ai/credit-analytics");
+  return { ...actual, runCreditAnalyticsContingency: vi.fn() };
 });
 
 function request(body: unknown) {
@@ -113,5 +119,39 @@ describe("API Route - /api/ai/chat", () => {
     expect(body.code).toBe("AI_GATEWAY_BUDGET_EXHAUSTED");
     expect(body.answer).toBeUndefined();
     expect(body.error).toContain("Nenhuma resposta substituta");
+  });
+
+  it("usa o motor financeiro auditável quando o Gateway limita uma consulta suportada", async () => {
+    authenticatedActor();
+    vi.mocked(runMclAssistant).mockRejectedValue({
+      name: "AI_RetryError",
+      errors: [{ name: "GatewayRateLimitError", statusCode: 429, message: "quota" }],
+    });
+    const contingency: RagResponse = {
+      answer: "O valor empenhado na ND 339039 é R$ 1.000,00.",
+      citations: [],
+      suggestedQuestions: [],
+      warnings: ["O modelo de linguagem ficou indisponível."],
+      requestId: "req-ai-test",
+      provider: "mcl-deterministic",
+      model: "motor-analitico-financeiro-v2",
+      authMode: "session-rbac",
+    };
+    vi.mocked(runCreditAnalyticsContingency).mockResolvedValue(contingency);
+
+    const response = await POST(request({
+      prompt: "desse tanto, quanto que era de ND 339039?",
+      history: [{ role: "user", content: "Quanto que a UASG do 9 BSUP já empenhou este ano?" }],
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual(contingency);
+    expect(runCreditAnalyticsContingency).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: "desse tanto, quanto que era de ND 339039?" }),
+      expect.objectContaining({ organizationId: "org-ai-test" }),
+      "req-ai-test",
+      "AI_GATEWAY_RATE_LIMITED",
+    );
   });
 });
