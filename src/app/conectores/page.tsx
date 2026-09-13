@@ -392,7 +392,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
         )}
 
         {/* Systems Catalogs grouped by Domain */}
-        <div className="space-y-10">
+        <div className="connector-dimension-grid">
           {domainsToRender.map((domain) => {
             const domainSystems = systems.filter((system) => sourceSystemBelongsToDomain(system, domain));
             const dimension = getDimensionDefinition(domain);
