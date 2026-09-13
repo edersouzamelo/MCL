@@ -244,6 +244,59 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     })).toMatchObject({ metric: "COMMITTED", ug: "9 BSUP", groupBy: "NE", sort: "VALUE_DESC", ranking: true });
   });
 
+  it("resolve inscrição em restos a pagar como métrica RPNP com as duas UASGs do 9 BSUP", () => {
+    const intent = resolveCreditAnalyticsIntent({
+      prompt: "quanto de créditos que o 9 B Sup inscreveu em restos a pagar?",
+      scope: "Todos os Dados",
+      history: [],
+    });
+
+    expect(intent).toMatchObject({
+      ug: "9 BSUP",
+      metric: "RPNP_REGISTERED_TOTAL",
+      groupBy: "UG",
+      answerable: true,
+    });
+    expect(isCreditAnalyticsConversation({
+      prompt: "quanto de créditos que o 9 B Sup inscreveu em restos a pagar?",
+      scope: "Todos os Dados",
+      history: [],
+    })).toBe(true);
+  });
+
+  it("calcula todo o ciclo de RPNP e preserva inscritos e reinscritos separadamente", () => {
+    const projection = {
+      snapshot: { fileName: "TG.xlsx", importedAt: "2026-09-12T01:00:00.000Z", rowCount: 2, checksum: "checksum" },
+      operational: {
+        ugOptions: [
+          { ug: "160142", om: "9 BATALHAO DE SUPRIMENTO" },
+          { ug: "167142", om: "9 BATALHAO DE SUPRIMENTO" },
+          { ug: "160136", om: "COMANDO DO 9 GRUPAMENTO LOGISTICO" },
+        ],
+        ncMovements: [],
+        neExecution: [],
+        rpnpMovements: [
+          { id: "a", ug: "160142", om: "9 BATALHAO DE SUPRIMENTO", ne: "2025NE1", supplier: "A", date: "2025-12-01", pi: "PI-A", nd: "33903023", registeredCents: 900_00, reinscribedCents: 10_00, cancelledCents: 20_00, toLiquidateCents: 100_00, liquidatedCents: 790_00, liquidatedToPayCents: 30_00, paidCents: 760_00, payableCents: 130_00 },
+          { id: "b", ug: "167142", om: "9 BATALHAO DE SUPRIMENTO", ne: "2025NE2", supplier: "B", date: "2025-12-02", pi: "PI-B", nd: "33903916", registeredCents: 100_00, reinscribedCents: 0, cancelledCents: 0, toLiquidateCents: 0, liquidatedCents: 100_00, liquidatedToPayCents: 5_00, paidCents: 95_00, payableCents: 5_00 },
+        ],
+      },
+    } as unknown as TgDashboardProjection;
+
+    const result = projectCreditAnalytics(projection, { ug: "9 BSUP", metric: "RPNP_REGISTERED_TOTAL", groupBy: "UG" });
+
+    expect(result.totals).toMatchObject({ registeredCents: 1_000_00, reinscribedCents: 10_00, metricValueCents: 1_010_00 });
+    expect(result.groups.map((group) => ({ label: group.label, value: group.metricValueCents }))).toEqual([
+      { label: "160142: 9 BATALHAO DE SUPRIMENTO", value: 910_00 },
+      { label: "167142: 9 BATALHAO DE SUPRIMENTO", value: 100_00 },
+    ]);
+    const answer = formatCreditAnalyticsAnswer(result, { ug: "9 BSUP", metric: "RPNP_REGISTERED_TOTAL", groupBy: "UG", ranking: false, answerable: true });
+    expect(answer).toContain("1.010,00");
+    expect(answer).toContain("Inscritos: R$");
+    expect(answer).toContain("1.000,00");
+    expect(answer).toContain("Reinscritos: R$");
+    expect(answer).toContain("10,00");
+  });
+
   it("filtra descrição de empenho e ordena NEs pela métrica solicitada", () => {
     const projection = {
       snapshot: { fileName: "TG.xlsx", importedAt: "2026-09-12T01:00:00.000Z", rowCount: 3, checksum: "checksum" },

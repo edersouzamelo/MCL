@@ -565,7 +565,9 @@ export type CreditAnalyticsInput = {
   nd?: string;
   pi?: string;
   search?: string;
-  metric?: "AVAILABLE" | "PROVISION" | "COMMITTED" | "LIQUIDATED" | "TO_LIQUIDATE" | "PAID";
+  metric?: "AVAILABLE" | "PROVISION" | "COMMITTED" | "LIQUIDATED" | "TO_LIQUIDATE" | "PAID"
+    | "RPNP_REGISTERED_TOTAL" | "RPNP_REGISTERED" | "RPNP_REINSCRIBED" | "RPNP_CANCELLED"
+    | "RPNP_TO_LIQUIDATE" | "RPNP_LIQUIDATED" | "RPNP_LIQUIDATED_TO_PAY" | "RPNP_PAID" | "RPNP_PAYABLE";
   groupBy?: "TOTAL" | "UG" | "ND" | "PI" | "NE";
   sort?: "VALUE_DESC" | "VALUE_ASC";
   includeFinalities?: boolean;
@@ -651,12 +653,113 @@ function creditMetricValue(
   return value.availableCreditCents;
 }
 
+type RpnpMetric = Extract<NonNullable<CreditAnalyticsInput["metric"]>, `RPNP_${string}`>;
+
+function rpnpMetricValue(
+  value: {
+    registeredCents: number;
+    reinscribedCents: number;
+    cancelledCents: number;
+    toLiquidateCents: number;
+    liquidatedCents: number;
+    liquidatedToPayCents: number;
+    paidCents: number;
+    payableCents: number;
+  },
+  metric: RpnpMetric,
+) {
+  if (metric === "RPNP_REGISTERED_TOTAL") return value.registeredCents + value.reinscribedCents;
+  if (metric === "RPNP_REGISTERED") return value.registeredCents;
+  if (metric === "RPNP_REINSCRIBED") return value.reinscribedCents;
+  if (metric === "RPNP_CANCELLED") return value.cancelledCents;
+  if (metric === "RPNP_TO_LIQUIDATE") return value.toLiquidateCents;
+  if (metric === "RPNP_LIQUIDATED") return value.liquidatedCents;
+  if (metric === "RPNP_LIQUIDATED_TO_PAY") return value.liquidatedToPayCents;
+  if (metric === "RPNP_PAID") return value.paidCents;
+  return value.payableCents;
+}
+
+function projectRpnpAnalytics(
+  projection: TgDashboardProjection,
+  input: CreditAnalyticsInput,
+  matchingUgs: TgDashboardProjection["operational"]["ugOptions"],
+  metric: RpnpMetric,
+  limit: number,
+) {
+  const allowedUgs = new Set(matchingUgs.map((option) => option.ug));
+  const rows = projection.operational.rpnpMovements.filter((row) =>
+    allowedUgs.has(row.ug)
+    && matchesCreditNd(row.nd, input.nd)
+    && matchesCreditPi(row.pi, input.pi)
+    && (!input.search || matchesCreditSearch({
+      ne: row.ne,
+      supplier: row.supplier,
+      nd: row.nd,
+      ndDescription: "",
+      description: "",
+      processNumber: "",
+      biddingModality: "",
+    }, input.search))
+  );
+  const summarize = (scoped: typeof rows) => ({
+    registeredCents: creditSum(scoped, (row) => row.registeredCents),
+    reinscribedCents: creditSum(scoped, (row) => row.reinscribedCents),
+    cancelledCents: creditSum(scoped, (row) => row.cancelledCents),
+    toLiquidateCents: creditSum(scoped, (row) => row.toLiquidateCents),
+    liquidatedCents: creditSum(scoped, (row) => row.liquidatedCents),
+    liquidatedToPayCents: creditSum(scoped, (row) => row.liquidatedToPayCents),
+    paidCents: creditSum(scoped, (row) => row.paidCents),
+    payableCents: creditSum(scoped, (row) => row.payableCents),
+    neCount: scoped.length,
+    ncCount: 0,
+  });
+  const groupBy = input.groupBy ?? "TOTAL";
+  const groupKeys = new Map<string, { key: string; label: string }>();
+  if (groupBy === "UG") matchingUgs.forEach((option) => groupKeys.set(option.ug, { key: option.ug, label: `${option.ug}: ${option.om}` }));
+  else if (groupBy === "ND") rows.forEach((row) => groupKeys.set(row.nd, { key: row.nd, label: row.nd }));
+  else if (groupBy === "PI") rows.forEach((row) => groupKeys.set(row.pi, { key: row.pi, label: row.pi }));
+  else if (groupBy === "NE") rows.forEach((row) => groupKeys.set(row.id, { key: row.id, label: `${row.ne}: ${row.supplier}` }));
+  else groupKeys.set("TOTAL", { key: "TOTAL", label: "Total do filtro" });
+
+  const groups = [...groupKeys.values()].map((group) => {
+    const scoped = groupBy === "TOTAL" ? rows : rows.filter((row) =>
+      groupBy === "NE" ? row.id === group.key : row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key
+    );
+    const summary = summarize(scoped);
+    const ne = groupBy === "NE" ? scoped[0] : undefined;
+    return {
+      ...group,
+      ...summary,
+      metricValueCents: rpnpMetricValue(summary, metric),
+      ...(ne ? { ug: ne.ug, om: ne.om, ne: ne.ne, date: ne.date, supplier: ne.supplier, nd: ne.nd, pi: ne.pi } : {}),
+    };
+  }).sort((left, right) => (input.sort === "VALUE_ASC" ? 1 : -1) * (left.metricValueCents - right.metricValueCents)).slice(0, limit);
+  const totals = summarize(rows);
+  return {
+    source: { fileName: projection.snapshot.fileName, importedAt: projection.snapshot.importedAt, rowCount: projection.snapshot.rowCount, checksum: projection.snapshot.checksum },
+    filters: { ug: input.ug ?? null, nd: input.nd ?? null, pi: input.pi ?? null, search: input.search ?? null, matchedUgs: matchingUgs },
+    metric,
+    totals: { ...totals, metricValueCents: rpnpMetricValue(totals, metric) },
+    groupBy,
+    groups,
+    finalities: [],
+    interpretationNotes: [
+      "Inscrito e reinscrito são movimentos distintos e são apresentados separadamente quando a pergunta pede o total inscrito em restos a pagar.",
+      "Os valores de RPNP são filtrados diretamente por UG Executora, ND, PI e NE na projeção persistida do Tesouro Gerencial.",
+    ],
+  };
+}
+
 export function projectCreditAnalytics(
   projection: TgDashboardProjection,
   input: CreditAnalyticsInput,
 ) {
   const limit = Math.min(Math.max(input.limit ?? 20, 1), 50);
   const matchingUgs = projection.operational.ugOptions.filter((option) => matchesCreditUg(option, input.ug));
+  const metric = input.metric ?? "AVAILABLE";
+  if (metric.startsWith("RPNP_")) {
+    return projectRpnpAnalytics(projection, input, matchingUgs, metric as RpnpMetric, limit);
+  }
   const allowedUgs = new Set(matchingUgs.map((option) => option.ug));
   const ncRows = projection.operational.ncMovements.filter((row) =>
     allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi)
@@ -687,7 +790,6 @@ export function projectCreditAnalytics(
     };
   };
 
-  const metric = input.metric ?? "AVAILABLE";
   const groupBy = input.groupBy ?? "TOTAL";
   const groupKeys = new Map<string, { key: string; label: string }>();
   const registerGroup = (key: string, label: string) => groupKeys.set(key, { key, label });
@@ -800,7 +902,9 @@ export async function queryTgCreditAnalytics(
   const gaps = [
     ...(input.ug && data.filters.matchedUgs.length === 0 ? [`Nenhuma UASG corresponde ao filtro '${input.ug}'.`] : []),
     ...(input.search && data.totals.neCount === 0
-      ? ["Nenhuma NE do exercício corrente contém o termo pesquisado nos campos descritivos disponíveis."]
+      ? [input.metric?.startsWith("RPNP_")
+        ? "Nenhum movimento de RPNP contém o termo pesquisado nos identificadores disponíveis."
+        : "Nenhuma NE do exercício corrente contém o termo pesquisado nos campos descritivos disponíveis."]
       : []),
     ...((input.nd || input.pi) && data.totals.ncCount === 0 && data.totals.neCount === 0
       ? ["Nenhum movimento contábil corresponde à combinação de filtros informada."]
