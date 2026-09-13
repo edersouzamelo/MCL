@@ -297,6 +297,47 @@ describe("RAG e guardrails do Assistente IA MCL", () => {
     expect(answer).toContain("10,00");
   });
 
+  it("inicia nova busca de objeto em RPNP sem herdar ND antiga e remove o sufixo de domínio", () => {
+    const intent = resolveCreditAnalyticsIntent({
+      prompt: "Existe empenho de COTURNO em RP?",
+      scope: "Todos os Dados",
+      history: [
+        { role: "user", content: "quanto de créditos que o 9 B Sup inscreveu em restos a pagar?" },
+        { role: "assistant", content: "R$ 1.019.172,67." },
+        { role: "user", content: "quantos desses RP são de serviço 339039?" },
+        { role: "assistant", content: "R$ 626.234,65." },
+      ],
+    });
+
+    expect(intent).toMatchObject({
+      ug: "9 BSUP",
+      search: "coturno",
+      metric: "RPNP_REGISTERED_TOTAL",
+      groupBy: "NE",
+      answerable: true,
+    });
+    expect(intent.nd).toBeUndefined();
+    expect(intent.pi).toBeUndefined();
+  });
+
+  it("pesquisa RPNP pela descrição do empenho", () => {
+    const projection = {
+      snapshot: { fileName: "TG.xlsx", importedAt: "2026-09-12T01:00:00.000Z", rowCount: 2, checksum: "checksum" },
+      operational: {
+        ugOptions: [{ ug: "160142", om: "9 BATALHAO DE SUPRIMENTO" }],
+        ncMovements: [], neExecution: [],
+        rpnpMovements: [
+          { id: "a", ug: "160142", om: "9 BATALHAO DE SUPRIMENTO", ne: "2025NE1", year: "2025", supplier: "A", date: "2025-12-01", pi: "PI-A", nd: "33903023", ndDescription: "Material de consumo", description: "Aquisição de coturno operacional", processNumber: "P1", biddingModality: "Pregão", registeredCents: 900_00, reinscribedCents: 0, cancelledCents: 0, toLiquidateCents: 100_00, liquidatedCents: 800_00, liquidatedToPayCents: 0, paidCents: 800_00, payableCents: 100_00 },
+          { id: "b", ug: "160142", om: "9 BATALHAO DE SUPRIMENTO", ne: "2025NE2", year: "2025", supplier: "B", date: "2025-12-02", pi: "PI-B", nd: "33903916", ndDescription: "Serviços", description: "Manutenção predial", processNumber: "P2", biddingModality: "Pregão", registeredCents: 100_00, reinscribedCents: 0, cancelledCents: 0, toLiquidateCents: 0, liquidatedCents: 100_00, liquidatedToPayCents: 0, paidCents: 100_00, payableCents: 0 },
+        ],
+      },
+    } as unknown as TgDashboardProjection;
+
+    const result = projectCreditAnalytics(projection, { ug: "9 BSUP", search: "coturno", metric: "RPNP_REGISTERED_TOTAL", groupBy: "NE" });
+    expect(result.totals).toMatchObject({ metricValueCents: 900_00, neCount: 1 });
+    expect(result.groups.map((group) => group.ne)).toEqual(["2025NE1"]);
+  });
+
   it("filtra descrição de empenho e ordena NEs pela métrica solicitada", () => {
     const projection = {
       snapshot: { fileName: "TG.xlsx", importedAt: "2026-09-12T01:00:00.000Z", rowCount: 3, checksum: "checksum" },

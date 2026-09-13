@@ -695,10 +695,10 @@ function projectRpnpAnalytics(
       ne: row.ne,
       supplier: row.supplier,
       nd: row.nd,
-      ndDescription: "",
-      description: "",
-      processNumber: "",
-      biddingModality: "",
+      ndDescription: row.ndDescription ?? "",
+      description: row.description ?? "",
+      processNumber: row.processNumber ?? "",
+      biddingModality: row.biddingModality ?? "",
     }, input.search))
   );
   const summarize = (scoped: typeof rows) => ({
@@ -731,7 +731,10 @@ function projectRpnpAnalytics(
       ...group,
       ...summary,
       metricValueCents: rpnpMetricValue(summary, metric),
-      ...(ne ? { ug: ne.ug, om: ne.om, ne: ne.ne, date: ne.date, supplier: ne.supplier, nd: ne.nd, pi: ne.pi } : {}),
+      ...(ne ? {
+        ug: ne.ug, om: ne.om, ne: ne.ne, date: ne.date, supplier: ne.supplier,
+        nd: ne.nd, description: ne.description, pi: ne.pi,
+      } : {}),
     };
   }).sort((left, right) => (input.sort === "VALUE_ASC" ? 1 : -1) * (left.metricValueCents - right.metricValueCents)).slice(0, limit);
   const totals = summarize(rows);

@@ -25,8 +25,10 @@ export type TgNeProjection = {
   liquidatedCents: number; liquidatedToPayCents: number; paidCents: number;
 };
 export type TgRpnpProjection = {
-  id: string; ug: string; om: string; ne: string; supplier: string; date: string;
-  pi: string; nd: string; registeredCents: number; reinscribedCents: number;
+  id: string; ug: string; om: string; ne: string; year: string; supplier: string; date: string;
+  pi: string; nd: string; ndDescription: string; description: string;
+  processNumber: string; biddingModality: string;
+  registeredCents: number; reinscribedCents: number;
   cancelledCents: number; toLiquidateCents: number; liquidatedCents: number;
   liquidatedToPayCents: number; paidCents: number; payableCents: number;
 };
@@ -83,8 +85,10 @@ export function projectTgOperational(report: Pick<TgReport, "rows"> | null) {
   const rpnpMovements = group(rows.filter(row => row.itemCode && rpnpCodes.has(row.itemCode)),
     row => [row.ug, row.ne, row.pi, row.nd].join("|"),
     (items, first, id): TgRpnpProjection => ({
-      id, ug: first.ug, om: first.om, ne: text(first.ne), supplier: text(first.supplier), date: text(first.documentDay ?? first.neDay),
-      pi: text(first.pi), nd: text(first.nd),
+      id, ug: first.ug, om: first.om, ne: text(first.ne), year: text(first.year), supplier: text(first.supplier), date: text(first.documentDay ?? first.neDay),
+      pi: text(first.pi), nd: text(first.nd), ndDescription: text(first.ndDescription),
+      description: text(first.neDescription), processNumber: text(first.processNumber),
+      biddingModality: text(first.biddingModality),
       registeredCents: sum(items, TG_ITEM.rpnpRegistered), reinscribedCents: sum(items, TG_ITEM.rpnpReinscribed),
       cancelledCents: sum(items, TG_ITEM.rpnpCancelled), toLiquidateCents: sum(items, TG_ITEM.rpnpToLiquidate),
       liquidatedCents: sum(items, TG_ITEM.rpnpLiquidated), liquidatedToPayCents: sum(items, TG_ITEM.rpnpLiquidatedToPay),

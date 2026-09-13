@@ -35,4 +35,24 @@ describe("projeção operacional do mestre TG", () => {
     expect(result.piNdMovementCents).toBe(100);
     expect(result.neMovementCents).toBe(40);
   });
+
+  it("preserva os campos descritivos dos empenhos de RPNP na projeção compacta", () => {
+    const result = projectTgOperational({ rows: [
+      row({
+        id: "rpnp", itemCode: "40", ne: "2025NE000001", year: "2025",
+        supplier: "Fornecedor", neDescription: "Aquisição de coturno operacional",
+        processNumber: "12345.000001/2025-00", biddingModality: "Pregão",
+        movementCents: 500_00, level: "RPNP_DETAIL",
+      }),
+    ] });
+
+    expect(result.rpnpMovements[0]).toMatchObject({
+      ne: "2025NE000001",
+      year: "2025",
+      ndDescription: "Uniformes",
+      description: "Aquisição de coturno operacional",
+      processNumber: "12345.000001/2025-00",
+      biddingModality: "Pregão",
+    });
+  });
 });
