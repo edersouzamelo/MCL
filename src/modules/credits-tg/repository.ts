@@ -7,13 +7,15 @@ import { projectTgOperational } from "./projection";
 // Separate source kind: queries for SAG CURRENT/RPNP cannot consume this payload.
 // Stable database discriminator. The payload itself declares V1 or V2.
 export const TG_SOURCE_KIND = "TG_MASTER_V1";
+export const TG_PROJECTION_VERSION = 2;
 export type TgSnapshot = TgReport & { checksum: string; importedAt: string; emailReceivedAt: string | null; ingestionMethod: string };
 export type TgSnapshotMetadata = Omit<TgSnapshot, "rows"> & { rowCount: number };
-export type TgDashboardProjection = { snapshot: TgSnapshotMetadata; operational: ReturnType<typeof projectTgOperational> };
+export type TgDashboardProjection = { projectionVersion?: number; snapshot: TgSnapshotMetadata; operational: ReturnType<typeof projectTgOperational> };
 export async function persistTg(input: { organizationId: string; report: TgReport; buffer: ArrayBuffer; actor: string; method: "APPS_SCRIPT_TG" | "MANUAL_TG"; emailReceivedAt?: string | null }) {
   const checksum = createHash("sha256").update(Buffer.from(input.buffer)).digest("hex");
   const payload = JSON.parse(JSON.stringify({ ...input.report, emailReceivedAt: input.emailReceivedAt ?? null })) as Prisma.InputJsonValue;
   const projection = JSON.parse(JSON.stringify({
+    projectionVersion: TG_PROJECTION_VERSION,
     snapshot: { schema: input.report.schema, parserVersion: input.report.parserVersion, fileName: input.report.fileName,
       sourceDate: input.report.sourceDate, metric: input.report.metric, warnings: input.report.warnings,
       checksum, importedAt: new Date().toISOString(), emailReceivedAt: input.emailReceivedAt ?? null,
@@ -41,11 +43,14 @@ export async function getLatestTgProjection(organizationId: string): Promise<TgD
   if (!record?.projection) return null;
   const result = record.projection as unknown as TgDashboardProjection;
   result.snapshot.importedAt = record.importedAt.toISOString();
-  return result;
+  if (result.projectionVersion === TG_PROJECTION_VERSION) return result;
+  const legacy = await getLatestTg(organizationId);
+  return legacy ? saveTgProjection(organizationId, legacy) : result;
 }
 export async function saveTgProjection(organizationId: string, snapshot: TgSnapshot): Promise<TgDashboardProjection> {
   const { rows, ...metadata } = snapshot;
   const projection = JSON.parse(JSON.stringify({
+    projectionVersion: TG_PROJECTION_VERSION,
     snapshot: { ...metadata, rowCount: rows.length },
     operational: projectTgOperational(snapshot),
   })) as Prisma.InputJsonValue;

@@ -68,7 +68,10 @@ function extractSearch(current: string) {
   const match = normalized.match(/\b(?:foi|foram)\s+empenhad[oa]s?\s+(.+?)(?:\s+este ano)?$/)
     ?? normalized.match(/\bempenhos?\s+(?:de|para)\s+(.+?)(?:\s+este ano)?$/);
   if (!match) return undefined;
-  const candidate = match[1].replace(/\b(?:na|no|pela|pelo)\s+nd\s+\d{2,8}\b/g, "").trim();
+  const candidate = match[1]
+    .replace(/\b(?:na|no|pela|pelo)\s+nd\s+\d{2,8}\b/g, "")
+    .replace(/\s+(?:em|nos?|d[eo]s?)\s+(?:rpnp|rp|restos? a pagar(?: nao processados?)?)$/g, "")
+    .trim();
   return candidate && !/^(credito|valor|recurso|quanto)$/.test(candidate) ? candidate : undefined;
 }
 
@@ -85,8 +88,10 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
   const rpnpSignal = turns.some((turn) => /\b(?:restos? a pagar|rpnp|reinscrit\w*)\b/.test(normalize(turn)));
   const metric = rpnpSignal ? latestMatch(turns, extractRpnpMetric) : latestMatch(turns, extractMetric);
   const ug = latestMatch(turns, extractUg);
-  const nd = latestMatch(turns, extractNd);
-  const pi = latestMatch(turns, extractPi);
+  // Uma nova busca por objeto mantém a unidade da conversa, mas não herda
+  // classificações contábeis antigas que o usuário não repetiu.
+  const nd = search ? extractNd(current) : latestMatch(turns, extractNd);
+  const pi = search ? extractPi(current) : latestMatch(turns, extractPi);
   const includeFinalities = /\b(?:finalidades?|destinacoes?|descricoes? das? ncs?)\b/.test(current);
   const groupBy = ranking || search
     ? "NE"
@@ -171,11 +176,17 @@ export function formatCreditAnalyticsAnswer(data: CreditToolData, intent: Resolv
     return `Nenhum movimento contábil corresponde a ${scope}. Não foi apresentado R$ 0,00 porque o filtro não encontrou registros.`;
   }
 
+  if (data.metric.startsWith("RPNP_") && data.filters.search && data.totals.neCount === 0) {
+    return `Nenhum empenho de RPNP do escopo autorizado contém “${data.filters.search}” nos campos descritivos disponíveis. A ausência do termo não prova que o objeto nunca tenha sido adquirido sob outra descrição.`;
+  }
+
   if (data.metric === "RPNP_REGISTERED_TOTAL") {
     return [
-      `O valor inscrito e reinscrito em restos a pagar não processados para ${scope || "o filtro informado"} soma ${currency(data.totals.metricValueCents)}.`,
+      `${data.filters.search ? "Sim. " : ""}O valor inscrito e reinscrito em restos a pagar não processados para ${scope || "o filtro informado"} soma ${currency(data.totals.metricValueCents)}.`,
       `Inscritos: ${currency(data.totals.registeredCents ?? 0)}. Reinscritos: ${currency(data.totals.reinscribedCents ?? 0)}.`,
-      ...(data.groups.length > 1 ? data.groups.map((group) => `${group.label}: ${currency(group.metricValueCents)}.`) : []),
+      ...(data.groups.length > 1 || data.filters.search
+        ? data.groups.map((group) => `${group.ne ?? group.label}: ${currency(group.metricValueCents)}, ${shortText(group.description)}.`)
+        : []),
       `Fonte: ${data.source.fileName}, importada em ${new Date(data.source.importedAt).toLocaleString("pt-BR", { timeZone: "America/Campo_Grande" })}.`,
     ].join("\n");
   }
