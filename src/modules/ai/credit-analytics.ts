@@ -50,6 +50,19 @@ function extractMetric(turn: string): CreditAnalyticsInput["metric"] | undefined
   return undefined;
 }
 
+function extractRpnpMetric(turn: string): CreditAnalyticsInput["metric"] | undefined {
+  if (/\b(?:reinscreveu|reinscrit[oa]s?|reinscricao)\b/.test(turn)) return "RPNP_REINSCRIBED";
+  if (/\b(?:inscreveu|inscrit[oa]s?|inscricao)\b/.test(turn)) return "RPNP_REGISTERED_TOTAL";
+  if (/\b(?:cancelad[oa]s?|cancelou|cancelamento)\b/.test(turn)) return "RPNP_CANCELLED";
+  if (/\b(?:a liquidar|nao liquidado)\b/.test(turn)) return "RPNP_TO_LIQUIDATE";
+  if (/\b(?:liquidado a pagar|liquidados a pagar)\b/.test(turn)) return "RPNP_LIQUIDATED_TO_PAY";
+  if (/\b(?:liquidad[oa]s?|liquidou)\b/.test(turn)) return "RPNP_LIQUIDATED";
+  if (/\b(?:pag[oa]s?|pagou)\b/.test(turn)) return "RPNP_PAID";
+  if (/\b(?:saldo a pagar|quanto.*a pagar)\b/.test(turn)) return "RPNP_PAYABLE";
+  if (/\b(?:restos? a pagar|rpnp)\b/.test(turn)) return "RPNP_REGISTERED_TOTAL";
+  return undefined;
+}
+
 function extractSearch(current: string) {
   const normalized = normalize(current).replace(/[?!.,;:]+$/g, "");
   const match = normalized.match(/\b(?:foi|foram)\s+empenhad[oa]s?\s+(.+?)(?:\s+este ano)?$/)
@@ -69,7 +82,8 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
   const current = normalize(input.prompt);
   const ranking = /\b(?:mais caros?|maiores|ranking|top)\b/.test(current) && /\b(?:empenhos?|empenhad[oa]s?)\b/.test(current);
   const search = extractSearch(input.prompt);
-  const metric = latestMatch(turns, extractMetric);
+  const rpnpSignal = turns.some((turn) => /\b(?:restos? a pagar|rpnp|reinscrit\w*)\b/.test(normalize(turn)));
+  const metric = rpnpSignal ? latestMatch(turns, extractRpnpMetric) : latestMatch(turns, extractMetric);
   const ug = latestMatch(turns, extractUg);
   const nd = latestMatch(turns, extractNd);
   const pi = latestMatch(turns, extractPi);
@@ -79,7 +93,7 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
     : /\b(?:cada|por)\s+(?:ug|uasg)\b/.test(current) || Boolean(ug && !/^\d{6}$/.test(ug))
       ? "UG"
       : "TOTAL";
-  const financialSignal = turns.some((turn) => /\b(?:creditos?|provisao|empenh\w*|liquid\w*|pag\w*|saldo|nd|natureza de despesa|uasg|ug)\b/.test(normalize(turn)));
+  const financialSignal = turns.some((turn) => /\b(?:creditos?|provisao|empenh\w*|liquid\w*|pag\w*|saldo|nd|natureza de despesa|uasg|ug|restos? a pagar|rpnp|inscrit\w*|reinscrit\w*)\b/.test(normalize(turn)));
   return {
     ug,
     nd,
@@ -112,13 +126,22 @@ const metricLabel: Record<NonNullable<CreditAnalyticsInput["metric"]>, string> =
   LIQUIDATED: "valor liquidado",
   TO_LIQUIDATE: "valor empenhado a liquidar",
   PAID: "valor pago",
+  RPNP_REGISTERED_TOTAL: "valor inscrito e reinscrito em restos a pagar não processados",
+  RPNP_REGISTERED: "valor inscrito em restos a pagar não processados",
+  RPNP_REINSCRIBED: "valor reinscrito em restos a pagar não processados",
+  RPNP_CANCELLED: "valor cancelado de restos a pagar não processados",
+  RPNP_TO_LIQUIDATE: "valor de restos a pagar não processados a liquidar",
+  RPNP_LIQUIDATED: "valor liquidado de restos a pagar não processados",
+  RPNP_LIQUIDATED_TO_PAY: "valor liquidado a pagar de restos a pagar não processados",
+  RPNP_PAID: "valor pago de restos a pagar não processados",
+  RPNP_PAYABLE: "saldo a pagar de restos a pagar não processados",
 };
 
 type CreditToolData = {
   source: { fileName: string; importedAt: string };
   filters: { ug: string | null; nd: string | null; pi: string | null; search: string | null; matchedUgs: Array<{ ug: string; om: string }> };
   metric: NonNullable<CreditAnalyticsInput["metric"]>;
-  totals: { metricValueCents: number; neCount: number; ncCount: number };
+  totals: { metricValueCents: number; neCount: number; ncCount: number; registeredCents?: number; reinscribedCents?: number };
   groups: Array<{
     label: string;
     metricValueCents: number;
@@ -146,6 +169,15 @@ export function formatCreditAnalyticsAnswer(data: CreditToolData, intent: Resolv
 
   if ((data.filters.nd || data.filters.pi) && data.totals.ncCount === 0 && data.totals.neCount === 0) {
     return `Nenhum movimento contábil corresponde a ${scope}. Não foi apresentado R$ 0,00 porque o filtro não encontrou registros.`;
+  }
+
+  if (data.metric === "RPNP_REGISTERED_TOTAL") {
+    return [
+      `O valor inscrito e reinscrito em restos a pagar não processados para ${scope || "o filtro informado"} soma ${currency(data.totals.metricValueCents)}.`,
+      `Inscritos: ${currency(data.totals.registeredCents ?? 0)}. Reinscritos: ${currency(data.totals.reinscribedCents ?? 0)}.`,
+      ...(data.groups.length > 1 ? data.groups.map((group) => `${group.label}: ${currency(group.metricValueCents)}.`) : []),
+      `Fonte: ${data.source.fileName}, importada em ${new Date(data.source.importedAt).toLocaleString("pt-BR", { timeZone: "America/Campo_Grande" })}.`,
+    ].join("\n");
   }
 
   if (intent.includeFinalities && data.finalities.length) {
