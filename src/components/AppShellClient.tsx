@@ -134,7 +134,7 @@ function isRouteActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShellClient({ children }: { children: React.ReactNode }) {
+export function AppShellClient({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "home" }) {
   const pathname = usePathname() || "/painel";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const sidebarCollapsed = useSyncExternalStore(
@@ -145,7 +145,7 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
   const currentTitle = routeNames.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? "MCL";
 
   return (
-    <div className={`mcl-app-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
+    <div className={`mcl-app-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""} ${variant === "home" ? "is-operational-home" : ""}`}>
 
       <aside className={`mcl-sidebar ${mobileMenuOpen ? "is-open" : ""}`}>
         <div className="mcl-sidebar-head">
@@ -206,8 +206,17 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
 
       {mobileMenuOpen ? <button className="mcl-sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)} /> : null}
 
-      <div className="mcl-shell-main">
-        <header className="mcl-topbar">
+      <div className={`mcl-shell-main ${variant === "home" ? "mcl-home-main" : ""}`}>
+        {variant === "home" ? (
+          <>
+            <button type="button" className="mcl-mobile-menu mcl-home-mobile-menu" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>
+              <Menu aria-hidden />
+            </button>
+            {children}
+          </>
+        ) : (
+          <>
+          <header className="mcl-topbar">
           <div className="mcl-topbar-left">
             <button type="button" className="mcl-mobile-menu" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>
               <Menu aria-hidden />
@@ -235,7 +244,9 @@ export function AppShellClient({ children }: { children: React.ReactNode }) {
           {children}
         </main>
 
-        <TechnicalFooter />
+          <TechnicalFooter />
+          </>
+        )}
       </div>
     </div>
   );

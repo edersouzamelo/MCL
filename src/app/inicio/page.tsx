@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { AppShellClient } from "@/components/AppShellClient";
 import { ChainMetricPopover } from "@/components/ChainMetricPopover";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { getUserProfile } from "@/app/actions/onboarding";
@@ -56,7 +57,8 @@ export default async function InicioPage() {
   const functionalStages = functionalStageItems.length;
 
   return (
-    <main className="ops-shell">
+    <AppShellClient variant="home">
+      <main className="ops-shell">
         <div className="ops-grid-field" />
         <div className="ops-ambient" />
 
@@ -158,6 +160,7 @@ export default async function InicioPage() {
             </div>
           </section>
         </div>
-    </main>
+      </main>
+    </AppShellClient>
   );
 }

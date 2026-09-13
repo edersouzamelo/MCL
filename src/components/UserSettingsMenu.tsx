@@ -96,9 +96,10 @@ export function UserSettingsMenu() {
 
           <section>
             <span>{labels.theme}</span>
-            <div className="mcl-choice-grid two">
+            <div className="mcl-choice-grid three">
               <button type="button" className={theme === "light" ? "active" : ""} onClick={() => setTheme("light")}>Claro</button>
               <button type="button" className={theme === "dark" ? "active" : ""} onClick={() => setTheme("dark")}>Escuro</button>
+              <button type="button" className={theme === "military" ? "active" : ""} onClick={() => setTheme("military")}>Militar</button>
             </div>
           </section>
 

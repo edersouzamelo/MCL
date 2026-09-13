@@ -8,6 +8,7 @@ import { saveUserPreferences, loadUserPreferences } from "@/app/actions/preferen
 
 export type Language = "pt-BR" | "en" | "es";
 export type FontSize = "pequena" | "media" | "grande";
+export type Theme = "light" | "dark" | "military";
 
 interface SettingsContextData {
   language: Language;
@@ -16,15 +17,19 @@ interface SettingsContextData {
   setAnimationsEnabled: (enabled: boolean) => void;
   fontSize: FontSize;
   setFontSize: (size: FontSize) => void;
-  theme: string;
-  setTheme: (theme: string) => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
 }
 
 const SettingsContext = createContext<SettingsContextData>({} as SettingsContextData);
 
-function applyVisualPreferences(theme: string, fontSize: FontSize, animationsEnabled: boolean) {
+function normalizeTheme(theme: string | null | undefined): Theme {
+  return theme === "light" || theme === "military" ? theme : "dark";
+}
+
+function applyVisualPreferences(theme: Theme, fontSize: FontSize, animationsEnabled: boolean) {
   const root = document.documentElement;
-  root.classList.toggle("dark", theme === "dark");
+  root.classList.toggle("dark", theme !== "light");
   root.dataset.mclTheme = theme;
   root.dataset.mclFont = fontSize;
   root.dataset.mclMotion = animationsEnabled ? "on" : "off";
@@ -36,14 +41,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("pt-BR");
   const [animationsEnabled, setAnimationsEnabled] = useState(true);
   const [fontSize, setFontSize] = useState<FontSize>("media");
-  const [theme, setTheme] = useState<string>("dark");
+  const [theme, setTheme] = useState<Theme>("dark");
 
   // Load from local storage on mount (fast visual restore)
   useEffect(() => {
     const localLang = (localStorage.getItem("mcl-lang") as Language) || "pt-BR";
     const localAnim = localStorage.getItem("mcl-anim") !== "false"; // Default is true
     const localFont = (localStorage.getItem("mcl-font") as FontSize) || "media";
-    const localTheme = localStorage.getItem("mcl_theme") || "dark";
+    const localTheme = normalizeTheme(localStorage.getItem("mcl_theme"));
 
     setLanguage(localLang);
     setAnimationsEnabled(localAnim);
@@ -61,14 +66,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setLanguage(serverPrefs.language as Language);
           setAnimationsEnabled(serverPrefs.animationsEnabled);
           setFontSize(serverPrefs.fontSize as FontSize);
-          setTheme(serverPrefs.theme);
+          const serverTheme = normalizeTheme(serverPrefs.theme);
+          setTheme(serverTheme);
 
           localStorage.setItem("mcl-lang", serverPrefs.language);
           localStorage.setItem("mcl-anim", String(serverPrefs.animationsEnabled));
           localStorage.setItem("mcl-font", serverPrefs.fontSize);
-          localStorage.setItem("mcl_theme", serverPrefs.theme);
+          localStorage.setItem("mcl_theme", serverTheme);
 
-          applyVisualPreferences(serverPrefs.theme, serverPrefs.fontSize as FontSize, serverPrefs.animationsEnabled);
+          applyVisualPreferences(serverTheme, serverPrefs.fontSize as FontSize, serverPrefs.animationsEnabled);
         }
       });
     }
@@ -102,7 +108,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleThemeChange = (newTheme: string) => {
+  const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
     localStorage.setItem("mcl_theme", newTheme);
     applyVisualPreferences(newTheme, fontSize, animationsEnabled);
