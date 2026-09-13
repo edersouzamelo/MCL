@@ -2,16 +2,18 @@ import Link from "next/link";
 import { Activity, AlertCircle, AlertTriangle, CheckCircle2, Clock3, Database, Globe, HelpCircle, Info, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ComprasGovSyncButton } from "@/components/ComprasGovSyncButton";
+import { ConnectorDimension } from "@/components/ConnectorDimension";
 import { Badge, Card, PageHeader, formatDateTime, OperationalSurface } from "@/components/ui";
 import { getDemoState } from "@/server/demo-store";
-import { getDiagnosticData, type SourceSystemDomain, type SourceSystemCatalogEntry } from "@/modules/connectors/catalog";
+import { getDiagnosticData, sourceSystemBelongsToDomain, type SourceSystemDomain, type SourceSystemCatalogEntry } from "@/modules/connectors/catalog";
+import { LOGISTICS_STAGES, type LogisticsStageDefinition } from "@/modules/logistics/stages";
 
 export const dynamic = "force-dynamic";
 
 const DOMAIN_ORDER: SourceSystemDomain[] = [
   "Necessidades",
-  "Aquisições",
   "Orçamento e finanças",
+  "Aquisições",
   "Recebimento",
   "Estoque / armazém",
   "Transporte / distribuição",
@@ -20,6 +22,15 @@ const DOMAIN_ORDER: SourceSystemDomain[] = [
   "Documental",
   "Local / derivado / contingência"
 ];
+
+type DimensionPresentation = Pick<LogisticsStageDefinition, "number" | "title" | "tone" | "glyph">;
+const SUPPORT_DIMENSIONS: Partial<Record<SourceSystemDomain, DimensionPresentation>> = {
+  Documental: { number: "A1", title: "Documental", tone: "violet", glyph: "clipboard" },
+  "Local / derivado / contingência": { number: "A2", title: "Local / derivado / contingência", tone: "slate", glyph: "package" },
+};
+function getDimensionDefinition(domain: SourceSystemDomain) {
+  return LOGISTICS_STAGES.find((stage) => stage.domain === domain) ?? SUPPORT_DIMENSIONS[domain]!;
+}
 
 interface DomainContext {
   title: string;
@@ -249,7 +260,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
   const domainsToRender = filterDomain ? [filterDomain] : DOMAIN_ORDER;
 
   // Active domain stats calculation
-  const domainSystems = filterDomain ? systems.filter(sys => sys.domain === filterDomain) : [];
+  const domainSystems = filterDomain ? systems.filter((system) => sourceSystemBelongsToDomain(system, filterDomain)) : [];
   const totalSources = domainSystems.length;
   const statusSummary = getDomainSummary(domainSystems);
 
@@ -383,15 +394,11 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
         {/* Systems Catalogs grouped by Domain */}
         <div className="space-y-10">
           {domainsToRender.map((domain) => {
-            const domainSystems = systems.filter((sys) => sys.domain === domain);
+            const domainSystems = systems.filter((system) => sourceSystemBelongsToDomain(system, domain));
+            const dimension = getDimensionDefinition(domain);
 
             return (
-              <section key={domain} className="border-b border-zinc-200 dark:border-zinc-800 pb-8 last:border-b-0 last:pb-0">
-                <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
-                  <Database className="h-5 w-5 text-zinc-400" />
-                  Dimensão: {domain}
-                </h2>
-
+              <ConnectorDimension key={domain} stage={dimension} systemCount={domainSystems.length}>
                 {domainSystems.length === 0 ? (
                   <div className="bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800/85 border-dashed p-8 rounded-2xl text-center max-w-lg mx-auto">
                     <Database className="h-8 w-8 text-zinc-400 mx-auto mb-3" strokeWidth={1.5} />
@@ -535,7 +542,7 @@ export default async function ConnectorsPage({ searchParams }: PageProps) {
                     })}
                   </div>
                 )}
-              </section>
+              </ConnectorDimension>
             );
           })}
         </div>

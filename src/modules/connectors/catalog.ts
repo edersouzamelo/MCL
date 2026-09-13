@@ -63,6 +63,7 @@ export interface SourceSystemCatalogEntry {
   id: string;
   name: string;
   domain: SourceSystemDomain;
+  relatedDomains?: SourceSystemDomain[];
   sourceKind: SourceKind;
   authority: SourceSystemAuthority;
   nature: DataNature;
@@ -87,6 +88,10 @@ export interface SourceSystemCatalogEntry {
   };
 }
 
+export function sourceSystemBelongsToDomain(system: SourceSystemCatalogEntry, domain: SourceSystemDomain) {
+  return system.domain === domain || system.relatedDomains?.includes(domain) === true;
+}
+
 export interface DiagnosticResponse {
   environment: {
     database: "persistent" | "memory" | "unknown";
@@ -108,6 +113,29 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
 
   // Load the live Compras.gov connector data from state if available
   const liveComprasGov = state.connectors.find((c) => c.id === "compras-gov");
+
+  const mappedRestrictedSystem = (id: string, name: string, domain: SourceSystemDomain, relatedDomains: SourceSystemDomain[] = []): SourceSystemCatalogEntry => ({
+    id, name, domain, relatedDomains, sourceKind: "EXTERNAL_SYSTEM", authority: "OFICIAL",
+    nature: "REAL_RESTRITA_NAO_INTEGRADA", integrationMethod: "NAO_INTEGRADO",
+    maturity: "MAPEADO_NAO_INTEGRADO", status: "NAO_INTEGRADO",
+    limitations: ["Escopo funcional, acesso e contrato de dados ainda dependem de homologação institucional."],
+    observation: "Sistema indicado no mapa fornecido; permanece somente catalogado e não integrado.",
+  });
+
+  const diagramSystems: SourceSystemCatalogEntry[] = [
+    mappedRestrictedSystem("sca-classe-iii", "SCA (Classe III)", "Estoque / armazém"),
+    mappedRestrictedSystem("sigelog-odf", "SIGELOG (ODF)", "Transporte / distribuição"),
+    mappedRestrictedSystem("sigm-odaa-classe-i", "SIGM ODAA (Classe I)", "Necessidades"),
+    mappedRestrictedSystem("sigm-odaa-classe-ii", "SIGM ODAA (Classe II)", "Estoque / armazém"),
+    mappedRestrictedSystem("siga-167", "SIGA (167)", "Orçamento e finanças"),
+    mappedRestrictedSystem("pmasex-sire-oplog-dsau-viii", "PMASEx, SIRE, OPLOG (DSAU) (Classe VIII)", "Necessidades", ["Orçamento e finanças", "Aquisições", "Recebimento"]),
+    mappedRestrictedSystem("sg7-classe-vii", "SG7 (Classe VII)", "Recebimento", ["Estoque / armazém", "Transporte / distribuição", "Manutenção", "Recolhimento"]),
+    mappedRestrictedSystem("servicos-scdp-contrato-brasil-opus", "Sistemas dedicados a serviços: SCDP, Contrato+ Brasil, OPUS", "Necessidades", ["Orçamento e finanças", "Aquisições", "Recebimento"]),
+    { id: "catmat-catser", name: "CATMAT / CATSER", domain: "Necessidades", relatedDomains: ["Aquisições"], sourceKind: "PUBLIC_SOURCE", authority: "OFICIAL", nature: "REAL_PUBLICA", integrationMethod: "REFERENCIA_DOCUMENTAL", maturity: "PLANEJADO", status: "PENDENTE", limitations: ["A catalogação não implica sincronização integral nem autoridade local sobre os códigos oficiais."], observation: "Referência transversal indicada no mapa entre necessidade e aquisição." },
+    { id: "sped-processos", name: "SPED - Processos", domain: "Necessidades", relatedDomains: ["Orçamento e finanças", "Aquisições"], sourceKind: "DOCUMENT_SOURCE", authority: "OFICIAL", nature: "REAL_RESTRITA_NAO_INTEGRADA", integrationMethod: "REFERENCIA_DOCUMENTAL", maturity: "MAPEADO_NAO_INTEGRADO", status: "NAO_INTEGRADO", limitations: ["Acesso documental restrito e sem integração autorizada no piloto."], observation: "Fonte processual transversal indicada no mapa fornecido." },
+    { id: "sped-diex", name: "SPED - DIEx", domain: "Recebimento", relatedDomains: ["Estoque / armazém", "Transporte / distribuição", "Manutenção", "Recolhimento"], sourceKind: "DOCUMENT_SOURCE", authority: "OFICIAL", nature: "REAL_RESTRITA_NAO_INTEGRADA", integrationMethod: "REFERENCIA_DOCUMENTAL", maturity: "MAPEADO_NAO_INTEGRADO", status: "NAO_INTEGRADO", limitations: ["Acesso documental restrito e sem integração autorizada no piloto."], observation: "Fonte documental transversal indicada no mapa fornecido." },
+    ...["Sistema de regularidade", "App Radar"].map((name): SourceSystemCatalogEntry => ({ id: name === "App Radar" ? "app-radar" : "sistema-regularidade", name, domain: "Aquisições", sourceKind: "GAP_TO_MAP", authority: "DESCONHECIDA", nature: "DESCONHECIDA_A_MAPEAR", integrationMethod: "DESCONHECIDO", maturity: "DESCONHECIDO", status: "DESCONHECIDO", limitations: ["Autoridade, origem dos dados e escopo funcional ainda precisam ser confirmados."], observation: "Rótulo reproduzido do mapa; requer detalhamento antes de qualquer integração." })),
+  ];
   
   const systems: SourceSystemCatalogEntry[] = [
     // A) e-PRDU
@@ -149,6 +177,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       id: "pgc-pca",
       name: "PGC / PCA — Planejamento e Gerenciamento de Contratações",
       domain: "Necessidades",
+      relatedDomains: ["Orçamento e finanças", "Aquisições"],
       sourceKind: "DOCUMENT_SOURCE",
       authority: "OFICIAL",
       nature: "REAL_RESTRITA_NAO_INTEGRADA",
@@ -229,6 +258,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       id: "siafi-stn",
       name: "SIAFI (Secretaria do Tesouro Nacional)",
       domain: "Orçamento e finanças",
+      relatedDomains: ["Recebimento"],
       sourceKind: "EXTERNAL_SYSTEM",
       authority: "OFICIAL",
       nature: "REAL_RESTRITA_NAO_INTEGRADA",
@@ -246,6 +276,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       id: "sag-financeiro",
       name: "SAG",
       domain: "Orçamento e finanças",
+      relatedDomains: ["Aquisições"],
       sourceKind: "EXTERNAL_SYSTEM",
       authority: "AUXILIAR",
       nature: "REAL_RESTRITA_NAO_INTEGRADA",
@@ -262,6 +293,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       id: "powerbi-local",
       name: "Dashboard PowerBI local",
       domain: "Local / derivado / contingência",
+      relatedDomains: ["Orçamento e finanças"],
       sourceKind: "LOCAL_DERIVED_SOURCE",
       authority: "DERIVADA",
       nature: "LOCAL_DERIVADA",
@@ -279,6 +311,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       id: "mcl-qr-recebimento",
       name: "MCL — QR e Passaporte Digital de Recebimento",
       domain: "Recebimento",
+      relatedDomains: ["Aquisições", "Estoque / armazém", "Transporte / distribuição", "Manutenção", "Recolhimento"],
       sourceKind: "MCL_NATIVE_CAPABILITY",
       authority: "AUXILIAR",
       nature: "MANUAL_VALIDADA",
@@ -297,6 +330,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       id: "siscofis-web",
       name: "SISCOFIS-WEB",
       domain: "Estoque / armazém",
+      relatedDomains: ["Recebimento", "Transporte / distribuição", "Manutenção", "Recolhimento"],
       sourceKind: "EXTERNAL_SYSTEM",
       authority: "OFICIAL",
       nature: "REAL_RESTRITA_NAO_INTEGRADA",
@@ -391,6 +425,7 @@ export function getDiagnosticData(state: DemoState): DiagnosticResponse {
       ],
       observation: "Fonte indicada no mapa macro para ordens de recolhimento. A integração permanece apenas mapeada."
     },
+    ...diagramSystems,
     // O) Controles locais / planilhas / relatórios
     {
       id: "planilhas-locais",

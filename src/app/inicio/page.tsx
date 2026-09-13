@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { AppShellClient } from "@/components/AppShellClient";
 import { ChainMetricPopover } from "@/components/ChainMetricPopover";
+import { LogisticsStageGlyph } from "@/components/LogisticsStageGlyph";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { getUserProfile } from "@/app/actions/onboarding";
 import { getDemoState } from "@/server/demo-store";
@@ -19,24 +19,6 @@ function getStageStatus(systems: SourceSystemCatalogEntry[]) {
   if (systems.some((system) => system.status === "SAUDAVEL" && (system.sourceKind === "MCL_NATIVE_CAPABILITY" || system.sourceKind === "DEMO_SIMULATOR"))) return "Demo";
   if (systems.some((system) => system.status === "PENDENTE" || system.status === "NAO_CONFIGURADO" || system.status === "NAO_INTEGRADO")) return "Pendente";
   return "Lacuna / pendente";
-}
-
-function StageGlyph({ type }: { type: string }) {
-  const paths: Record<string, ReactNode> = {
-    clipboard: <><path d="M10 7H7v21h18V7h-3" /><path d="M11 4h10v6H11zM11 16l3 3 6-7M11 24h10" /></>,
-    credit: <><path d="M5 8h22v17H5zM5 13h22M9 20h6" /><path d="M22 18v4" /></>,
-    cart: <><path d="M4 6h4l3 14h12l3-10H10M12 25h3v3h-3zM21 25h3v3h-3z" /><path d="M13 15h10" /></>,
-    package: <><path d="M5 10l11-6 11 6v13l-11 6-11-6zM5 10l11 6 11-6M16 16v13" /><path d="M10 7l11 6v5" /></>,
-    warehouse: <><path d="M4 13L16 5l12 8v15H4zM8 16h16M9 20h6v8M18 20h6v8" /><path d="M13 11h6" /></>,
-    truck: <><path d="M3 8h15v15H3zM18 13h6l5 6v4H18zM8 23v4h4v-4M22 23v4h4v-4" /><path d="M24 14v5h5" /></>,
-    wrench: <><path d="M20 5a7 7 0 0 0-8 9L4 22l6 6 8-8a7 7 0 0 0 9-8l-5 5-5-2-2-5z" /><path d="M7 23l3 3" /></>,
-    return: <><path d="M11 8 5 14l6 6" /><path d="M6 14h12a9 9 0 0 1 9 9v4M18 6h9v7" /></>,
-  };
-  return (
-    <svg className="ops-stage-icon-symbol" viewBox="0 0 32 32" aria-hidden="true">
-      {paths[type] ?? paths.package}
-    </svg>
-  );
 }
 
 function Arrow() {
@@ -106,7 +88,7 @@ export default async function InicioPage() {
                 <article className={`ops-stage ${stage.tone}`} key={stage.number}>
                   <div className="ops-stage-line" aria-hidden="true"><span>{stage.number}</span>{index < resolvedStages.length - 1 ? <i /> : null}</div>
                   <div className="ops-stage-title">
-                    <span className="ops-stage-icon"><StageGlyph type={stage.glyph} /></span>
+                    <span className="ops-stage-icon"><LogisticsStageGlyph type={stage.glyph} /></span>
                     <div><h3>{stage.title}</h3><span className="ops-status">{stage.status}</span></div>
                   </div>
                   <p>{stage.description}</p>
