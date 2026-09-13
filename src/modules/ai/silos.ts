@@ -564,7 +564,10 @@ export type CreditAnalyticsInput = {
   ug?: string;
   nd?: string;
   pi?: string;
-  groupBy?: "TOTAL" | "UG" | "ND" | "PI";
+  search?: string;
+  metric?: "AVAILABLE" | "PROVISION" | "COMMITTED" | "LIQUIDATED" | "TO_LIQUIDATE" | "PAID";
+  groupBy?: "TOTAL" | "UG" | "ND" | "PI" | "NE";
+  sort?: "VALUE_DESC" | "VALUE_ASC";
   includeFinalities?: boolean;
   limit?: number;
 };
@@ -603,6 +606,51 @@ function matchesCreditPi(value: string, query?: string) {
   return !query?.trim() || normalizeCreditText(value).includes(normalizeCreditText(query));
 }
 
+function matchesCreditSearch(
+  row: {
+    ne: string;
+    supplier: string;
+    nd: string;
+    ndDescription: string;
+    description: string;
+    processNumber: string;
+    biddingModality: string;
+  },
+  query?: string,
+) {
+  if (!query?.trim()) return true;
+  const haystack = normalizeCreditText([
+    row.ne,
+    row.supplier,
+    row.nd,
+    row.ndDescription,
+    row.description,
+    row.processNumber,
+    row.biddingModality,
+  ].join(" "));
+  const tokens = normalizeCreditText(query).split(" ").filter((token) => token.length > 1);
+  return tokens.length > 0 && tokens.every((token) => haystack.includes(token));
+}
+
+function creditMetricValue(
+  value: {
+    provisionUpdatedCents: number;
+    availableCreditCents: number;
+    committedCents: number;
+    liquidatedCents: number;
+    committedToLiquidateCents: number;
+    paidCents: number;
+  },
+  metric: NonNullable<CreditAnalyticsInput["metric"]>,
+) {
+  if (metric === "PROVISION") return value.provisionUpdatedCents;
+  if (metric === "COMMITTED") return value.committedCents;
+  if (metric === "LIQUIDATED") return value.liquidatedCents;
+  if (metric === "TO_LIQUIDATE") return value.committedToLiquidateCents;
+  if (metric === "PAID") return value.paidCents;
+  return value.availableCreditCents;
+}
+
 export function projectCreditAnalytics(
   projection: TgDashboardProjection,
   input: CreditAnalyticsInput,
@@ -614,7 +662,7 @@ export function projectCreditAnalytics(
     allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi)
   );
   const neRows = projection.operational.neExecution.filter((row) =>
-    allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi)
+    allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi) && matchesCreditSearch(row, input.search)
   );
 
   const summarize = (
@@ -639,6 +687,7 @@ export function projectCreditAnalytics(
     };
   };
 
+  const metric = input.metric ?? "AVAILABLE";
   const groupBy = input.groupBy ?? "TOTAL";
   const groupKeys = new Map<string, { key: string; label: string }>();
   const registerGroup = (key: string, label: string) => groupKeys.set(key, { key, label });
@@ -648,15 +697,36 @@ export function projectCreditAnalytics(
     [...ncRows, ...neRows].forEach((row) => registerGroup(row.nd, row.nd));
   } else if (groupBy === "PI") {
     [...ncRows, ...neRows].forEach((row) => registerGroup(row.pi, row.pi));
+  } else if (groupBy === "NE") {
+    neRows.forEach((row) => registerGroup(row.id, `${row.ne}: ${row.description}`));
   } else {
     registerGroup("TOTAL", "Total do filtro");
   }
 
   const groups = [...groupKeys.values()].map((group) => {
-    const groupNcs = groupBy === "TOTAL" ? ncRows : ncRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
-    const groupNes = groupBy === "TOTAL" ? neRows : neRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
-    return { ...group, ...summarize(groupNcs, groupNes) };
-  }).sort((left, right) => right.availableCreditCents - left.availableCreditCents).slice(0, limit);
+    const groupNcs = groupBy === "TOTAL" || groupBy === "NE" ? (groupBy === "TOTAL" ? ncRows : []) : ncRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
+    const groupNes = groupBy === "TOTAL" ? neRows : groupBy === "NE" ? neRows.filter((row) => row.id === group.key) : neRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
+    const summary = summarize(groupNcs, groupNes);
+    const ne = groupBy === "NE" ? groupNes[0] : undefined;
+    return {
+      ...group,
+      ...summary,
+      metricValueCents: creditMetricValue(summary, metric),
+      ...(ne ? {
+        ug: ne.ug,
+        om: ne.om,
+        ne: ne.ne,
+        date: ne.date,
+        supplier: ne.supplier,
+        nd: ne.nd,
+        ndDescription: ne.ndDescription,
+        description: ne.description,
+        pi: ne.pi,
+        processNumber: ne.processNumber,
+        biddingModality: ne.biddingModality,
+      } : {}),
+    };
+  }).sort((left, right) => (input.sort === "VALUE_ASC" ? 1 : -1) * (creditMetricValue(left, metric) - creditMetricValue(right, metric))).slice(0, limit);
 
   const purposeGroups = new Map<string, {
     purpose: string;
@@ -692,9 +762,14 @@ export function projectCreditAnalytics(
       ug: input.ug ?? null,
       nd: input.nd ?? null,
       pi: input.pi ?? null,
+      search: input.search ?? null,
       matchedUgs: matchingUgs,
     },
-    totals: summarize(ncRows, neRows),
+    metric,
+    totals: {
+      ...summarize(ncRows, neRows),
+      metricValueCents: creditMetricValue(summarize(ncRows, neRows), metric),
+    },
     groupBy,
     groups,
     finalities: input.includeFinalities
@@ -724,6 +799,9 @@ export async function queryTgCreditAnalytics(
   const data = projectCreditAnalytics(projection, input);
   const gaps = [
     ...(input.ug && data.filters.matchedUgs.length === 0 ? [`Nenhuma UASG corresponde ao filtro '${input.ug}'.`] : []),
+    ...(input.search && data.totals.neCount === 0
+      ? ["Nenhuma NE do exercício corrente contém o termo pesquisado nos campos descritivos disponíveis."]
+      : []),
     ...((input.nd || input.pi) && data.totals.ncCount === 0 && data.totals.neCount === 0
       ? ["Nenhum movimento contábil corresponde à combinação de filtros informada."]
       : []),
