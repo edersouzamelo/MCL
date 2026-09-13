@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { ChainMetricPopover } from "@/components/ChainMetricPopover";
 import { UserSettingsMenu } from "@/components/UserSettingsMenu";
 import { getUserProfile } from "@/app/actions/onboarding";
 import { getDemoState } from "@/server/demo-store";
@@ -50,8 +51,9 @@ export default async function InicioPage() {
     ...stage,
     status: getStageStatus(diagnosis.systems.filter((system) => system.domain === stage.domain)),
   }));
-  const functionalStages = resolvedStages.filter((stage) => ["Conectado", "Parcial", "Demo"].includes(stage.status)).length;
-  const pendingStages = resolvedStages.length - functionalStages;
+  const functionalStageItems = resolvedStages.filter((stage) => ["Conectado", "Parcial", "Demo"].includes(stage.status));
+  const pendingStageItems = resolvedStages.filter((stage) => !["Conectado", "Parcial", "Demo"].includes(stage.status));
+  const functionalStages = functionalStageItems.length;
 
   return (
     <main className="ops-shell">
@@ -81,10 +83,10 @@ export default async function InicioPage() {
             <div className="ops-overview" aria-label="Resumo da situação da cadeia">
               <div className="ops-overview-head"><span>Situação da cadeia</span><strong><i /> Em implantação</strong></div>
               <div className="ops-metrics">
-                <div><strong>{String(LOGISTICS_STAGES.length).padStart(2, "0")}</strong><span>etapas mapeadas</span></div>
-                <div><strong>{String(functionalStages).padStart(2, "0")}</strong><span>capacidades funcionais</span></div>
-                <div><strong>{String(diagnosis.systems.length).padStart(2, "0")}</strong><span>fontes catalogadas</span></div>
-                <div className="attention"><strong>{String(pendingStages).padStart(2, "0")}</strong><span>pontos pendentes</span></div>
+                <ChainMetricPopover label="etapas mapeadas" items={LOGISTICS_STAGES.map((stage) => stage.title)} />
+                <ChainMetricPopover label="capacidades funcionais" items={functionalStageItems.map((stage) => stage.title)} />
+                <ChainMetricPopover label="fontes catalogadas" items={diagnosis.systems.map((system) => system.name)} />
+                <ChainMetricPopover label="pontos pendentes" items={pendingStageItems.map((stage) => stage.title)} tone="attention" />
               </div>
               <div className="ops-progress"><span style={{ width: `${Math.round((functionalStages / LOGISTICS_STAGES.length) * 100)}%` }} /></div>
               <p>{functionalStages} de {LOGISTICS_STAGES.length} etapas possuem alguma capacidade funcional no ambiente atual.</p>
