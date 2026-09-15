@@ -1,11 +1,17 @@
+import { randomUUID } from "node:crypto";
 import type { Role } from "@/modules/domain/types";
 import type { DemoState, UserScope } from "@/modules/domain/types";
 import { getDemoState } from "@/server/demo-store";
 import { prisma } from "@/server/db";
 
+export const MCL_ADMIN_EMAIL = "edersouzamelo@gmail.com";
+export const CONGRESS_VISITOR_PROFILE = "Visitante - 1º Congresso de Gestão da Cadeia de suprimento COLOG";
+
 export type LocalIdentity = {
   id?: string | null;
   email?: string | null;
+  name?: string | null;
+  image?: string | null;
 };
 
 export type LocalAccess = {
@@ -110,4 +116,94 @@ export async function resolveLocalAccess(identity: LocalIdentity, now = new Date
     })),
     now,
   );
+}
+
+/**
+ * Autoaprovisionamento controlado para o congresso.
+ * O Google comprova a identidade; o MCL cria apenas um vínculo READ_ONLY na mesma
+ * organização operacional do administrador. Nenhuma permissão administrativa é concedida.
+ */
+export async function provisionGoogleVisitor(identity: LocalIdentity, now = new Date()) {
+  if (!process.env.DATABASE_URL) {
+    return undefined;
+  }
+
+  const email = identity.email?.trim().toLowerCase();
+  if (!email) {
+    return undefined;
+  }
+
+  const owner = await prisma.user.findUnique({
+    where: { email: MCL_ADMIN_EMAIL },
+    include: { scopes: true },
+  });
+  const ownerScope = owner?.scopes.find((scope) =>
+    activeScope(
+      {
+        active: scope.active,
+        validFrom: scope.validFrom.toISOString(),
+        validUntil: scope.validUntil?.toISOString(),
+      },
+      now,
+    ),
+  );
+
+  // Sem vínculo operacional real do administrador, não inventamos uma organização.
+  if (!ownerScope) {
+    return undefined;
+  }
+
+  const existing = await prisma.user.findUnique({
+    where: { email },
+    include: { scopes: true },
+  });
+
+  const user = existing
+    ? await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          active: true,
+          name: identity.name ?? existing.name,
+          image: identity.image ?? existing.image,
+        },
+      })
+    : await prisma.user.create({
+        data: {
+          id: identity.id || randomUUID(),
+          email,
+          name: identity.name,
+          image: identity.image,
+          active: true,
+          prefTheme: "dark",
+          prefAnimations: true,
+          prefLanguage: "pt-BR",
+          prefFontSize: "media",
+        },
+      });
+
+  const activeExistingScope = existing?.scopes.find((scope) =>
+    activeScope(
+      {
+        active: scope.active,
+        validFrom: scope.validFrom.toISOString(),
+        validUntil: scope.validUntil?.toISOString(),
+      },
+      now,
+    ),
+  );
+
+  if (!activeExistingScope) {
+    await prisma.userScope.create({
+      data: {
+        userId: user.id,
+        organizationId: ownerScope.organizationId,
+        supplyClass: ownerScope.supplyClass,
+        role: "READ_ONLY",
+        validFrom: now,
+        active: true,
+      },
+    });
+  }
+
+  return resolveLocalAccess({ id: user.id, email: user.email, name: user.name, image: user.image }, now);
 }

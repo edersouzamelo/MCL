@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { completeOnboarding } from "@/app/actions/onboarding";
 import { useFormStatus } from "react-dom";
+import { BadgeCheck, Users } from "lucide-react";
+
+const VISITOR_PROFILE = "Visitante - 1º Congresso de Gestão da Cadeia de suprimento COLOG";
 
 const FUNCOES_RAE = [
   "Ordenador de Despesas (OD) / Agente Diretor",
@@ -14,6 +17,7 @@ const FUNCOES_RAE = [
   "Tesoureiro",
   "Gestor de Contratos",
   "Furriel / Auxiliar",
+  VISITOR_PROFILE,
 ];
 
 function SubmitButton() {
@@ -30,11 +34,12 @@ function SubmitButton() {
 }
 
 export default function OnboardingForm({ initialName }: { initialName: string }) {
-  const [oms, setOms] = useState<{ id: string; name: string }[]>([]);
+  const [oms, setOms] = useState<{ id: string; name: string; uasg?: string }[]>([]);
   const [omSearch, setOmSearch] = useState("");
   const [showOmDropdown, setShowOmDropdown] = useState(false);
   const [selectedOm, setSelectedOm] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [militaryRole, setMilitaryRole] = useState("");
 
   useEffect(() => {
     fetch("/api/oms")
@@ -43,10 +48,11 @@ export default function OnboardingForm({ initialName }: { initialName: string })
       .catch((err) => console.error("Failed to load OMs", err));
   }, []);
 
-  const filteredOms = oms.filter((om: any) =>
+  const filteredOms = oms.filter((om) =>
     om.name.toLowerCase().includes(omSearch.toLowerCase()) ||
     (om.uasg && om.uasg.includes(omSearch))
   );
+  const isCongressVisitor = militaryRole === VISITOR_PROFILE;
 
   return (
     <form action={completeOnboarding} className="space-y-6">
@@ -86,16 +92,18 @@ export default function OnboardingForm({ initialName }: { initialName: string })
 
       <div>
         <label htmlFor="militaryRole" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Função (RAE)
+          Função (RAE) / Perfil de acesso
         </label>
         <div className="mt-1">
           <select
             id="militaryRole"
             name="militaryRole"
             required
+            value={militaryRole}
+            onChange={(event) => setMilitaryRole(event.target.value)}
             className="block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
           >
-            <option value="" className="bg-white dark:bg-zinc-950">Selecione uma função...</option>
+            <option value="" className="bg-white dark:bg-zinc-950">Selecione uma função ou perfil...</option>
             {FUNCOES_RAE.map((funcao) => (
               <option key={funcao} value={funcao} className="bg-white dark:bg-zinc-950">
                 {funcao}
@@ -123,13 +131,13 @@ export default function OnboardingForm({ initialName }: { initialName: string })
             className="appearance-none block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-sm placeholder-zinc-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/40"
           />
           <input type="hidden" name="militaryOrganization" value={selectedOm} required />
-          
+
           {showOmDropdown && omSearch && (
             <div className="absolute z-20 mt-1.5 w-full bg-white dark:bg-zinc-950 shadow-2xl max-h-60 rounded-lg py-1 border border-zinc-200 dark:border-zinc-800 overflow-auto focus:outline-none sm:text-sm custom-scrollbar">
               {filteredOms.length === 0 ? (
                 <div className="px-4 py-2 text-zinc-500">Nenhuma OM encontrada</div>
               ) : (
-                filteredOms.map((om: any) => {
+                filteredOms.map((om) => {
                   const omLabel = om.uasg ? `${om.name} (UASG ${om.uasg})` : om.name;
                   return (
                     <div
@@ -201,6 +209,30 @@ export default function OnboardingForm({ initialName }: { initialName: string })
           </div>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setMilitaryRole(VISITOR_PROFILE)}
+        aria-pressed={isCongressVisitor}
+        className={`w-full rounded-xl border p-4 text-left transition-all ${
+          isCongressVisitor
+            ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40"
+            : "border-emerald-700/50 bg-emerald-950/20 hover:border-emerald-500 hover:bg-emerald-500/10"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-500">
+            {isCongressVisitor ? <BadgeCheck className="h-5 w-5" aria-hidden /> : <Users className="h-5 w-5" aria-hidden />}
+          </div>
+          <div>
+            <div className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-500">Perfil especial do evento</div>
+            <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-white">{VISITOR_PROFILE}</div>
+            <div className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+              Selecione esta opção se você está conhecendo o MCL durante o congresso. O perfil será identificado como VISITANTE no sistema.
+            </div>
+          </div>
+        </div>
+      </button>
 
       <div className="flex items-start mt-6">
         <div className="flex items-center h-5">

@@ -6,6 +6,8 @@ import { useSession, signOut } from "next-auth/react";
 import { LogOut, Settings2, SlidersHorizontal, User } from "lucide-react";
 import { useSettings, type FontSize, type Language } from "@/contexts/SettingsContext";
 
+const ADMIN_EMAIL = "edersouzamelo@gmail.com";
+
 export function UserSettingsMenu() {
   const { data: session } = useSession();
   const {
@@ -43,13 +45,21 @@ export function UserSettingsMenu() {
     font: language === "en" ? "Text size" : language === "es" ? "Tamaño del texto" : "Tamanho do texto",
     motion: language === "en" ? "Animations" : language === "es" ? "Animaciones" : "Animações",
   };
+  const isAdmin = session?.user?.email?.toLowerCase() === ADMIN_EMAIL;
+  const isVisitor = !isAdmin && (session?.user?.roles ?? []).includes("READ_ONLY");
 
   return (
     <div className="mcl-user-menu" ref={menuRef}>
       <div className="mcl-user-summary">
         <div>
           <strong>{session?.user?.name || "Operador Demonstrativo"}</strong>
-          <small>Cmdo 9º Gpt Log · UASG 160136</small>
+          {isVisitor ? (
+            <span className="mt-1 inline-flex w-fit rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold tracking-[0.16em] text-emerald-400">
+              VISITANTE
+            </span>
+          ) : (
+            <small>Cmdo 9º Gpt Log · UASG 160136</small>
+          )}
         </div>
         <button
           type="button"
@@ -123,7 +133,7 @@ export function UserSettingsMenu() {
           </section>
 
           <footer>
-            {session?.user?.email === "edersouzamelo@gmail.com" ? (
+            {isAdmin ? (
               <Link href="/admin/usuarios" onClick={() => setIsOpen(false)}>
                 <Settings2 aria-hidden />
                 Painel do administrador
