@@ -36,6 +36,11 @@ export default function AcquisitionsPage() {
     const { item, variant } = itemForVariant(state, need.itemVariantId);
     return {
       id: need.id,
+      persistentCode: need.persistentCode,
+      itemName: item?.name ?? "item",
+      variantLabel: variant?.size ?? variant?.label ?? "",
+      quantity: need.quantityApproved ?? need.quantityRequested,
+      status: need.status,
       label: `${need.persistentCode} - ${item?.name ?? "item"} ${variant?.size ?? ""}`.trim(),
     };
   });
@@ -47,37 +52,124 @@ export default function AcquisitionsPage() {
   return (
     <AppShell>
       <PageHeader
-        title="Aquisicoes"
-        description="Instrumentos sinteticos e dados publicos coletados do Compras.gov.br com origem, vigencia e vinculos manuais."
+        title="Aquisições"
+        description="Consulta CATMAT, confirmação humana, atas e ARP, unidades e saldos, síntese de cobertura e instrumentos vinculados."
         action={<InlineLink href="/conectores">Abrir conectores</InlineLink>}
       />
 
       <Card className="mb-4">
-        <h2 className="text-lg font-semibold">Vinculo manual para piloto</h2>
-        <p className="mt-1 text-sm text-zinc-600">
-          O vinculo indica potencial atendimento e depende de validacao humana; ele nao afirma aplicabilidade operacional.
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-400">
+              Fluxo de obtenção recuperado
+            </p>
+            <h2 className="mt-1 text-xl font-semibold">CATMAT, atas e cobertura orientada pela necessidade</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+              O fluxo preserva a sequência operacional do MCL: pesquisar o CATMAT, confirmar humanamente o item,
+              consultar atas vigentes, verificar unidades e saldos retornados pela fonte e registrar a possibilidade de cobertura.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <InlineLink href="/catalogo">Pesquisar CATMAT</InlineLink>
+            <InlineLink href="/necessidades">Abrir necessidades</InlineLink>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+            <span className="text-xs font-semibold text-zinc-500">01</span>
+            <h3 className="mt-1 font-semibold">CATMAT</h3>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">Busca no catálogo oficial e seleção de candidato.</p>
+          </div>
+          <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+            <span className="text-xs font-semibold text-zinc-500">02</span>
+            <h3 className="mt-1 font-semibold">Confirmação humana</h3>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">O candidato só vira mapeamento após confirmação intencional.</p>
+          </div>
+          <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+            <span className="text-xs font-semibold text-zinc-500">03</span>
+            <h3 className="mt-1 font-semibold">Atas e ARP</h3>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">Consulta atas vigentes somente para o CATMAT confirmado.</p>
+          </div>
+          <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+            <span className="text-xs font-semibold text-zinc-500">04</span>
+            <h3 className="mt-1 font-semibold">Unidades e saldos</h3>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">Exibe a resposta da fonte e a síntese determinística de cobertura.</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="mb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Retomar busca por necessidade</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Escolha uma necessidade para abrir diretamente o fluxo CATMAT, ARP e cobertura.
+            </p>
+          </div>
+          <Badge tone="info">{needs.length} necessidades</Badge>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {needs.map((need) => (
+            <div key={need.id} className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-zinc-500">{need.persistentCode}</p>
+                  <h3 className="mt-1 font-semibold">{need.itemName}</h3>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {need.variantLabel || "sem variante"} · quantidade {need.quantity}
+                  </p>
+                </div>
+                <Badge tone="neutral">{need.status}</Badge>
+              </div>
+              <div className="mt-4">
+                <InlineLink href={`/necessidades/${need.id}/buscar-cobertura`}>Buscar cobertura</InlineLink>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="mb-4">
+        <h2 className="text-lg font-semibold">Vínculo manual para piloto</h2>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          O vínculo indica potencial atendimento e depende de validação humana. Ele não afirma aplicabilidade operacional.
         </p>
         <div className="mt-4">
-          <AcquisitionLinkForm needs={needs} instruments={publicInstrumentOptions} />
+          <AcquisitionLinkForm
+            needs={needs.map(({ id, label }) => ({ id, label }))}
+            instruments={publicInstrumentOptions}
+          />
         </div>
       </Card>
 
       <Card>
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Instrumentos de aquisição registrados</h2>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Dados públicos coletados do Compras.gov.br e registros do piloto, sempre com origem identificada.
+            </p>
+          </div>
+          <Badge tone="neutral">{state.acquisitionInstruments.length} registros</Badge>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] text-left text-sm">
-            <thead className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
+            <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
               <tr>
-                <th className="py-2">Referencia</th>
+                <th className="py-2">Referência</th>
                 <th>Origem</th>
-                <th>Vigencia</th>
-                <th>Situacao</th>
+                <th>Vigência</th>
+                <th>Situação</th>
                 <th>Fornecedor</th>
                 <th>Item</th>
                 <th>Quantidade</th>
                 <th>Valor</th>
-                <th>Atualizacao</th>
-                <th>Confianca</th>
-                <th>Vinculos</th>
+                <th>Atualização</th>
+                <th>Confiança</th>
+                <th>Vínculos</th>
               </tr>
             </thead>
             <tbody>
@@ -91,7 +183,7 @@ export default function AcquisitionsPage() {
                 );
                 const origin = instrument.sourceOrigin ?? (instrument.sourceSystem === "SIM-AQUISICAO" ? "SINTETICO" : "PUBLICO");
                 return (
-                  <tr key={instrument.id} className="border-b border-zinc-100 align-top">
+                  <tr key={instrument.id} className="border-b border-zinc-100 align-top dark:border-zinc-900">
                     <td className="py-3">
                       <p className="font-semibold">{instrument.reference}</p>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">{instrument.externalReference ?? instrument.sourceRecordId}</p>
@@ -102,7 +194,7 @@ export default function AcquisitionsPage() {
                     <td>{instrument.supplierName ?? instrument.supplierNameSynthetic ?? "nao fornecido"}</td>
                     <td>
                       <p>{instrument.itemCode ?? "nao fornecido"}</p>
-                      <p className="max-w-xs text-xs text-zinc-600">{instrument.itemDescription ?? "Item sintetico do piloto"}</p>
+                      <p className="max-w-xs text-xs text-zinc-600 dark:text-zinc-400">{instrument.itemDescription ?? "Item sintetico do piloto"}</p>
                     </td>
                     <td>{instrument.quantity ?? instrument.capacity ?? "nao fornecido"}</td>
                     <td>{formatMoney(instrument.totalValue)}</td>
