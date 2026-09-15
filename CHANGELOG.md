@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-15
+
+- **Recuperação de Aquisições:** restaura na interface o acesso ao fluxo já existente de CATMAT, confirmação humana, atas/ARP, unidades/saldos e síntese de cobertura, preservando os vínculos manuais e instrumentos já existentes.
+- **Scanner QR:** recoloca o acesso visível ao scanner de unidades logísticas no menu principal, sem alterar o `ScannerClient`.
+
 ## v1.0.0 - 2026-07-03
 
 - **Persistência Real PostgreSQL/Prisma:** Integração completa com tabelas de análises de materiais no Neon/PostgreSQL local, com migrações, schema atualizado e inicialização preguiçosa robusta para testes.
