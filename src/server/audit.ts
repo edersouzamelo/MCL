@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { appendAuditLog } from "@/server/demo-store";
 
@@ -8,7 +9,7 @@ export type AuditEntryInput = {
   resourceType: string;
   resourceId: string;
   organizationId?: string | null;
-  outcome: string;
+  outcome: "SUCESSO" | "NEGADO" | "ERRO";
   reason: string;
   metadata?: Record<string, unknown>;
   userAgent?: string;
@@ -37,7 +38,7 @@ export async function recordAuditEvent(entry: AuditEntryInput) {
           userAgent,
           outcome: entry.outcome,
           reason: entry.reason,
-          metadata: entry.metadata ?? {},
+          metadata: (entry.metadata ?? {}) as Prisma.InputJsonObject,
         },
       });
     } catch (error) {
