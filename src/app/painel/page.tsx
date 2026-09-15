@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/AppShell";
-import { Badge, Card, InlineLink, MetricCard, PageHeader } from "@/components/ui";
-import { CoverageMetricsDashboard } from "@/components/CoverageMetricsDashboard";
-import { dashboardMetrics, itemForVariant, organizationName } from "@/modules/demo/selectors";
+import { Badge, Card, InlineLink, PageHeader } from "@/components/ui";
+import { PrduCoverageDashboard } from "@/components/PrduCoverageDashboard";
+import { itemForVariant, organizationName } from "@/modules/demo/selectors";
 import { getDemoState } from "@/server/demo-store";
 import { projectNeed } from "@/modules/events/projection";
 
@@ -9,9 +9,6 @@ export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
   const state = getDemoState();
-  const metrics = dashboardMetrics(state);
-  const mainNeed = state.needs[0];
-  const mainProjection = mainNeed ? projectNeed(mainNeed, state) : undefined;
 
   const tableRows = state.needs.map((need) => {
     const { item, variant } = itemForVariant(state, need.itemVariantId);
@@ -22,14 +19,12 @@ export default function DashboardPage() {
       : [];
     return {
       needId: need.id,
-      persistentCode: need.persistentCode,
       organization: organizationName(state, need.organizationId),
       material: `${item?.name ?? "Item"} ${variant?.label ?? ""}`.trim(),
       requested: need.quantityRequested,
       covered: projection.totalCovered,
       deficit: Math.max(0, need.quantityRequested - projection.totalCovered),
       coverage: projection.coveragePercent,
-      delivered: projection.deliveredPercent,
       catmatCode: mapping?.externalItemCode ?? "Pendente",
       atasCount: relatedAtas.length,
     };
@@ -41,48 +36,34 @@ export default function DashboardPage() {
   return (
     <AppShell>
       <PageHeader
-        title="Situacao geral da cadeia"
-        description="Visao consolidada do piloto em modo memoria: necessidades, cobertura, estoque rastreavel, CATMAT, atas e divergencias."
-        action={mainNeed ? <InlineLink href={`/necessidades/${mainNeed.id}/buscar-cobertura`}>Abrir cobertura CATMAT/ARP</InlineLink> : undefined}
+        title="Situação geral da cadeia"
+        description="Visão consolidada da posição logística. O primeiro bloco correlaciona necessidade de referência PRDU e estoque disponível; blocos demonstrativos remanescentes são explicitamente separados."
+        action={<InlineLink href="/importacao">Abrir Input</InlineLink>}
       />
 
-      <div className="mb-4">
-        <Badge tone="warn">Modo memoria seguro</Badge>
-      </div>
+      <PrduCoverageDashboard />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Necessidades" value={state.needs.length} detail="Demandas do piloto Classe II" />
-        <MetricCard label="Unidades rastreaveis" value={metrics.totalUnits} detail={`${metrics.deliveredUnits} entregues`} tone="good" />
-        <MetricCard label="Cobertura principal" value={mainProjection ? `${mainProjection.coveragePercent}%` : "0%"} detail="Estoque e vinculos conhecidos" tone="warn" />
-        <MetricCard label="Divergencias abertas" value={metrics.openDivergences} detail="Monitoramento operacional" tone={metrics.openDivergences ? "bad" : "good"} />
-      </div>
-
-      <section className="mt-6 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/60 rounded-xl p-5">
-        <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Cenário atual do piloto</h2>
-        <p className="mt-2 text-sm text-zinc-650 dark:text-zinc-300">
-          Necessidade ativa de demonstração: <strong className="font-bold text-zinc-900 dark:text-white">{mainNeed?.persistentCode ?? "sem necessidade ativa"}</strong>. O painel foi estabilizado para não depender de leitura direta do PostgreSQL enquanto a cadeia CATMAT é sincronizada.
-        </p>
-      </section>
-
-      <section className="mt-6">
-        <CoverageMetricsDashboard />
-      </section>
-
-      <section className="mt-6">
+      <section className="mt-8">
         <Card>
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Cobertura de aquisição por material</h2>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Acompanhamento da correlação CATMAT de necessidades com atas e saldos.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="warn">Demonstração</Badge>
+                <Badge tone="neutral">Piloto CATMAT/ARP</Badge>
+              </div>
+              <h2 className="mt-3 text-lg font-semibold text-zinc-900 dark:text-zinc-100">Cobertura de aquisição por material</h2>
+              <p className="mt-1 max-w-4xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                Esta seção preserva o piloto de correlação entre necessidades, CATMAT e atas. Os registros abaixo ainda vêm do estado demonstrativo em memória e não alimentam a cobertura PRDU exibida acima.
+              </p>
             </div>
             <Badge tone="info">{catmatMapped} CATMAT vinculados · {atasCount} atas</Badge>
           </div>
 
           <div className="mt-6 overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-zinc-50 dark:bg-zinc-950/50 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-455">
+              <thead className="border-b border-zinc-200 bg-zinc-50 text-xs uppercase text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/50">
                 <tr>
-                  <th className="py-2.5 px-3">Material</th>
+                  <th className="px-3 py-2.5">Material</th>
                   <th>Organização</th>
                   <th>Solicitado</th>
                   <th>Coberto</th>
@@ -95,24 +76,24 @@ export default function DashboardPage() {
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                 {tableRows.map((row) => (
-                  <tr key={row.needId} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/35 transition-colors duration-150">
-                    <td className="py-3 px-3 font-bold text-zinc-900 dark:text-zinc-100">{row.material}</td>
+                  <tr key={row.needId} className="transition-colors duration-150 hover:bg-zinc-50 dark:hover:bg-zinc-900/35">
+                    <td className="px-3 py-3 font-bold text-zinc-900 dark:text-zinc-100">{row.material}</td>
                     <td className="text-zinc-700 dark:text-zinc-300">{row.organization}</td>
                     <td className="text-zinc-800 dark:text-zinc-300">{row.requested}</td>
                     <td className="text-zinc-800 dark:text-zinc-300">{row.covered}</td>
                     <td className="font-extrabold text-rose-650 dark:text-rose-400">{row.deficit}</td>
                     <td>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                        row.catmatCode === "Pendente" 
-                          ? "bg-amber-500/10 text-amber-900 dark:text-amber-400 border-amber-500/20" 
-                          : "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/20"
+                      <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                        row.catmatCode === "Pendente"
+                          ? "border-amber-500/20 bg-amber-500/10 text-amber-900 dark:text-amber-400"
+                          : "border-emerald-500/20 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
                       }`}>
                         {row.catmatCode}
                       </span>
                     </td>
                     <td className="text-zinc-800 dark:text-zinc-300">{row.atasCount}</td>
                     <td className="font-medium text-zinc-900 dark:text-zinc-100">{row.coverage}%</td>
-                    <td className="py-3 px-3 text-right"><InlineLink href={`/necessidades/${row.needId}/buscar-cobertura`}>ABRIR ANÁLISE</InlineLink></td>
+                    <td className="px-3 py-3 text-right"><InlineLink href={`/necessidades/${row.needId}/buscar-cobertura`}>ABRIR ANÁLISE</InlineLink></td>
                   </tr>
                 ))}
               </tbody>
