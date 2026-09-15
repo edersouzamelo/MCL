@@ -3,9 +3,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import { timingSafeEqual } from "node:crypto";
-import { resolveLocalAccess } from "@/modules/auth/access";
+import { provisionGoogleVisitor, resolveLocalAccess } from "@/modules/auth/access";
 import { getAuthRuntimeConfiguration } from "@/modules/auth/config";
 import { appendAuditLog } from "@/server/demo-store";
+import { recordAuditEvent } from "@/server/audit";
 
 function optionalProviders() {
   const configuration = getAuthRuntimeConfiguration();
@@ -121,9 +122,19 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       try {
-        const access = await resolveLocalAccess(user);
+        let access = await resolveLocalAccess(user);
+
+        // Para o congresso, somente o provedor Google pode autoaprovisionar novos usuários.
+        // GitHub e credenciais locais preservam a política de vínculo prévio.
+        if (!access && account?.provider === "google") {
+          access = await provisionGoogleVisitor(user);
+        } else if (access && account?.provider === "google") {
+          // Reutiliza o aprovisionamento para atualizar nome/foto Google sem alterar escopos existentes.
+          access = (await provisionGoogleVisitor(user)) ?? access;
+        }
+
         if (!access) {
-          appendAuditLog({
+          await recordAuditEvent({
             actorId: "anonymous",
             action: "AUTH_LOGIN",
             resourceType: "SESSION",
@@ -134,9 +145,25 @@ export const authOptions: NextAuthOptions = {
           });
           return false;
         }
+
         Object.assign(user, access);
+        await recordAuditEvent({
+          actorId: access.id,
+          action: "AUTH_LOGIN",
+          resourceType: "SESSION",
+          resourceId: account?.provider ?? "desconhecido",
+          organizationId: access.organizationId,
+          outcome: "SUCESSO",
+          reason: "Identidade autenticada e vinculada ao MCL.",
+          metadata: {
+            provider: account?.provider ?? "desconhecido",
+            email: access.email ?? user.email ?? "nao-informado",
+            roles: access.roles,
+          },
+        });
         return true;
-      } catch {
+      } catch (error) {
+        console.error("MCL: falha no callback de autenticação.", error);
         return false;
       }
     },
