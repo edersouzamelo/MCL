@@ -26,6 +26,7 @@ export function PcaNeedsClient() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   async function load(selectedUasg = uasg, selectedYear = year) {
@@ -71,6 +72,7 @@ export function PcaNeedsClient() {
   async function synchronize() {
     setSyncing(true);
     setError(null);
+    setSyncResult(null);
     try {
       const response = await fetch("/api/necessidades/pca", {
         method: "POST",
@@ -80,6 +82,9 @@ export function PcaNeedsClient() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "A sincronização não foi concluída.");
       await load(uasg, year);
+      setSyncResult(payload.count > 0
+        ? `Sincronização concluída: ${payload.count} itens importados do PNCP.`
+        : "O PNCP respondeu, mas não devolveu itens para esta UASG e exercício.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "A sincronização não foi concluída.");
     } finally {
@@ -143,6 +148,7 @@ export function PcaNeedsClient() {
       </section>
 
       {error && <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">{error}</div>}
+      {syncResult && <div role="status" className="rounded-xl border border-sky-300 bg-sky-50 p-4 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">{syncResult}</div>}
 
       <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
         <div className="flex flex-col gap-3 border-b border-zinc-200 p-4 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">

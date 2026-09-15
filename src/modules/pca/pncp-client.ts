@@ -8,6 +8,49 @@ type PncpPage = {
   paginasRestantes?: number;
 };
 
+function flattenPcaRecords(records: PncpPcaRecord[], year: number) {
+  return records.flatMap((pca) => {
+    if (Number(pca.anoPca ?? pca.ano) !== year) return [];
+    const items = Array.isArray(pca.itens) ? pca.itens : [];
+    return items
+      .filter((item): item is PncpPcaRecord => Boolean(item) && typeof item === "object")
+      .map((item) => ({
+        ...item,
+        anoPca: pca.anoPca ?? pca.ano,
+        numeroControlePNCPPca: pca.idPcaPncp ?? pca.numeroControlePNCPPca,
+        dataPublicacaoPncp: pca.dataPublicacaoPNCP,
+        codigoUnidade: pca.codigoUnidade,
+        nomeUnidade: pca.nomeUnidade,
+        orgaoEntidadeCnpj: pca.orgaoEntidadeCnpj,
+      }));
+  });
+}
+
+async function readPncpPage(url: URL) {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { accept: "application/json", "user-agent": "MCL/1.0 (conector PCA)" },
+      signal: AbortSignal.timeout(25_000),
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new Error("O PNCP não respondeu em 25 segundos. Tente sincronizar novamente mais tarde.");
+    }
+    throw new Error("Não foi possível conectar ao PNCP neste momento.");
+  }
+  if (response.status === 204) return { data: [], totalPages: 1 };
+  if (!response.ok) throw new Error(`PNCP respondeu HTTP ${response.status} ao consultar o PCA.`);
+  const payload = await response.json() as PncpPage | PncpPcaRecord[];
+  return {
+    data: Array.isArray(payload) ? payload : payload.data ?? [],
+    totalPages: Array.isArray(payload)
+      ? 1
+      : payload.totalPaginas ?? (payload.paginasRestantes ? Number(url.searchParams.get("pagina")) + payload.paginasRestantes : Number(url.searchParams.get("pagina"))),
+  };
+}
+
 export async function fetchPncpPcaByUser(input: {
   year: number;
   pncpUserId: number;
@@ -83,16 +126,9 @@ export async function fetchPncpPcaByUasg(input: { year: number; uasg: string; cn
       url.searchParams.set("tamanhoPagina", "500");
       url.searchParams.set("cnpj", cnpj);
 
-      const response = await fetch(url, {
-        headers: { accept: "application/json", "user-agent": "MCL/1.0 (conector PCA)" },
-        signal: AbortSignal.timeout(25_000),
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error(`PNCP respondeu HTTP ${response.status} ao consultar o PCA.`);
-      const payload = await response.json() as PncpPage | PncpPcaRecord[];
-      const data = Array.isArray(payload) ? payload : payload.data ?? [];
-      records.push(...data.filter((record) => Number(record.anoPca ?? record.ano) === input.year));
-      totalPages = Array.isArray(payload) ? 1 : payload.totalPaginas ?? (payload.paginasRestantes ? page + payload.paginasRestantes : page);
+      const result = await readPncpPage(url);
+      records.push(...flattenPcaRecords(result.data, input.year));
+      totalPages = result.totalPages;
       page += 1;
     } while (page <= totalPages && page <= 200);
   }
