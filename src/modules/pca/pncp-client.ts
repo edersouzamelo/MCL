@@ -62,6 +62,10 @@ function dateWindows(start: Date, end: Date) {
 }
 
 export async function fetchPncpPcaByUasg(input: { year: number; uasg: string; cnpj?: string | null }) {
+  const cnpj = input.cnpj?.replace(/\D/g, "");
+  if (!cnpj || cnpj.length !== 14) {
+    throw new Error("O PNCP exige o CNPJ do órgão para consultar o PCA por UASG.");
+  }
   const today = new Date();
   const end = today < new Date(`${input.year}-12-31T23:59:59Z`) ? today : new Date(`${input.year}-12-31T23:59:59Z`);
   const start = new Date(`${input.year - 1}-01-01T00:00:00Z`);
@@ -77,7 +81,7 @@ export async function fetchPncpPcaByUasg(input: { year: number; uasg: string; cn
       url.searchParams.set("codigoUnidade", input.uasg);
       url.searchParams.set("pagina", String(page));
       url.searchParams.set("tamanhoPagina", "500");
-      if (input.cnpj) url.searchParams.set("cnpj", input.cnpj.replace(/\D/g, ""));
+      url.searchParams.set("cnpj", cnpj);
 
       const response = await fetch(url, {
         headers: { accept: "application/json", "user-agent": "MCL/1.0 (conector PCA)" },

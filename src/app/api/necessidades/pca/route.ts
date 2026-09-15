@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         superiorUasg: organization.id === current.id ? null : current.uasg,
       }));
     return NextResponse.json({
-      unit: { id: target.id, name: target.name, uasg: target.uasg, configured: Boolean(target.uasg) },
+      unit: { id: target.id, name: target.name, uasg: target.uasg, configured: Boolean(target.uasg && target.pncpCnpj) },
       userUnit: { id: current.id, name: current.name, uasg: current.uasg },
       units: suggestPcaUnits(unitDirectory, current.uasg),
       year,

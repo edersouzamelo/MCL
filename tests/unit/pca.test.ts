@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePncpPcaRecord } from "@/modules/pca/pncp-client";
+import { fetchPncpPcaByUasg, normalizePncpPcaRecord } from "@/modules/pca/pncp-client";
 import { suggestPcaUnits } from "@/modules/pca/unit-suggestions";
 
 describe("PCA do PNCP", () => {
@@ -31,5 +31,10 @@ describe("PCA do PNCP", () => {
     expect(units.findIndex((unit) => unit.reason === "OTHER")).toBeGreaterThan(
       units.findIndex((unit) => unit.reason === "SUBORDINATE"),
     );
+  });
+
+  it("recusa consulta por UASG sem o CNPJ obrigatório do órgão", async () => {
+    await expect(fetchPncpPcaByUasg({ year: 2026, uasg: "160136" }))
+      .rejects.toThrow("O PNCP exige o CNPJ do órgão");
   });
 });

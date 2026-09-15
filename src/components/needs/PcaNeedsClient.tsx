@@ -138,7 +138,7 @@ export function PcaNeedsClient() {
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-500">
           <span>Fonte oficial: PNCP</span>
           <span>{data?.lastSynchronizedAt ? `Atualizado em ${new Date(data.lastSynchronizedAt).toLocaleString("pt-BR")}` : "Ainda não sincronizado"}</span>
-          {data && !data.unit.configured && <span className="font-semibold text-amber-700 dark:text-amber-400">UASG da organização pendente</span>}
+          {data && !data.unit.configured && <span className="font-semibold text-amber-700 dark:text-amber-400">UASG ou CNPJ do órgão pendente no cadastro</span>}
         </div>
       </section>
 

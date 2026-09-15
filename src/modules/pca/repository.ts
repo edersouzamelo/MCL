@@ -30,6 +30,7 @@ export async function syncPcaItems(organizationId: string, year: number) {
   const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
   if (!organization) throw new Error("Organização não localizada.");
   if (!organization.uasg) throw new Error("A organização ainda não possui UASG vinculada no MCL.");
+  if (!organization.pncpCnpj) throw new Error("Cadastre o CNPJ do órgão da organização antes de sincronizar o PCA com o PNCP.");
 
   const records = await fetchPncpPcaByUasg({ year, uasg: organization.uasg, cnpj: organization.pncpCnpj });
   const normalized = records.map(normalizePncpPcaRecord);
