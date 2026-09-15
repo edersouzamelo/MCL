@@ -48,6 +48,7 @@ const navigation = [
       { href: "/creditos", label: "Créditos", icon: Wallet },
       { href: "/aquisicoes", label: "Aquisições", icon: Landmark },
       { href: "/recebimento", label: "Recebimento", icon: PackageCheck },
+      { href: "/scanner", label: "Scanner QR", icon: QrCode },
       { href: "/armazenagem", label: "Armazenagem", icon: Warehouse },
       { href: "/entrega", label: "Entrega", icon: Truck },
       { href: "/manutencao", label: "Manutenção", icon: Wrench },
