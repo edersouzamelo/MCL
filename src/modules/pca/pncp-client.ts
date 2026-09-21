@@ -105,6 +105,12 @@ function text(record: PncpPcaRecord, ...keys: string[]) {
 }
 
 function number(record: PncpPcaRecord, ...keys: string[]) {
+  // JSON numbers already use a decimal point; never apply Brazilian string formatting.
+  for (const key of keys) {
+    const raw = record[key];
+    if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+    if (typeof raw === "string" && raw.trim()) break;
+  }
   const value = text(record, ...keys);
   if (!value) return null;
   const normalized = value.replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".");
