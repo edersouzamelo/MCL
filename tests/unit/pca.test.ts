@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchPncpPcaByUasg, normalizePncpPcaRecord } from "@/modules/pca/pncp-client";
 import { suggestPcaUnits } from "@/modules/pca/unit-suggestions";
 
@@ -38,27 +38,36 @@ describe("PCA do PNCP", () => {
       .rejects.toThrow("O PNCP exige o CNPJ do órgão");
   });
 
-  it("extrai os itens aninhados do PCA retornado pelo PNCP", async () => {
-    const originalFetch = global.fetch;
-    global.fetch = (async () => new Response(JSON.stringify({
-      data: [{
-        anoPca: 2026,
-        idPcaPncp: "09549370000157-0-000001/2026",
-        codigoUnidade: "160136",
-        itens: [{ numeroItem: 7, codigoItem: "123456", descricaoItem: "Coturno operacional" }],
-      }],
-      totalPaginas: 1,
-    }))) as typeof fetch;
-    try {
-      const records = await fetchPncpPcaByUasg({ year: 2026, uasg: "160136", cnpj: "09549370000157" });
-      expect(records).toHaveLength(1);
-      expect(records[0]).toMatchObject({
-        numeroItem: 7,
-        descricaoItem: "Coturno operacional",
-        numeroControlePNCPPca: "09549370000157-0-000001/2026",
-      });
-    } finally {
-      global.fetch = originalFetch;
-    }
+  afterEach(() => vi.unstubAllGlobals());
+
+  const officialItem = { numeroItem: 7, descricao: "Coturno operacional", codigoItem: "123456",
+    codigoUnidade: "160136", cnpj: "00394452000103", anoPca: 2026, sequencialPca: 392 };
+
+  it("consulta diretamente o plano da UASG e conserva a identidade do item", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ sequencialPlano: 392 }))
+      .mockResolvedValueOnce(Response.json({ uasg: "160136", itens: [officialItem] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const records = await fetchPncpPcaByUasg({ year: 2026, uasg: "160136", cnpj: "00394452000103" });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/160136/2026/sequenciaisplano");
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/2026/392/itens/plano");
+    expect(records).toHaveLength(1);
+    const normalized = normalizePncpPcaRecord(records[0], 0);
+    expect(normalized.pncpItemId).toBe("00394452000103-0-000392/2026:7");
+    expect(normalized.description).toBe("Coturno operacional");
+  });
+
+  it("recusa resposta incompleta em vez de apagar o banco local", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ sequencialPlano: 392 }))
+      .mockResolvedValueOnce(Response.json({ uasg: "160136" })));
+    await expect(fetchPncpPcaByUasg({ year: 2026, uasg: "160136", cnpj: "00394452000103" }))
+      .rejects.toThrow("plano incompleto");
+  });
+
+  it("recusa itens de outra unidade", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ sequencialPlano: 392 }))
+      .mockResolvedValueOnce(Response.json({ uasg: "160136", itens: [{ ...officialItem, codigoUnidade: "160999" }] })));
+    await expect(fetchPncpPcaByUasg({ year: 2026, uasg: "160136", cnpj: "00394452000103" }))
+      .rejects.toThrow("itens inconsistentes");
   });
 });
