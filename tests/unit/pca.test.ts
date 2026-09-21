@@ -38,6 +38,12 @@ describe("PCA do PNCP", () => {
       .rejects.toThrow("O PNCP exige o CNPJ do órgão");
   });
 
+  it("preserva números JSON com três casas decimais", () => {
+    const item = normalizePncpPcaRecord({ valorUnitario: 0.535, valorTotal: 4530.816 }, 0);
+    expect(item.estimatedUnitValue).toBe(0.535);
+    expect(item.estimatedTotalValue).toBe(4530.816);
+  });
+
   afterEach(() => vi.unstubAllGlobals());
 
   const officialItem = { numeroItem: 7, descricao: "Coturno operacional", codigoItem: "123456",
