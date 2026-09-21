@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/server/db";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { fetchPncpPcaByUasg, normalizePncpPcaRecord } from "@/modules/pca/pncp-client";
 import type { PcaItemView } from "@/modules/pca/contracts";
 
@@ -38,15 +39,26 @@ export async function syncPcaItems(organizationId: string, year: number) {
 
   await prisma.$transaction(async (tx) => {
     await tx.pcaItem.updateMany({ where: { organizationId, year }, data: { active: false } });
-    for (const item of normalized) {
-      const persisted = { ...item, rawPayload: item.rawPayload as Prisma.InputJsonValue };
-      await tx.pcaItem.upsert({
-        where: { organizationId_year_pncpItemId: { organizationId, year, pncpItemId: item.pncpItemId } },
-        create: { organizationId, year, ...persisted, synchronizedAt, active: true },
-        update: { ...persisted, synchronizedAt, active: true },
-      });
+    // Bulk upsert keeps item identities and avoids thousands of database round trips.
+    const columns = ["pncpItemId", "pncpControlNumber", "itemNumber", "catalogCode", "catalogType",
+      "description", "unit", "estimatedQuantity", "estimatedUnitValue", "estimatedTotalValue",
+      "expectedContractingDate", "category", "classificationCode", "sourceUpdatedAt", "sourceUrl"] as const;
+    const quoted = (name: string) => Prisma.raw(`"${name}"`);
+    for (let offset = 0; offset < normalized.length; offset += 250) {
+      const rows = normalized.slice(offset, offset + 250).map((item) => Prisma.sql`(
+        ${randomUUID()}, ${organizationId}, ${year},
+        ${Prisma.join(columns.map((column) => item[column]))},
+        ${JSON.stringify(item.rawPayload)}::jsonb, ${synchronizedAt}, true
+      )`);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "PcaItem" ("id", "organizationId", "year", ${Prisma.join(columns.map(quoted))},
+          "rawPayload", "synchronizedAt", "active") VALUES ${Prisma.join(rows)}
+        ON CONFLICT ("organizationId", "year", "pncpItemId") DO UPDATE SET
+          ${Prisma.join([...columns, "rawPayload", "synchronizedAt", "active"].map((column) =>
+            Prisma.sql`${quoted(column)} = EXCLUDED.${quoted(column)}`))}
+      `);
     }
-  });
+  }, { timeout: 60_000 });
 
   return { count: normalized.length, synchronizedAt: synchronizedAt.toISOString() };
 }
