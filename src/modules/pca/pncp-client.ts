@@ -8,47 +8,23 @@ type PncpPage = {
   paginasRestantes?: number;
 };
 
-function flattenPcaRecords(records: PncpPcaRecord[], year: number) {
-  return records.flatMap((pca) => {
-    if (Number(pca.anoPca ?? pca.ano) !== year) return [];
-    const items = Array.isArray(pca.itens) ? pca.itens : [];
-    return items
-      .filter((item): item is PncpPcaRecord => Boolean(item) && typeof item === "object")
-      .map((item) => ({
-        ...item,
-        anoPca: pca.anoPca ?? pca.ano,
-        numeroControlePNCPPca: pca.idPcaPncp ?? pca.numeroControlePNCPPca,
-        dataPublicacaoPncp: pca.dataPublicacaoPNCP,
-        codigoUnidade: pca.codigoUnidade,
-        nomeUnidade: pca.nomeUnidade,
-        orgaoEntidadeCnpj: pca.orgaoEntidadeCnpj,
-      }));
-  });
-}
-
-async function readPncpPage(url: URL) {
+async function readPncpJson(url: URL): Promise<unknown> {
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: { accept: "application/json", "user-agent": "MCL/1.0 (conector PCA)" },
+      headers: { accept: "application/json" },
       signal: AbortSignal.timeout(25_000),
       cache: "no-store",
     });
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new Error("O PNCP não respondeu em 25 segundos. Tente sincronizar novamente mais tarde.");
+      throw new Error("O PNCP não respondeu em 25 segundos. Os dados já armazenados foram preservados.");
     }
     throw new Error("Não foi possível conectar ao PNCP neste momento.");
   }
-  if (response.status === 204) return { data: [], totalPages: 1 };
+  if (response.status === 204) return null;
   if (!response.ok) throw new Error(`PNCP respondeu HTTP ${response.status} ao consultar o PCA.`);
-  const payload = await response.json() as PncpPage | PncpPcaRecord[];
-  return {
-    data: Array.isArray(payload) ? payload : payload.data ?? [],
-    totalPages: Array.isArray(payload)
-      ? 1
-      : payload.totalPaginas ?? (payload.paginasRestantes ? Number(url.searchParams.get("pagina")) + payload.paginasRestantes : Number(url.searchParams.get("pagina"))),
-  };
+  return response.json();
 }
 
 export async function fetchPncpPcaByUser(input: {
@@ -89,51 +65,34 @@ export async function fetchPncpPcaByUser(input: {
   return records;
 }
 
-function yyyymmdd(date: Date) {
-  return date.toISOString().slice(0, 10).replaceAll("-", "");
-}
-
-function dateWindows(start: Date, end: Date) {
-  const windows: Array<[Date, Date]> = [];
-  let cursor = start;
-  while (cursor <= end) {
-    const finish = new Date(Math.min(end.getTime(), cursor.getTime() + 364 * 86_400_000));
-    windows.push([cursor, finish]);
-    cursor = new Date(finish.getTime() + 86_400_000);
-  }
-  return windows;
-}
-
 export async function fetchPncpPcaByUasg(input: { year: number; uasg: string; cnpj?: string | null }) {
   const cnpj = input.cnpj?.replace(/\D/g, "");
   if (!cnpj || cnpj.length !== 14) {
     throw new Error("O PNCP exige o CNPJ do órgão para consultar o PCA por UASG.");
   }
-  const today = new Date();
-  const end = today < new Date(`${input.year}-12-31T23:59:59Z`) ? today : new Date(`${input.year}-12-31T23:59:59Z`);
-  const start = new Date(`${input.year - 1}-01-01T00:00:00Z`);
-  const records: PncpPcaRecord[] = [];
-
-  for (const [dataInicio, dataFim] of dateWindows(start, end)) {
-    let page = 1;
-    let totalPages = 1;
-    do {
-      const url = new URL(`${PNCP_BASE_URL}/pca/atualizacao`);
-      url.searchParams.set("dataInicio", yyyymmdd(dataInicio));
-      url.searchParams.set("dataFim", yyyymmdd(dataFim));
-      url.searchParams.set("codigoUnidade", input.uasg);
-      url.searchParams.set("pagina", String(page));
-      url.searchParams.set("tamanhoPagina", "500");
-      url.searchParams.set("cnpj", cnpj);
-
-      const result = await readPncpPage(url);
-      records.push(...flattenPcaRecords(result.data, input.year));
-      totalPages = result.totalPages;
-      page += 1;
-    } while (page <= totalPages && page <= 200);
+  const base = `https://pncp.gov.br/pncp-api/v1/orgaos/${cnpj}/pca`;
+  const sequence = await readPncpJson(new URL(`${base}/${encodeURIComponent(input.uasg)}/${input.year}/sequenciaisplano`)) as { sequencialPlano?: number } | null;
+  if (sequence === null) return [];
+  if (!Number.isInteger(sequence.sequencialPlano) || Number(sequence.sequencialPlano) < 1) {
+    throw new Error("O PNCP retornou uma identificação de plano inválida. Os dados anteriores foram preservados.");
   }
-
-  return [...new Map(records.map((record, index) => [normalizePncpPcaRecord(record, index).pncpItemId, record])).values()];
+  const plan = await readPncpJson(new URL(`${base}/${input.year}/${sequence.sequencialPlano}/itens/plano`)) as { uasg?: string; itens?: PncpPcaRecord[] } | null;
+  if (!plan || plan.uasg !== input.uasg || !Array.isArray(plan.itens)) {
+    throw new Error("O PNCP retornou um plano incompleto ou de outra UASG. Os dados anteriores foram preservados.");
+  }
+  const controlNumber = `${cnpj}-0-${String(sequence.sequencialPlano).padStart(6, "0")}/${input.year}`;
+  const seen = new Set<number>();
+  return plan.itens.map((item) => {
+    if (!item || item.codigoUnidade !== input.uasg || item.cnpj !== cnpj ||
+        Number(item.anoPca) !== input.year || Number(item.sequencialPca) !== sequence.sequencialPlano ||
+        !Number.isInteger(item.numeroItem) || seen.has(Number(item.numeroItem))) {
+      throw new Error("O PNCP retornou itens inconsistentes. Os dados anteriores foram preservados.");
+    }
+    seen.add(Number(item.numeroItem));
+    return { ...item, numeroControlePNCPPca: controlNumber,
+      idItemPca: `${controlNumber}:${item.numeroItem}`,
+      sourceUrl: `https://pncp.gov.br/app/pca/${cnpj}/${input.year}/${sequence.sequencialPlano}` };
+  });
 }
 
 function text(record: PncpPcaRecord, ...keys: string[]) {
@@ -181,9 +140,9 @@ export function normalizePncpPcaRecord(record: PncpPcaRecord, index: number) {
     estimatedTotalValue: number(record, "valorTotal", "valorTotalEstimado"),
     expectedContractingDate: date(record, "dataDesejada", "dataEstimadaContratacao", "dataPrevistaContratacao"),
     category: text(record, "categoriaItemPcaNome", "categoriaItemPca"),
-    classificationCode: text(record, "codigoClassificacaoSuperior", "codigoGrupo"),
+    classificationCode: text(record, "classificacaoSuperiorCodigo", "codigoClassificacaoSuperior", "codigoGrupo"),
     sourceUpdatedAt: date(record, "dataAtualizacao", "dataPublicacaoPncp"),
-    sourceUrl: controlNumber ? `https://pncp.gov.br/pca/${encodeURIComponent(controlNumber)}` : null,
+    sourceUrl: text(record, "sourceUrl") ?? (controlNumber ? `https://pncp.gov.br/pca/${encodeURIComponent(controlNumber)}` : null),
     rawPayload: record,
   };
 }
