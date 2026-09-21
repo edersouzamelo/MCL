@@ -6,6 +6,7 @@ import { suggestPcaUnits } from "@/modules/pca/unit-suggestions";
 import { listPcaItems, syncPcaItems } from "@/modules/pca/repository";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 function validYear(value: string | null) {
   const year = Number(value);
