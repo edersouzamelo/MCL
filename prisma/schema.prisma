@@ -161,6 +161,9 @@ model PcaItem {
   @@unique([organizationId, year, pncpItemId])
   @@index([organizationId, year, active])
   @@index([catalogCode])
+  pgcData                    Json?
+  pgcSynchronizedAt          DateTime?
+
 }
 
 model FinancialSourceImport {
