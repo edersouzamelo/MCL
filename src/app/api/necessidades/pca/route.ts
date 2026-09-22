@@ -3,10 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
 import { prisma } from "@/server/db";
 import { suggestPcaUnits } from "@/modules/pca/unit-suggestions";
-import { listPcaItems, syncPcaItems } from "@/modules/pca/repository";
+import { listPcaItems, syncPcaItems, getPcaItemDetails, syncPgcItems } from "@/modules/pca/repository";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 180;
 
 function validYear(value: string | null) {
   const year = Number(value);
@@ -36,6 +36,8 @@ export async function GET(request: Request) {
 
   try {
     const { current, target } = await contextFor(session.user.organizationId, url.searchParams.get("uasg"));
+    const itemId = url.searchParams.get("itemId");
+    if (itemId) return NextResponse.json({ item: await getPcaItemDetails(target.id, year, itemId) });
     const items = await listPcaItems(target.id, year);
     const scopedOrganizations = await prisma.organization.findMany({
       where: { active: true, OR: [{ id: current.id }, { parentId: current.id }] },
@@ -71,12 +73,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Permissão de gestor obrigatória para sincronizar o PCA." }, { status: 403 });
   }
 
-  const body = await request.json().catch(() => ({})) as { uasg?: string; year?: number };
+  const body = await request.json().catch(() => ({})) as { uasg?: string; year?: number; source?: string };
   const year = validYear(body.year == null ? null : String(body.year));
   if (!year) return NextResponse.json({ error: "Exercício inválido." }, { status: 400 });
   try {
     const { target } = await contextFor(session.user.organizationId, body.uasg);
-    const result = await syncPcaItems(target.id, year);
+    const result = body.source === "pgc" ? await syncPgcItems(target.id, year) : await syncPcaItems(target.id, year);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Falha ao sincronizar o PCA." }, { status: 422 });
