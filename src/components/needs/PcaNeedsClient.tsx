@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Building2, CalendarDays, Check, ChevronDown, Database, RefreshCw, Search } from "lucide-react";
 import type { PcaItemView, PcaUnitOption } from "@/modules/pca/contracts";
+
+import { PcaItemDetails } from "@/components/needs/PcaItemDetails";
 
 type PcaPayload = {
   unit: { id: string; name: string; uasg: string | null; configured: boolean };
@@ -25,12 +27,14 @@ export function PcaNeedsClient() {
   const [unitOpen, setUnitOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   async function load(selectedUasg = uasg, selectedYear = year) {
     setLoading(true);
+    setExpandedId(null);
     setError(null);
     const params = new URLSearchParams({ year: String(selectedYear) });
     if (selectedUasg) params.set("uasg", selectedUasg);
@@ -69,7 +73,7 @@ export function PcaNeedsClient() {
     return (data?.items ?? []).filter((item) => !normalized || `${item.description} ${item.catalogCode ?? ""} ${item.category ?? ""}`.toLocaleLowerCase("pt-BR").includes(normalized));
   }, [data?.items, query]);
 
-  async function synchronize() {
+  async function synchronize(source = "pncp") {
     setSyncing(true);
     setError(null);
     setSyncResult(null);
@@ -77,12 +81,12 @@ export function PcaNeedsClient() {
       const response = await fetch("/api/necessidades/pca", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ uasg, year }),
+        body: JSON.stringify({ uasg, year, source }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "A sincronização não foi concluída.");
       await load(uasg, year);
-      setSyncResult(payload.count > 0
+      setSyncResult(source === "pgc" ? `PGC consultado: ${payload.count} de ${payload.total} itens com dados de DFD vinculados. ${payload.conflicts ?? 0} conflitos de catálogo não vinculados.` : payload.count > 0
         ? `Sincronização concluída: ${payload.count} itens importados do PNCP.`
         : "O PNCP respondeu, mas não devolveu itens para esta UASG e exercício.");
     } catch (cause) {
@@ -111,7 +115,7 @@ export function PcaNeedsClient() {
         <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_150px_auto] lg:items-end">
           <div ref={pickerRef} className="relative">
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-zinc-500">Organização</label>
-            <button onClick={() => setUnitOpen((open) => !open)} className="flex min-h-11 w-full items-center justify-between rounded-lg border border-zinc-300 bg-white px-3 text-left text-sm dark:border-zinc-700 dark:bg-zinc-950">
+            <button disabled={syncing} onClick={() => setUnitOpen((open) => !open)} className="flex min-h-11 w-full items-center justify-between rounded-lg border border-zinc-300 bg-white px-3 text-left text-sm dark:border-zinc-700 dark:bg-zinc-950">
               <span className="flex min-w-0 items-center gap-2"><Building2 className="h-4 w-4 shrink-0 text-sky-600"/><span className="truncate">{selectedUnit?.name ?? data?.unit.name ?? "Unidade do usuário"}</span></span>
               <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500"/>
             </button>
@@ -136,12 +140,13 @@ export function PcaNeedsClient() {
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-zinc-500">Exercício</label>
-            <div className="flex min-h-11 items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950"><CalendarDays className="h-4 w-4 text-zinc-500"/><select value={year} onChange={(event) => { const next = Number(event.target.value); setYear(next); void load(uasg, next); }} className="w-full bg-transparent text-sm outline-none">{[year - 1, year, year + 1].map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
+            <div className="flex min-h-11 items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 dark:border-zinc-700 dark:bg-zinc-950"><CalendarDays className="h-4 w-4 text-zinc-500"/><select disabled={syncing} value={year} onChange={(event) => { const next = Number(event.target.value); setYear(next); void load(uasg, next); }} className="w-full bg-transparent text-sm outline-none">{[year - 1, year, year + 1].map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
           </div>
-          <button disabled={syncing || loading} onClick={synchronize} className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-sky-700 px-4 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:text-sky-400 dark:hover:bg-sky-950/30"><RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}/>{syncing ? "Sincronizando" : "Sincronizar PNCP"}</button>
+          <button disabled={syncing || loading} onClick={() => void synchronize()} className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-sky-700 px-4 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:text-sky-400 dark:hover:bg-sky-950/30"><RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}/>{syncing ? "Sincronizando" : "Sincronizar PNCP"}</button>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-500">
-          <span>Fonte oficial: PNCP</span>
+          <button disabled={syncing || loading} onClick={() => void synchronize("pgc")} className="font-semibold text-sky-700 underline disabled:opacity-50 dark:text-sky-400">{syncing ? "Aguarde a sincronização…" : "Atualizar DFDs (Compras.gov.br)"}</button>
+          <span>Fonte do PCA: PNCP</span>
           <span>{data?.lastSynchronizedAt ? `Atualizado em ${new Date(data.lastSynchronizedAt).toLocaleString("pt-BR")}` : "Ainda não sincronizado"}</span>
           {data && !data.unit.configured && <span className="font-semibold text-amber-700 dark:text-amber-400">UASG ou CNPJ do órgão pendente no cadastro</span>}
         </div>
@@ -153,12 +158,12 @@ export function PcaNeedsClient() {
       <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60">
         <div className="flex flex-col gap-3 border-b border-zinc-200 p-4 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
           <div><h2 className="font-bold text-zinc-950 dark:text-zinc-50">PCA da organização</h2><p className="text-xs text-zinc-500">{visibleItems.length} de {data?.items.length ?? 0} itens</p></div>
-          <div className="flex items-center gap-2 rounded-lg bg-zinc-100 px-3 dark:bg-zinc-950"><Search className="h-4 w-4 text-zinc-500"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar descrição ou CATMAT" className="h-10 w-full bg-transparent text-sm outline-none sm:w-72"/></div>
+          <div className="flex items-center gap-2 rounded-lg bg-zinc-100 px-3 dark:bg-zinc-950"><Search className="h-4 w-4 text-zinc-500"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar descrição, CATMAT ou CATSER" className="h-10 w-full bg-transparent text-sm outline-none sm:w-72"/></div>
         </div>
         {loading ? (
           <div className="p-12 text-center text-sm text-zinc-500">Consultando o banco do PCA…</div>
         ) : visibleItems.length ? (
-          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-950/60"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Descrição</th><th className="px-4 py-3">Código</th><th className="px-4 py-3 text-right">Quantidade</th><th className="px-4 py-3 text-right">Valor estimado</th><th className="px-4 py-3">Previsão</th></tr></thead><tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">{visibleItems.map((item) => <tr key={item.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-950/40"><td className="px-4 py-3 text-zinc-500">{item.itemNumber ?? "—"}</td><td className="max-w-xl px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{item.description}</td><td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{item.catalogCode ?? "Não informado"}</td><td className="px-4 py-3 text-right">{item.estimatedQuantity ?? "—"} {item.unit}</td><td className="px-4 py-3 text-right">{item.estimatedTotalValue ? currency.format(Number(item.estimatedTotalValue)) : "—"}</td><td className="px-4 py-3">{item.expectedContractingDate ? new Date(item.expectedContractingDate).toLocaleDateString("pt-BR") : "—"}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-950/60"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Descrição</th><th className="px-4 py-3">Código</th><th className="px-4 py-3 text-right">Quantidade</th><th className="px-4 py-3 text-right">Valor estimado</th><th className="px-4 py-3">Previsão</th></tr></thead><tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">{visibleItems.map((item) => <Fragment key={item.id}><tr className="hover:bg-zinc-50 dark:hover:bg-zinc-950/40"><td className="px-4 py-3 text-zinc-500">{item.itemNumber ?? "—"}</td><td className="max-w-xl px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{item.description}<button aria-expanded={expandedId === item.id} aria-controls={`details-${item.id}`} onClick={() => setExpandedId(expandedId === item.id ? null : item.id)} className="mt-2 flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline dark:text-sky-400"><ChevronDown className={`h-3 w-3 transition-transform ${expandedId === item.id ? "rotate-180" : ""}`}/>{expandedId === item.id ? "Recolher detalhes" : "Detalhes do item e DFD"}</button></td><td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{item.catalogCode ?? "Não informado"}</td><td className="px-4 py-3 text-right">{item.estimatedQuantity ?? "—"} {item.unit}</td><td className="px-4 py-3 text-right">{item.estimatedTotalValue ? currency.format(Number(item.estimatedTotalValue)) : "—"}</td><td className="px-4 py-3">{item.expectedContractingDate ? item.expectedContractingDate.slice(0, 10).split("-").reverse().join("/") : "—"}</td></tr>{expandedId === item.id && <tr id={`details-${item.id}`}><td colSpan={6}><PcaItemDetails key={item.id} id={item.id} uasg={uasg} year={year}/></td></tr>}</Fragment>)}</tbody></table></div>
         ) : (
           <div className="flex flex-col items-center p-12 text-center"><Database className="h-9 w-9 text-zinc-400"/><h3 className="mt-3 font-bold text-zinc-900 dark:text-zinc-100">Nenhum item do PCA armazenado</h3><p className="mt-1 max-w-lg text-sm text-zinc-500">Sincronize esta UASG com o PNCP. Se a fonte não devolver registros, o MCL preservará a lacuna em vez de exibir dados demonstrativos como oficiais.</p></div>
         )}
