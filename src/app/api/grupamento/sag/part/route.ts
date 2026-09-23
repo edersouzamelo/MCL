@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
-import { parseCurrentSagPdf } from "@/modules/grupamento/pdf-sag";
-import { parseRpnPdf, parseRpnWorkbook } from "@/modules/grupamento/rpn";
-import { parseSagWorkbook } from "@/modules/grupamento/sag";
+import { parseCurrentSagPdf, parseRpnPdf } from "@/modules/grupamento/pdf-sag";
+import { parseRpnWorkbook, type RpnImportResult } from "@/modules/grupamento/rpn";
+import { parseSagWorkbook, type SagImportResult } from "@/modules/grupamento/sag";
 import { SAG_PI_FAMILIES, type SagPiFamily, validatePiFamilyRows } from "@/modules/grupamento/sag-family-batch";
 import { appendAuditLog } from "@/server/demo-store";
 import { checksumBuffer, replaceSagBatchPart, type FinancialSourceKind } from "@/modules/financial-snapshots/repository";
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   try {
     const buffer = await file.arrayBuffer();
     const sourceKind = source as FinancialSourceKind;
-    const parsed = sourceKind === "CURRENT"
+    const parsed: SagImportResult | RpnImportResult = sourceKind === "CURRENT"
       ? (extensionOf(file) === "pdf"
           ? await withPdfTimeout(parseCurrentSagPdf(buffer, file.name), `Exercício Corrente ${family}`)
           : parseSagWorkbook(buffer, file.name))
