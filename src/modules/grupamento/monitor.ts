@@ -8,6 +8,22 @@ export const GROUP_STORAGE_KEYS = {
 } as const;
 
 export const CCO_DEFAULT_LOOP_DELAY_SECONDS = 10;
+export const CCO_DEFAULT_SCROLL_PX_PER_SECOND = 36;
+export const CCO_PI_SCROLL_PX_PER_SECOND = 26;
+export const CCO_SCROLL_TOP_HOLD_MS = 1_200;
+export const CCO_SCROLL_BOTTOM_HOLD_MS = 1_400;
+
+export function readableMonitorCycleMs(maxOffset: number, baseSeconds: number, screen: string) {
+  const baseMs = Math.max(5, baseSeconds) * 1000;
+  if (maxOffset <= 2) return baseMs;
+
+  const pixelsPerSecond = screen === "pis"
+    ? CCO_PI_SCROLL_PX_PER_SECOND
+    : CCO_DEFAULT_SCROLL_PX_PER_SECOND;
+  const travelMs = (maxOffset / pixelsPerSecond) * 1000;
+
+  return Math.max(baseMs, CCO_SCROLL_TOP_HOLD_MS + travelMs + CCO_SCROLL_BOTTOM_HOLD_MS);
+}
 
 export const CCO_SCREEN_CATALOG = [
   { id: "overview", label: "Visão executiva" },

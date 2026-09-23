@@ -10,14 +10,18 @@ import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
   CCO_DEFAULT_LOOP_DELAY_SECONDS,
+  CCO_DEFAULT_SCROLL_PX_PER_SECOND,
+  CCO_PI_SCROLL_PX_PER_SECOND,
+  CCO_SCROLL_BOTTOM_HOLD_MS,
+  CCO_SCROLL_TOP_HOLD_MS,
   CCO_SCREEN_CATALOG,
   GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
+  readableMonitorCycleMs,
   type CcoMonitorConfig,
 } from "@/modules/grupamento/monitor";
 
 const MIN_KIOSK_SCALE = 0.86;
-const SCROLL_EDGE_HOLD_MS = 650;
 const SCREEN_FADE_MS = 450;
 const DATA_REFRESH_MS = 30_000;
 const PAGE_RELOAD_MS = 5 * 60_000;
@@ -44,6 +48,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [monitor, setMonitor] = useState<CcoMonitorConfig>(() => defaultCcoMonitorConfig()[Math.max(0, Math.min(7, monitorId - 1))]);
   const [screenIndex, setScreenIndex] = useState(0);
+  const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
   const [now, setNow] = useState(new Date());
 
@@ -112,29 +117,29 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     return () => window.clearInterval(timer);
   }, []);
 
+  const safeIndex = Math.min(screenIndex, Math.max(0, monitor.screens.length - 1));
+  const activeScreen = monitor.screens[safeIndex] ?? "overview";
+
   useEffect(() => {
     if (monitor.mode !== "loop" || monitor.screens.length <= 1) return;
 
     let switchTimer = 0;
-    const cycleMs = Math.max(5, monitor.delaySeconds) * 1000;
-    const timer = window.setInterval(() => {
+    const timer = window.setTimeout(() => {
       setTransitioning(true);
       switchTimer = window.setTimeout(() => {
+        setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
         setScreenIndex((current) => (current + 1) % monitor.screens.length);
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => setTransitioning(false));
         });
       }, SCREEN_FADE_MS);
-    }, cycleMs);
+    }, screenCycleMs);
 
     return () => {
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
       if (switchTimer) window.clearTimeout(switchTimer);
     };
-  }, [monitor.mode, monitor.screens, monitor.delaySeconds]);
-
-  const safeIndex = Math.min(screenIndex, Math.max(0, monitor.screens.length - 1));
-  const activeScreen = monitor.screens[safeIndex] ?? "overview";
+  }, [monitor.mode, monitor.screens, monitor.delaySeconds, screenIndex, screenCycleMs]);
   const screenLabel = CCO_SCREEN_CATALOG.find((item) => item.id === activeScreen)?.label ?? "Visão executiva";
   const ccol = monitor.layout === "ccol";
   const isRuleScreen = activeScreen === "briefing" || activeScreen.startsWith("class-");
@@ -201,6 +206,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
             screenKey={activeScreen}
             cycleSeconds={Math.max(5, monitor.delaySeconds)}
             loopMode={monitor.mode === "loop" && monitor.screens.length > 1}
+            onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
           >
             {screenContent}
           </MonitorViewport>
@@ -241,11 +247,13 @@ function MonitorViewport({
   screenKey,
   cycleSeconds,
   loopMode,
+  onRequiredCycleMs,
 }: {
   children: ReactNode;
   screenKey: string;
   cycleSeconds: number;
   loopMode: boolean;
+  onRequiredCycleMs: (requiredMs: number) => void;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -268,10 +276,12 @@ function MonitorViewport({
       const fitRatio = Math.min(frameWidth / contentWidth, frameHeight / contentHeight, 1);
       const nextScale = Math.max(MIN_KIOSK_SCALE, fitRatio);
       const nextMaxOffset = Math.max(0, contentHeight * nextScale - frameHeight);
+      const requiredCycleMs = readableMonitorCycleMs(nextMaxOffset, cycleSeconds, screenKey);
 
       setScale((current) => Math.abs(current - nextScale) > 0.005 ? nextScale : current);
       setMaxOffset(nextMaxOffset);
       setOffset(0);
+      onRequiredCycleMs(requiredCycleMs);
     };
 
     const frameId = window.requestAnimationFrame(measure);
@@ -283,7 +293,7 @@ function MonitorViewport({
       window.cancelAnimationFrame(frameId);
       observer.disconnect();
     };
-  }, [screenKey]);
+  }, [cycleSeconds, onRequiredCycleMs, screenKey]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -294,32 +304,33 @@ function MonitorViewport({
 
 
     const startedAt = performance.now();
-    const travelMs = loopMode
-      ? Math.max(3_500, cycleSeconds * 1_000 - SCROLL_EDGE_HOLD_MS * 2)
-      : Math.max(5_500, Math.min(14_000, maxOffset * 18));
-    const singleCycleMs = SCROLL_EDGE_HOLD_MS + travelMs + 1_100 + travelMs + SCROLL_EDGE_HOLD_MS;
+    const pixelsPerSecond = screenKey === "pis"
+      ? CCO_PI_SCROLL_PX_PER_SECOND
+      : CCO_DEFAULT_SCROLL_PX_PER_SECOND;
+    const travelMs = Math.max(3_500, (maxOffset / pixelsPerSecond) * 1000);
+    const singleCycleMs = CCO_SCROLL_TOP_HOLD_MS + travelMs + CCO_SCROLL_BOTTOM_HOLD_MS + travelMs;
 
     const animate = (time: number) => {
       const elapsed = time - startedAt;
       let nextOffset = 0;
 
       if (loopMode) {
-        if (elapsed <= SCROLL_EDGE_HOLD_MS) {
+        if (elapsed <= CCO_SCROLL_TOP_HOLD_MS) {
           nextOffset = 0;
         } else {
-          const progress = Math.min(1, (elapsed - SCROLL_EDGE_HOLD_MS) / travelMs);
+          const progress = Math.min(1, (elapsed - CCO_SCROLL_TOP_HOLD_MS) / travelMs);
           nextOffset = maxOffset * progress;
         }
       } else {
         const phase = elapsed % singleCycleMs;
-        if (phase <= SCROLL_EDGE_HOLD_MS) {
+        if (phase <= CCO_SCROLL_TOP_HOLD_MS) {
           nextOffset = 0;
-        } else if (phase <= SCROLL_EDGE_HOLD_MS + travelMs) {
-          nextOffset = maxOffset * ((phase - SCROLL_EDGE_HOLD_MS) / travelMs);
-        } else if (phase <= SCROLL_EDGE_HOLD_MS + travelMs + 1_100) {
+        } else if (phase <= CCO_SCROLL_TOP_HOLD_MS + travelMs) {
+          nextOffset = maxOffset * ((phase - CCO_SCROLL_TOP_HOLD_MS) / travelMs);
+        } else if (phase <= CCO_SCROLL_TOP_HOLD_MS + travelMs + CCO_SCROLL_BOTTOM_HOLD_MS) {
           nextOffset = maxOffset;
-        } else if (phase <= SCROLL_EDGE_HOLD_MS + travelMs + 1_100 + travelMs) {
-          const returnProgress = (phase - SCROLL_EDGE_HOLD_MS - travelMs - 1_100) / travelMs;
+        } else if (phase <= CCO_SCROLL_TOP_HOLD_MS + travelMs + CCO_SCROLL_BOTTOM_HOLD_MS + travelMs) {
+          const returnProgress = (phase - CCO_SCROLL_TOP_HOLD_MS - travelMs - CCO_SCROLL_BOTTOM_HOLD_MS) / travelMs;
           nextOffset = maxOffset * (1 - returnProgress);
         }
       }
@@ -330,7 +341,7 @@ function MonitorViewport({
 
     animationFrame = window.requestAnimationFrame(animate);
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [maxOffset, cycleSeconds, loopMode, screenKey]);
+  }, [maxOffset, loopMode, screenKey]);
 
   return (
     <div ref={frameRef} className="h-full w-full overflow-hidden">
