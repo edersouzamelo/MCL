@@ -40,6 +40,8 @@ type LegacySagPair = {
   rpn: RpnImportResult;
 };
 
+type SagUploadMode = "single" | "family";
+
 function currency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(value);
 }
@@ -74,6 +76,10 @@ function readStored<T>(key: string): T | null {
 export function GrupamentoCommandCenterClient({ organizationId }: { organizationId?: string }) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
+  const [currentMode, setCurrentMode] = useState<SagUploadMode>("family");
+  const [rpnMode, setRpnMode] = useState<SagUploadMode>("single");
+  const [currentSingleFile, setCurrentSingleFile] = useState<File | null>(null);
+  const [rpnSingleFile, setRpnSingleFile] = useState<File | null>(null);
   const [currentFiles, setCurrentFiles] = useState<Record<SagPiFamily, File | null>>(() => emptyFamilyFiles());
   const [rpnFiles, setRpnFiles] = useState<Record<SagPiFamily, File | null>>(() => emptyFamilyFiles());
   const [monitors, setMonitors] = useState<CcoMonitorConfig[]>(defaultCcoMonitorConfig());
@@ -114,7 +120,14 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
 
   const sourceCount = Number(Boolean(sag)) + Number(Boolean(rpn));
   const validRows = (sag?.rows.length ?? 0) + (rpn?.rows.length ?? 0);
-  const allFamilyFilesSelected = SAG_PI_FAMILIES.every((family) => currentFiles[family] && rpnFiles[family]);
+  const currentReady = currentMode === "single"
+    ? Boolean(currentSingleFile)
+    : SAG_PI_FAMILIES.every((family) => Boolean(currentFiles[family]));
+  const rpnReady = rpnMode === "single"
+    ? Boolean(rpnSingleFile)
+    : SAG_PI_FAMILIES.every((family) => Boolean(rpnFiles[family]));
+  const uploadFileCount = (currentMode === "single" ? 1 : 4) + (rpnMode === "single" ? 1 : 4);
+  const allFilesSelected = currentReady && rpnReady;
   const unmappedCurrent = useMemo(() => (sag ? findUnmappedPis(sag.rows) : []), [sag]);
   const unmappedPrevious = useMemo(() => (rpn ? findUnmappedPis(rpn.rows) : []), [rpn]);
 
@@ -124,31 +137,32 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
     setNotice("");
     setUploadProgress("");
 
-    if (!allFamilyFilesSelected) {
-      setError("Selecione os 8 relatórios: E5, E6, E7 e D8 para Exercício Corrente e RPNP.");
+    if (!allFilesSelected) {
+      setError("Complete as duas fontes SAG. Cada uma pode usar 1 PDF integral ou 4 PDFs separados por E5/E6/E7/D8.");
       return;
     }
 
-    const oversized = [
-      ...SAG_PI_FAMILIES.map((family) => ({ source: "Exercício Corrente", family, file: currentFiles[family] })),
-      ...SAG_PI_FAMILIES.map((family) => ({ source: "RPNP", family, file: rpnFiles[family] })),
-    ].find((item) => item.file && item.file.size > 4 * 1024 * 1024);
-    if (oversized?.file) {
-      setError(`${oversized.source} ${oversized.family}: ${fileSize(oversized.file.size)}. Cada PDF precisa ficar abaixo de 4 MB para o envio seguro. Reduza mais o escopo no SAG.`);
+    const jobs = [
+      ...(currentMode === "single"
+        ? [{ source: "CURRENT" as const, family: "ALL" as const, file: currentSingleFile!, label: "Exercício Corrente · PDF integral" }]
+        : SAG_PI_FAMILIES.map((family) => ({ source: "CURRENT" as const, family, file: currentFiles[family]!, label: `Exercício Corrente · ${family}` }))),
+      ...(rpnMode === "single"
+        ? [{ source: "RPNP" as const, family: "ALL" as const, file: rpnSingleFile!, label: "RPNP · PDF integral" }]
+        : SAG_PI_FAMILIES.map((family) => ({ source: "RPNP" as const, family, file: rpnFiles[family]!, label: `RPNP · ${family}` }))),
+    ];
+
+    const oversized = jobs.find((job) => job.file.size > 4 * 1024 * 1024);
+    if (oversized) {
+      setError(`${oversized.label}: ${fileSize(oversized.file.size)}. Cada PDF precisa ficar abaixo de 4 MB para o envio seguro. Use o modo fracionado para essa fonte.`);
       return;
     }
 
     setUploading(true);
     const batchId = window.crypto.randomUUID();
     try {
-      const jobs = [
-        ...SAG_PI_FAMILIES.map((family) => ({ source: "CURRENT" as const, family, file: currentFiles[family]! })),
-        ...SAG_PI_FAMILIES.map((family) => ({ source: "RPNP" as const, family, file: rpnFiles[family]! })),
-      ];
-
       for (let index = 0; index < jobs.length; index += 1) {
         const job = jobs[index];
-        setUploadProgress(`Processando ${index + 1}/8 · ${job.source === "CURRENT" ? "Exercício Corrente" : "RPNP"} ${job.family}`);
+        setUploadProgress(`Processando ${index + 1}/${jobs.length} · ${job.label}`);
         const body = new FormData();
         body.set("batchId", batchId);
         body.set("source", job.source);
@@ -157,24 +171,24 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
 
         const response = await fetch("/api/grupamento/sag/part", { method: "POST", body });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error ?? `Falha em ${job.source} ${job.family}.`);
+        if (!response.ok) throw new Error(payload.error ?? `Falha em ${job.label}.`);
       }
 
-      setUploadProgress("Consolidando as 8 partes no banco...");
+      setUploadProgress("Consolidando as fontes no banco...");
       const finalize = await fetch("/api/grupamento/sag/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batchId }),
       });
       const payload = await finalize.json();
-      if (!finalize.ok) throw new Error(payload.error ?? "Falha ao consolidar o lote SAG.");
+      if (!finalize.ok) throw new Error(payload.error ?? "Falha ao consolidar a carga SAG.");
 
       const parsed = payload as SagPairResponse;
       setSag(parsed.current);
       setRpn(parsed.rpn);
       window.dispatchEvent(new CustomEvent("mcl-grupamento-sag-updated"));
       window.dispatchEvent(new CustomEvent("mcl-grupamento-rpn-updated"));
-      setNotice(`Lote consolidado: 4 PDFs do Exercício Corrente + 4 PDFs de RPNP · ${parsed.current.rows.length + parsed.rpn.rows.length} linha(s) válidas.`);
+      setNotice(`Carga consolidada · Exercício Corrente: ${currentMode === "single" ? "PDF integral" : "4 famílias"} · RPNP: ${rpnMode === "single" ? "PDF integral" : "4 famílias"} · ${parsed.current.rows.length + parsed.rpn.rows.length} linha(s) válidas.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha na carga SAG.");
     } finally {
@@ -284,12 +298,12 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-sm font-bold"><Upload className="h-4 w-4" /> Carga SAG — 8 arquivos / 2 fontes</div>
-              <p className="mt-1 text-xs leading-5 text-zinc-500">O SAG deve ser exportado por família de PI. Use um arquivo E5, E6, E7 e D8 para cada uma das duas fontes; PDF é o formato recomendado.</p>
+              <div className="flex items-center gap-2 text-sm font-bold"><Upload className="h-4 w-4" /> Carga SAG — arquitetura híbrida</div>
+              <p className="mt-1 text-xs leading-5 text-zinc-500">Cada fonte pode entrar como 1 PDF integral ou 4 PDFs separados por E5, E6, E7 e D8. Use o fracionamento somente quando o SAG ou o tamanho do arquivo exigirem.</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <a
-                href="/docs/Cartilha_MCL_CCOL_SAG_v2.pdf"
+                href="/docs/Cartilha_MCL_CCOL_SAG_v3.pdf"
                 download
                 className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300 dark:hover:bg-sky-950/50"
                 title="Tutorial de apanha dos relatórios no SAG e importação no MCL"
@@ -303,23 +317,31 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
           </div>
 
           <form onSubmit={handleUpload} className="space-y-4">
-            <FamilySourceGroup
+            <HybridSourceGroup
               source="current"
               title="Exercício Corrente"
               description="Disponível, a liquidar, em liquidação, liquidado e pago."
+              mode={currentMode}
+              onMode={setCurrentMode}
+              singleFile={currentSingleFile}
+              onSingleFile={setCurrentSingleFile}
               files={currentFiles}
               onFile={(family, file) => setCurrentFiles((current) => ({ ...current, [family]: file }))}
             />
-            <FamilySourceGroup
+            <HybridSourceGroup
               source="rpn"
               title="RPNP / créditos do exercício anterior"
               description="Inscrito, a liquidar, liquidado e cancelado."
+              mode={rpnMode}
+              onMode={setRpnMode}
+              singleFile={rpnSingleFile}
+              onSingleFile={setRpnSingleFile}
               files={rpnFiles}
               onFile={(family, file) => setRpnFiles((current) => ({ ...current, [family]: file }))}
             />
-            <button type="submit" disabled={uploading || !allFamilyFilesSelected} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-800">
+            <button type="submit" disabled={uploading || !allFilesSelected} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-800">
               {uploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-              {uploading ? (uploadProgress || "Processando os 8 relatórios...") : "Processar os 8 relatórios"}
+              {uploading ? (uploadProgress || "Processando a carga SAG...") : `Processar carga SAG (${uploadFileCount} arquivo${uploadFileCount > 1 ? "s" : ""})`}
             </button>
           </form>
 
@@ -364,7 +386,7 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
           {notice ? <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{notice}</p> : null}
 
           <div className="mt-4 space-y-2 border-t border-zinc-200 pt-4 text-xs text-zinc-500 dark:border-zinc-800">
-            <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Os 8 arquivos são validados por família e consolidados em duas fontes lógicas; nenhum número sintético substitui arquivo ausente.</p>
+            <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Cada fonte pode ser integral ou fracionada. O MCL valida o modo escolhido e consolida sempre em duas fontes lógicas; nenhum número sintético substitui arquivo ausente.</p>
             <p className="flex items-start gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0" /> A classificação usa PI exato conforme a matriz fornecida; PI não mapeado permanece explicitamente fora da Classe.</p>
             <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Novas cargas são persistidas no banco com checksum. Snapshots locais legados só entram por recuperação explícita e auditada.</p>
             <p className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Escopo de sessão: {organizationId || "organização não informada"}.</p>
@@ -444,38 +466,79 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
   );
 }
 
-function FamilySourceGroup({
+function HybridSourceGroup({
   source,
   title,
   description,
+  mode,
+  onMode,
+  singleFile,
+  onSingleFile,
   files,
   onFile,
 }: {
   source: "current" | "rpn";
   title: string;
   description: string;
+  mode: SagUploadMode;
+  onMode: (mode: SagUploadMode) => void;
+  singleFile: File | null;
+  onSingleFile: (file: File | null) => void;
   files: Record<SagPiFamily, File | null>;
   onFile: (family: SagPiFamily, file: File | null) => void;
 }) {
   return (
     <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-      <div className="mb-3">
-        <div className="text-sm font-bold">{title}</div>
-        <div className="mt-0.5 text-[11px] text-zinc-500">{description}</div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-bold">{title}</div>
+          <div className="mt-0.5 text-[11px] text-zinc-500">{description}</div>
+        </div>
+        <div className="inline-flex rounded-lg border border-zinc-200 p-1 dark:border-zinc-800">
+          <button
+            type="button"
+            onClick={() => onMode("single")}
+            className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold transition ${mode === "single" ? "bg-sky-600 text-white" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}
+          >
+            PDF único
+          </button>
+          <button
+            type="button"
+            onClick={() => onMode("family")}
+            className={`rounded-md px-2.5 py-1.5 text-[10px] font-bold transition ${mode === "family" ? "bg-sky-600 text-white" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900"}`}
+          >
+            Por família
+          </button>
+        </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {SAG_PI_FAMILIES.map((family) => (
+
+      {mode === "single" ? (
+        <div className="mt-3">
           <SourcePicker
-            key={family}
-            id={familyFieldName(source, family)}
-            step={family}
-            title={`Família ${family}`}
-            description="PDF separado desta família de PI."
-            file={files[family]}
-            onFile={(file) => onFile(family, file)}
+            id={`${source}-all`}
+            step="ALL"
+            title="PDF integral"
+            description="Arquivo único contendo os PI E5, E6, E7 e D8."
+            file={singleFile}
+            onFile={onSingleFile}
           />
-        ))}
-      </div>
+          <p className="mt-2 text-[10px] leading-4 text-zinc-500">Se o SAG travar ou o PDF ultrapassar 4 MB, troque esta fonte para “Por família”.</p>
+        </div>
+      ) : (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {SAG_PI_FAMILIES.map((family) => (
+            <SourcePicker
+              key={family}
+              id={familyFieldName(source, family)}
+              step={family}
+              title={`Família ${family}`}
+              description="PDF separado desta família de PI."
+              file={files[family]}
+              onFile={(file) => onFile(family, file)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
