@@ -7,6 +7,8 @@ export const GROUP_STORAGE_KEYS = {
   monitors: "mcl:grupamento:monitors:v2",
 } as const;
 
+export const CCO_DEFAULT_LOOP_DELAY_SECONDS = 10;
+
 export const CCO_SCREEN_CATALOG = [
   { id: "overview", label: "Visão executiva" },
   { id: "execution", label: "Exercício Corrente" },
@@ -56,7 +58,7 @@ export function defaultCcoMonitorConfig(): CcoMonitorConfig[] {
     enabled: true,
     mode: screens.length === 1 ? "single" : "loop",
     screens,
-    delaySeconds: 15,
+    delaySeconds: CCO_DEFAULT_LOOP_DELAY_SECONDS,
     layout: layout ?? "mcl",
   }));
 }
