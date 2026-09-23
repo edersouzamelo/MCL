@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Clock3, Database, Monitor, ShieldCheck } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
 import { CCO_RULE_SOURCE } from "@/modules/grupamento/cco";
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
+  CCO_DEFAULT_LOOP_DELAY_SECONDS,
   CCO_SCREEN_CATALOG,
   GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
   type CcoMonitorConfig,
 } from "@/modules/grupamento/monitor";
+
+const MIN_KIOSK_SCALE = 0.86;
+const SCROLL_EDGE_HOLD_MS = 650;
 
 function load<T>(key: string): T | null {
   try {
@@ -21,6 +26,14 @@ function load<T>(key: string): T | null {
   } catch {
     return null;
   }
+}
+
+function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
+  return {
+    ...item,
+    layout: item.layout ?? "mcl",
+    delaySeconds: item.delaySeconds === 15 ? CCO_DEFAULT_LOOP_DELAY_SECONDS : item.delaySeconds,
+  };
 }
 
 export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
@@ -35,7 +48,17 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     const hydrate = async () => {
       const stored = load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
       const selected = stored?.find((item) => item.id === monitorId);
-      if (selected) setMonitor({ ...selected, layout: selected.layout ?? "mcl" });
+      if (selected) {
+        const normalized = normalizeMonitor(selected);
+        setMonitor(normalized);
+        if (selected.delaySeconds !== normalized.delaySeconds && stored) {
+          window.localStorage.setItem(
+            GROUP_STORAGE_KEYS.monitors,
+            JSON.stringify(stored.map((item) => (item.id === monitorId ? normalized : item))),
+          );
+        }
+      }
+
       try {
         const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
         if (!response.ok) return;
@@ -51,6 +74,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         }
       }
     };
+
     const frame = window.requestAnimationFrame(() => { void hydrate(); });
     const refresh = () => { void hydrate(); };
     window.addEventListener("storage", refresh);
@@ -87,53 +111,89 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const ccol = monitor.layout === "ccol";
   const isRuleScreen = activeScreen === "briefing" || activeScreen.startsWith("class-");
 
+  const screenContent = !monitor.enabled ? (
+    <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
+  ) : !sag || !rpn ? (
+    <Empty ccol={ccol} title="Par SAG incompleto" description="Esta tela exige Exercício Corrente e créditos do exercício anterior validados. Não há substituição por números sintéticos." />
+  ) : isRuleScreen ? (
+    <GrupamentoRuleMonitorScreen screen={activeScreen} sag={sag} rpn={rpn} layout={monitor.layout} />
+  ) : (
+    <GrupamentoBaseMonitorScreen screen={activeScreen} sag={sag} rpn={rpn} layout={monitor.layout} />
+  );
+
   return (
-    <main className={`min-h-screen pb-14 ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}>
-      <header className={`flex min-h-20 items-center justify-between gap-5 border-b px-8 py-4 ${ccol ? "border-slate-300 bg-white" : "border-white/10 bg-slate-950/90"}`}>
-        <div className="flex items-center gap-4">
-          <div className={`flex h-11 w-11 items-center justify-center rounded-xl border ${ccol ? "border-sky-800/20 bg-sky-900 text-white" : "border-sky-400/20 bg-sky-400/10 text-sky-300"}`}>
-            <Monitor className="h-6 w-6" />
+    <main
+      className={`relative flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
+      style={{
+        backgroundImage: ccol
+          ? "radial-gradient(circle at 82% 5%, rgba(14,165,233,.10), transparent 30%), radial-gradient(circle at 8% 92%, rgba(6,182,212,.06), transparent 34%), linear-gradient(145deg, #ffffff 0%, #f6f9fb 50%, #edf4f7 100%)"
+          : "radial-gradient(circle at 82% 5%, rgba(14,165,233,.18), transparent 31%), radial-gradient(circle at 10% 92%, rgba(34,211,238,.08), transparent 36%), linear-gradient(145deg, #020617 0%, #07111d 48%, #020617 100%)",
+      }}
+    >
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div className={`absolute -right-20 -top-24 h-96 w-96 rounded-full blur-3xl ${ccol ? "bg-sky-300/15" : "bg-sky-400/10"}`} />
+        <div className={`absolute -bottom-32 left-[8%] h-80 w-[42vw] rounded-full blur-3xl ${ccol ? "bg-cyan-200/20" : "bg-cyan-400/[0.06]"}`} />
+        <div className={`absolute inset-x-0 top-0 h-44 bg-gradient-to-b ${ccol ? "from-white/75 to-transparent" : "from-sky-300/[0.025] to-transparent"}`} />
+      </div>
+
+      <header className={`relative z-20 flex h-[76px] shrink-0 items-center justify-between gap-5 border-b px-7 py-3 backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/80" : "border-white/10 bg-slate-950/72"}`}>
+        <div className="flex min-w-0 items-center gap-4">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${ccol ? "border-sky-800/20 bg-sky-900 text-white" : "border-sky-400/20 bg-sky-400/10 text-sky-300"}`}>
+            <Monitor className="h-5 w-5" />
           </div>
-          <div>
-            <div className={`text-xs font-bold uppercase tracking-[0.2em] ${ccol ? "text-sky-800" : "text-sky-300"}`}>MCL · Escalão / Grupamento Logístico</div>
-            <div className="mt-1 text-xl font-black">{monitor.label} · {screenLabel}</div>
+          <div className="min-w-0">
+            <div className={`truncate text-[11px] font-bold uppercase tracking-[0.22em] ${ccol ? "text-sky-800" : "text-sky-300"}`}>MCL · Escalão / Grupamento Logístico</div>
+            <div className="mt-1 truncate text-lg font-black">{monitor.label} · {screenLabel}</div>
           </div>
         </div>
-        <div className="flex items-center gap-5 text-right">
+        <div className="flex shrink-0 items-center gap-5 text-right">
           <div>
-            <div className="text-lg font-mono font-bold">{now.toLocaleTimeString("pt-BR")}</div>
-            <div className={ccol ? "text-xs text-slate-500" : "text-xs text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
+            <div className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
+            <div className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
           </div>
-          <div className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
+          <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
             {monitor.enabled ? "Saída ativa" : "Saída desativada"}
           </div>
         </div>
       </header>
 
       {ccol ? (
-        <div className="border-b-4 border-sky-900 bg-slate-100 px-8 py-2 text-right text-[11px] font-bold uppercase tracking-[0.16em] text-sky-950">
+        <div className="relative z-20 shrink-0 border-b-2 border-sky-900/80 bg-white/60 px-7 py-1.5 text-right text-[10px] font-bold uppercase tracking-[0.16em] text-sky-950 backdrop-blur">
           Prontidão Logística · na defesa e preservação da fronteira oeste
         </div>
       ) : null}
 
-      <section className="p-8">
-        {!monitor.enabled ? (
-          <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
-        ) : !sag || !rpn ? (
-          <Empty ccol={ccol} title="Par SAG incompleto" description="Esta tela exige Exercício Corrente e créditos do exercício anterior validados. Não há substituição por números sintéticos." />
-        ) : isRuleScreen ? (
-          <GrupamentoRuleMonitorScreen screen={activeScreen} sag={sag} rpn={rpn} layout={monitor.layout} />
-        ) : (
-          <GrupamentoBaseMonitorScreen screen={activeScreen} sag={sag} rpn={rpn} layout={monitor.layout} />
-        )}
+      <section className="relative z-10 min-h-0 flex-1 overflow-hidden px-6 py-4">
+        <MonitorViewport
+          key={activeScreen}
+          screenKey={activeScreen}
+          cycleSeconds={Math.max(5, monitor.delaySeconds)}
+          loopMode={monitor.mode === "loop" && monitor.screens.length > 1}
+        >
+          {screenContent}
+        </MonitorViewport>
       </section>
 
-      <footer className={`fixed inset-x-0 bottom-0 flex items-center justify-between border-t px-8 py-3 text-xs ${ccol ? "border-slate-300 bg-white text-slate-600" : "border-white/10 bg-slate-950/95 text-slate-400"}`}>
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="flex min-w-0 items-center gap-1.5"><Database className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Fonte: {sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "par incompleto"}</span></span>
-          <span className="hidden items-center gap-1.5 xl:flex"><ShieldCheck className="h-3.5 w-3.5" /> Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}</span>
+      <div className={`pointer-events-none absolute bottom-11 right-6 z-30 flex items-center gap-2.5 rounded-xl border px-3 py-2 backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-55" : "border-white/10 bg-slate-950/35 text-white opacity-45"}`}>
+        <BrandLogo className="h-8 w-8" tone={ccol ? "green" : "sky"} sizes="32px" />
+        <div className="leading-none">
+          <div className="text-[11px] font-black tracking-[0.16em]">MCL</div>
+          <div className={`mt-1 text-[7px] font-bold uppercase tracking-[0.13em] ${ccol ? "text-slate-500" : "text-sky-200"}`}>Continuidade Logística</div>
         </div>
-        <div className="flex items-center gap-3">
+      </div>
+
+      <footer className={`relative z-20 flex h-10 shrink-0 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/85 text-slate-600" : "border-white/10 bg-slate-950/85 text-slate-400"}`}>
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Database className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Fonte: {sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "par incompleto"}</span>
+          </span>
+          <span className="hidden items-center gap-1.5 xl:flex">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
           <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
           <span>{monitor.mode === "loop" ? `loop · ${monitor.delaySeconds}s` : "tela fixa"}</span>
           <span>{safeIndex + 1}/{monitor.screens.length}</span>
@@ -143,9 +203,128 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   );
 }
 
+function MonitorViewport({
+  children,
+  screenKey,
+  cycleSeconds,
+  loopMode,
+}: {
+  children: ReactNode;
+  screenKey: string;
+  cycleSeconds: number;
+  loopMode: boolean;
+}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [maxOffset, setMaxOffset] = useState(0);
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    const content = contentRef.current;
+    if (!frame || !content) return;
+
+    const measure = () => {
+      const frameWidth = frame.clientWidth;
+      const frameHeight = frame.clientHeight;
+      const contentWidth = content.scrollWidth;
+      const contentHeight = content.scrollHeight;
+      if (!frameWidth || !frameHeight || !contentWidth || !contentHeight) return;
+
+      const fitRatio = Math.min(frameWidth / contentWidth, frameHeight / contentHeight, 1);
+      const nextScale = Math.max(MIN_KIOSK_SCALE, fitRatio);
+      const nextMaxOffset = Math.max(0, contentHeight * nextScale - frameHeight);
+
+      setScale((current) => Math.abs(current - nextScale) > 0.005 ? nextScale : current);
+      setMaxOffset(nextMaxOffset);
+      setOffset(0);
+    };
+
+    const frameId = window.requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    observer.observe(content);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, [screenKey]);
+
+  useEffect(() => {
+    let animationFrame = 0;
+    if (maxOffset <= 2) {
+      animationFrame = window.requestAnimationFrame(() => setOffset(0));
+      return () => window.cancelAnimationFrame(animationFrame);
+    }
+
+
+    const startedAt = performance.now();
+    const travelMs = loopMode
+      ? Math.max(3_500, cycleSeconds * 1_000 - SCROLL_EDGE_HOLD_MS * 2)
+      : Math.max(5_500, Math.min(14_000, maxOffset * 18));
+    const singleCycleMs = SCROLL_EDGE_HOLD_MS + travelMs + 1_100 + travelMs + SCROLL_EDGE_HOLD_MS;
+
+    const animate = (time: number) => {
+      const elapsed = time - startedAt;
+      let nextOffset = 0;
+
+      if (loopMode) {
+        if (elapsed <= SCROLL_EDGE_HOLD_MS) {
+          nextOffset = 0;
+        } else {
+          const progress = Math.min(1, (elapsed - SCROLL_EDGE_HOLD_MS) / travelMs);
+          nextOffset = maxOffset * progress;
+        }
+      } else {
+        const phase = elapsed % singleCycleMs;
+        if (phase <= SCROLL_EDGE_HOLD_MS) {
+          nextOffset = 0;
+        } else if (phase <= SCROLL_EDGE_HOLD_MS + travelMs) {
+          nextOffset = maxOffset * ((phase - SCROLL_EDGE_HOLD_MS) / travelMs);
+        } else if (phase <= SCROLL_EDGE_HOLD_MS + travelMs + 1_100) {
+          nextOffset = maxOffset;
+        } else if (phase <= SCROLL_EDGE_HOLD_MS + travelMs + 1_100 + travelMs) {
+          const returnProgress = (phase - SCROLL_EDGE_HOLD_MS - travelMs - 1_100) / travelMs;
+          nextOffset = maxOffset * (1 - returnProgress);
+        }
+      }
+
+      setOffset(nextOffset);
+      animationFrame = window.requestAnimationFrame(animate);
+    };
+
+    animationFrame = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [maxOffset, cycleSeconds, loopMode, screenKey]);
+
+  return (
+    <div ref={frameRef} className="h-full w-full overflow-hidden">
+      <div
+        className="w-full will-change-transform"
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: "top center",
+        }}
+      >
+        <div
+          ref={contentRef}
+          className="w-full will-change-transform"
+          style={{
+            transform: `translate3d(0, -${scale > 0 ? offset / scale : 0}px, 0)`,
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Empty({ ccol, title, description }: { ccol: boolean; title: string; description: string }) {
   return (
-    <div className="flex min-h-[65vh] items-center justify-center">
+    <div className="flex h-full min-h-[55vh] items-center justify-center">
       <div className="max-w-lg text-center">
         <Clock3 className={`mx-auto h-10 w-10 ${ccol ? "text-slate-400" : "text-slate-600"}`} />
         <h1 className="mt-4 text-3xl font-black">{title}</h1>
