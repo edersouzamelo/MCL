@@ -52,7 +52,6 @@ function hasCurrentContract(page: PositionedPage) {
   return (
     text.includes("UG") &&
     text.includes("PI") &&
-    text.includes("NOMEPI") &&
     text.includes("DISPONIVEL") &&
     text.includes("ALIQUIDAR") &&
     text.includes("EMLIQUIDACAO") &&
@@ -66,7 +65,6 @@ function hasRpnContract(page: PositionedPage) {
   return (
     text.includes("UG") &&
     text.includes("PI") &&
-    text.includes("NOMEPI") &&
     text.includes("TOTALINSCRITO") &&
     text.includes("TOTALALIQUIDAR") &&
     text.includes("TOTALLIQUIDADO") &&

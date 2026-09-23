@@ -36,6 +36,7 @@ export type SagImportResult = {
     importedAt: string;
     origin: "MANUAL_SAG";
     nature: "DADO_IMPORTADO";
+    files?: Array<{ family: string; fileName: string; rowCount: number }>;
   };
   sheets: string[];
   rows: SagRow[];
@@ -56,8 +57,8 @@ export type SagImportResult = {
 };
 
 const HEADER_ALIASES = {
-  ug: ["UG"],
-  acronym: ["SIGLA", "T_SIGLA"],
+  ug: ["UG", "UASG"],
+  acronym: ["SIGLA", "T_SIGLA", "NOME_UG", "NOME UG"],
   pi: ["PI"],
   piName: ["NOME_PI", "NOME PI"],
   expenseNature: ["ND"],
@@ -227,6 +228,47 @@ function readSheet(sheetName: string, sheet: XLSX.WorkSheet, warnings: string[])
   }
 
   return rows;
+}
+
+export function mergeSagImportResults(
+  parts: SagImportResult[],
+  fileName: string,
+  files: Array<{ family: string; fileName: string; rowCount: number }>,
+): SagImportResult {
+  const rows = parts.flatMap((part) => part.rows);
+  const piGroups = groupRows(rows, "pi");
+  const ugGroups = groupRows(rows, "ug");
+  const warnings = parts.flatMap((part) => part.warnings.map((warning) => `${part.source.fileName}: ${warning}`));
+
+  return {
+    source: {
+      fileName,
+      importedAt: new Date().toISOString(),
+      origin: "MANUAL_SAG",
+      nature: "DADO_IMPORTADO",
+      files,
+    },
+    sheets: parts.flatMap((part) => part.sheets.map((sheet) => `${part.source.fileName} · ${sheet}`)),
+    rows,
+    totals: addSnapshots(rows),
+    byPi: [...piGroups.entries()]
+      .map(([pi, group]) => ({
+        pi,
+        piName: group.find((row) => row.piName)?.piName,
+        snapshot: addSnapshots(group),
+        rowCount: group.length,
+      }))
+      .sort((a, b) => b.snapshot.total - a.snapshot.total),
+    byUg: [...ugGroups.entries()]
+      .map(([ug, group]) => ({
+        ug,
+        acronym: group.find((row) => row.acronym)?.acronym,
+        snapshot: addSnapshots(group),
+        rowCount: group.length,
+      }))
+      .sort((a, b) => b.snapshot.total - a.snapshot.total),
+    warnings,
+  };
 }
 
 export function parseSagWorkbook(buffer: ArrayBuffer, fileName: string): SagImportResult {

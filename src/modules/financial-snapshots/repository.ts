@@ -14,7 +14,7 @@ type PersistInput = {
   rowCount: number;
   payload: SagImportResult | RpnImportResult;
   warnings: string[];
-  ingestionMethod: "MANUAL_PAIR" | "APPS_SCRIPT" | "LEGACY_BROWSER_RECOVERY";
+  ingestionMethod: "MANUAL_PAIR" | "MANUAL_FAMILY_BATCH" | "APPS_SCRIPT" | "LEGACY_BROWSER_RECOVERY";
   importedBy?: string;
 };
 
@@ -29,6 +29,12 @@ function json(value: unknown): Prisma.InputJsonValue {
 
 export function checksumBuffer(buffer: ArrayBuffer) {
   return createHash("sha256").update(Buffer.from(buffer)).digest("hex");
+}
+
+export function checksumBuffers(buffers: ArrayBuffer[]) {
+  const hash = createHash("sha256");
+  buffers.forEach((buffer) => hash.update(Buffer.from(buffer)));
+  return hash.digest("hex");
 }
 
 function upsertArgs(input: PersistInput): Prisma.FinancialSourceImportUpsertArgs {
