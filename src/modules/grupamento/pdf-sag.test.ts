@@ -6,6 +6,26 @@ function item(str: string, x: number, y: number) {
 }
 
 describe("SAG PDF coordinate reconstruction", () => {
+  it("uses the PI column position instead of mistaking NOME UG codes such as CMD018 for PI", () => {
+    const page: PositionedPage = [
+      item("UASG", 10, 800), item("NOME_UG", 70, 800), item("PI", 150, 800),
+      item("DISPONIVEL", 400, 800), item("A_LIQUIDAR", 480, 800), item("EM_LIQUIDACAO", 560, 800),
+      item("LIQUIDADO", 640, 800), item("PAGO", 720, 800),
+      item("160136", 10, 760), item("CMD018", 70, 760), item("E5MBPDRCOLU", 150, 760),
+      item("10,00", 400, 760), item("20,00", 480, 760), item("0,00", 560, 760),
+      item("30,00", 640, 760), item("40,00", 720, 760),
+      item("160136", 10, 720), item("CMD013", 70, 720), item("E5ARPDRCOLU", 150, 720),
+      item("5,00", 400, 720), item("10,00", 480, 720), item("0,00", 560, 720),
+      item("15,00", 640, 720), item("20,00", 720, 720),
+    ];
+
+    const result = parseCurrentSagPositionedPages([page], "e5.pdf");
+
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows.map((row) => row.acronym)).toEqual(["CMD018", "CMD013"]);
+    expect(result.rows.map((row) => row.pi)).toEqual(["E5MBPDRCOLU", "E5ARPDRCOLU"]);
+  });
+
   it("reconstructs current-year financial columns while joining a wrapped PI description", () => {
     const page: PositionedPage = [
       item("UG", 10, 800), item("SIGLA", 70, 800), item("PI", 150, 800), item("NOME_PI", 230, 800),
