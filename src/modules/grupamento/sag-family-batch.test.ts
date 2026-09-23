@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { parseCurrentSagPositionedPages, parseRpnPositionedPages, type PositionedPage } from "@/modules/grupamento/pdf-sag";
 import { mergeRpnImportResults, parseRpnWorkbook } from "@/modules/grupamento/rpn";
 import { mergeSagImportResults, parseSagWorkbook } from "@/modules/grupamento/sag";
-import { SAG_PI_FAMILIES, familyFieldName, validatePiFamilyRows } from "@/modules/grupamento/sag-family-batch";
+import { SAG_PI_FAMILIES, familyFieldName, validateCombinedPiRows, validatePiFamilyRows } from "@/modules/grupamento/sag-family-batch";
 
 function item(str: string, x: number, y: number) {
   return { str, x, y, width: 20, height: 8 };
@@ -27,6 +27,18 @@ describe("SAG family batch", () => {
     expect(validatePiFamilyRows([{ pi: "E5ABC001" }, { pi: "E5ABC002" }], "E5").valid).toBe(true);
     expect(validatePiFamilyRows([{ pi: undefined }], "E5")).toMatchObject({ valid: false, missingPi: 1 });
     expect(validatePiFamilyRows([{ pi: "E6ABC001" }], "E5")).toMatchObject({ valid: false, mismatched: ["E6ABC001"] });
+  });
+
+  it("accepts one integral source containing the allowed PI families and rejects unrelated PI", () => {
+    expect(validateCombinedPiRows([
+      { pi: "E5ABC001" },
+      { pi: "E6ABC001" },
+      { pi: "E7ABC001" },
+      { pi: "D8ABC001" },
+    ])).toMatchObject({ valid: true, missingPi: 0, unexpected: [] });
+
+    expect(validateCombinedPiRows([{ pi: "E5ABC001" }, { pi: "A1OUTRO" }]))
+      .toMatchObject({ valid: false, unexpected: ["A1OUTRO"] });
   });
 
   it("accepts the PDF identity contract UASG + NOME UG + PI without requiring NOME PI", () => {

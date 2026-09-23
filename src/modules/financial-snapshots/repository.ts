@@ -14,7 +14,7 @@ type PersistInput = {
   rowCount: number;
   payload: SagImportResult | RpnImportResult;
   warnings: string[];
-  ingestionMethod: "MANUAL_PAIR" | "MANUAL_FAMILY_PART" | "MANUAL_FAMILY_BATCH" | "APPS_SCRIPT" | "LEGACY_BROWSER_RECOVERY";
+  ingestionMethod: "MANUAL_PAIR" | "MANUAL_FAMILY_PART" | "MANUAL_FAMILY_BATCH" | "MANUAL_HYBRID_BATCH" | "APPS_SCRIPT" | "LEGACY_BROWSER_RECOVERY";
   importedBy?: string;
 };
 

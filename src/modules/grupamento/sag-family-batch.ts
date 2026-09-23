@@ -26,3 +26,20 @@ export function validatePiFamilyRows(rows: Array<{ pi?: string }>, family: SagPi
     mismatched,
   };
 }
+
+
+export function validateCombinedPiRows(rows: Array<{ pi?: string }>) {
+  const missingPi = rows.filter((row) => !normalizedPi(row.pi)).length;
+  const unexpected = [...new Set(
+    rows
+      .map((row) => normalizedPi(row.pi))
+      .filter((pi) => pi && !SAG_PI_FAMILIES.some((family) => pi.startsWith(family))),
+  )];
+
+  return {
+    valid: rows.length > 0 && missingPi === 0 && unexpected.length === 0,
+    rowCount: rows.length,
+    missingPi,
+    unexpected,
+  };
+}

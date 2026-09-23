@@ -41,49 +41,65 @@ export async function POST(request: Request) {
   if (!validBatchId(batchId)) return NextResponse.json({ error: "Identificador de lote inválido." }, { status: 400 });
 
   const parts = await getSagBatchParts(session.user.organizationId, batchId);
-  const expectedKinds = [
-    ...SAG_PI_FAMILIES.map((family) => sagBatchPartSourceKind(batchId, "CURRENT", family)),
-    ...SAG_PI_FAMILIES.map((family) => sagBatchPartSourceKind(batchId, "RPNP", family)),
-  ];
   const byKind = new Map(parts.map((part) => [part.sourceKind, part]));
-  const missing = expectedKinds.filter((kind) => !byKind.has(kind));
-  if (missing.length) {
+
+  function resolveSource(sourceKind: "CURRENT" | "RPNP") {
+    const all = byKind.get(sagBatchPartSourceKind(batchId, sourceKind, "ALL"));
+    const familyRows = SAG_PI_FAMILIES
+      .map((family) => ({
+        family,
+        row: byKind.get(sagBatchPartSourceKind(batchId, sourceKind, family)),
+      }))
+      .filter((item) => Boolean(item.row));
+
+    if (all && familyRows.length) {
+      return { error: `${sourceKind}: lote ambíguo; há arquivo integral e arquivos fracionados ao mesmo tempo.` } as const;
+    }
+    if (all) {
+      return { mode: "single" as const, all };
+    }
+    if (familyRows.length !== SAG_PI_FAMILIES.length) {
+      const missing = SAG_PI_FAMILIES.filter(
+        (family) => !byKind.has(sagBatchPartSourceKind(batchId, sourceKind, family)),
+      );
+      return { error: `${sourceKind}: faltam ${missing.length} família(s): ${missing.join(", ")}.` } as const;
+    }
+    return {
+      mode: "family" as const,
+      familyRows: familyRows as Array<{ family: (typeof SAG_PI_FAMILIES)[number]; row: NonNullable<(typeof familyRows)[number]["row"]> }>,
+    };
+  }
+
+  const currentSource = resolveSource("CURRENT");
+  const rpnSource = resolveSource("RPNP");
+  if ("error" in currentSource || "error" in rpnSource) {
     return NextResponse.json({
-      error: `Lote incompleto: faltam ${missing.length} arquivo(s).`,
-      missing: missing.map((kind) => kind.split(":").slice(-2).join(" ")),
+      error: [("error" in currentSource ? currentSource.error : null), ("error" in rpnSource ? rpnSource.error : null)].filter(Boolean).join(" "),
     }, { status: 409 });
   }
 
-  const currentParts = SAG_PI_FAMILIES.map((family) => {
-    const row = byKind.get(sagBatchPartSourceKind(batchId, "CURRENT", family))!;
-    return {
-      family,
-      row,
-      payload: asPayload<SagImportResult>(row.payload),
-    };
-  });
-  const rpnParts = SAG_PI_FAMILIES.map((family) => {
-    const row = byKind.get(sagBatchPartSourceKind(batchId, "RPNP", family))!;
-    return {
-      family,
-      row,
-      payload: asPayload<RpnImportResult>(row.payload),
-    };
-  });
+  const current = currentSource.mode === "single"
+    ? asPayload<SagImportResult>(currentSource.all.payload)
+    : mergeSagImportResults(
+        currentSource.familyRows.map((part) => asPayload<SagImportResult>(part.row.payload)),
+        "Exercício Corrente · 4 PDFs (E5, E6, E7, D8)",
+        currentSource.familyRows.map((part) => ({ family: part.family, fileName: part.row.fileName, rowCount: part.row.rowCount })),
+      );
 
-  const current = mergeSagImportResults(
-    currentParts.map((part) => part.payload),
-    "Exercício Corrente · 4 PDFs (E5, E6, E7, D8)",
-    currentParts.map((part) => ({ family: part.family, fileName: part.row.fileName, rowCount: part.row.rowCount })),
-  );
-  const rpn = mergeRpnImportResults(
-    rpnParts.map((part) => part.payload),
-    "RPNP · 4 PDFs (E5, E6, E7, D8)",
-    rpnParts.map((part) => ({ family: part.family, fileName: part.row.fileName, rowCount: part.row.rowCount })),
-  );
+  const rpn = rpnSource.mode === "single"
+    ? asPayload<RpnImportResult>(rpnSource.all.payload)
+    : mergeRpnImportResults(
+        rpnSource.familyRows.map((part) => asPayload<RpnImportResult>(part.row.payload)),
+        "RPNP · 4 PDFs (E5, E6, E7, D8)",
+        rpnSource.familyRows.map((part) => ({ family: part.family, fileName: part.row.fileName, rowCount: part.row.rowCount })),
+      );
 
-  const currentChecksum = currentParts.map((part) => part.row.checksum).join(":");
-  const rpnChecksum = rpnParts.map((part) => part.row.checksum).join(":");
+  const currentChecksum = currentSource.mode === "single"
+    ? currentSource.all.checksum
+    : currentSource.familyRows.map((part) => part.row.checksum).join(":");
+  const rpnChecksum = rpnSource.mode === "single"
+    ? rpnSource.all.checksum
+    : rpnSource.familyRows.map((part) => part.row.checksum).join(":");
 
   try {
     const [currentImport, rpnImport] = await persistFinancialPair(
@@ -95,7 +111,7 @@ export async function POST(request: Request) {
         rowCount: current.rows.length,
         payload: current,
         warnings: current.warnings,
-        ingestionMethod: "MANUAL_FAMILY_BATCH",
+        ingestionMethod: "MANUAL_HYBRID_BATCH",
         importedBy: session.user.id,
       },
       {
@@ -106,23 +122,25 @@ export async function POST(request: Request) {
         rowCount: rpn.rows.length,
         payload: rpn,
         warnings: rpn.warnings,
-        ingestionMethod: "MANUAL_FAMILY_BATCH",
+        ingestionMethod: "MANUAL_HYBRID_BATCH",
         importedBy: session.user.id,
       },
     );
 
     appendAuditLog({
       actorId: session.user.id,
-      action: "SAG_FAMILY_BATCH_FINALIZE",
+      action: "SAG_HYBRID_BATCH_FINALIZE",
       resourceType: "GRUPAMENTO_CCOL",
       resourceId: batchId,
       organizationId: session.user.organizationId,
       outcome: "SUCESSO",
-      reason: "Oito partes SAG validadas e consolidadas deterministicamente em duas fontes lógicas.",
+      reason: "Fontes SAG validadas em modo integral ou fracionado e consolidadas deterministicamente em duas fontes lógicas.",
       metadata: {
         batchId,
-        currentFiles: current.source.files,
-        rpnFiles: rpn.source.files,
+        currentMode: currentSource.mode,
+        rpnMode: rpnSource.mode,
+        currentFiles: current.source.files ?? [{ family: "ALL", fileName: current.source.fileName, rowCount: current.rows.length }],
+        rpnFiles: rpn.source.files ?? [{ family: "ALL", fileName: rpn.source.fileName, rowCount: rpn.rows.length }],
         currentRowCount: current.rows.length,
         rpnRowCount: rpn.rows.length,
       },
@@ -135,7 +153,7 @@ export async function POST(request: Request) {
       rpn: { ...rpn, persistedAt: rpnImport.importedAt.toISOString(), checksum: rpnImport.checksum },
       importedAt: new Date().toISOString(),
       persisted: true,
-      mode: "FAMILY_BATCH_STAGED",
+      mode: "HYBRID_BATCH_STAGED",
     });
   } catch (error) {
     return NextResponse.json({

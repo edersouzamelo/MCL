@@ -4,7 +4,7 @@ import { authOptions } from "@/modules/auth/options";
 import { parseCurrentSagPdf, parseRpnPdf } from "@/modules/grupamento/pdf-sag";
 import { parseRpnWorkbook, type RpnImportResult } from "@/modules/grupamento/rpn";
 import { parseSagWorkbook, type SagImportResult } from "@/modules/grupamento/sag";
-import { SAG_PI_FAMILIES, type SagPiFamily, validatePiFamilyRows } from "@/modules/grupamento/sag-family-batch";
+import { SAG_PI_FAMILIES, type SagPiFamily, validateCombinedPiRows, validatePiFamilyRows } from "@/modules/grupamento/sag-family-batch";
 import { appendAuditLog } from "@/server/demo-store";
 import { checksumBuffer, replaceSagBatchPart, type FinancialSourceKind } from "@/modules/financial-snapshots/repository";
 
@@ -51,12 +51,12 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const batchId = String(formData.get("batchId") ?? "");
   const source = String(formData.get("source") ?? "").toUpperCase();
-  const family = String(formData.get("family") ?? "").toUpperCase() as SagPiFamily;
+  const family = String(formData.get("family") ?? "").toUpperCase();
   const file = formData.get("file");
 
   if (!validBatchId(batchId)) return NextResponse.json({ error: "Identificador de lote inválido." }, { status: 400 });
   if (source !== "CURRENT" && source !== "RPNP") return NextResponse.json({ error: "Fonte SAG inválida." }, { status: 400 });
-  if (!SAG_PI_FAMILIES.includes(family)) return NextResponse.json({ error: "Família de PI inválida." }, { status: 400 });
+  if (family !== "ALL" && !SAG_PI_FAMILIES.includes(family as SagPiFamily)) return NextResponse.json({ error: "Família de PI inválida." }, { status: 400 });
   if (!(file instanceof File) || !file.size) return NextResponse.json({ error: `${source} ${family}: arquivo ausente ou vazio.` }, { status: 400 });
   if (!ALLOWED_EXTENSIONS.has(extensionOf(file))) return NextResponse.json({ error: `${source} ${family}: formato não suportado.` }, { status: 415 });
   if (file.size > MAX_FILE_SIZE) {
@@ -76,14 +76,26 @@ export async function POST(request: Request) {
           ? await withPdfTimeout(parseRpnPdf(buffer, file.name), `RPNP ${family}`)
           : parseRpnWorkbook(buffer, file.name));
 
-    const validation = validatePiFamilyRows(parsed.rows, family);
-    if (!validation.valid) {
-      const detail = !validation.rowCount
-        ? "nenhuma linha financeira válida foi encontrada"
-        : validation.missingPi
-          ? `${validation.missingPi} linha(s) sem PI; inclua UASG, NOME UG e PI no primeiro parâmetro do relatório`
-          : `há PI fora da família ${family}: ${validation.mismatched.slice(0, 5).join(", ")}`;
-      return NextResponse.json({ error: `${sourceKind} ${family}: ${detail}.` }, { status: 422 });
+    if (family === "ALL") {
+      const validation = validateCombinedPiRows(parsed.rows);
+      if (!validation.valid) {
+        const detail = !validation.rowCount
+          ? "nenhuma linha financeira válida foi encontrada"
+          : validation.missingPi
+            ? `${validation.missingPi} linha(s) sem PI; inclua UASG, NOME UG e PI no primeiro parâmetro do relatório`
+            : `há PI fora das famílias E5/E6/E7/D8: ${validation.unexpected.slice(0, 5).join(", ")}`;
+        return NextResponse.json({ error: `${sourceKind} ALL: ${detail}.` }, { status: 422 });
+      }
+    } else {
+      const validation = validatePiFamilyRows(parsed.rows, family as SagPiFamily);
+      if (!validation.valid) {
+        const detail = !validation.rowCount
+          ? "nenhuma linha financeira válida foi encontrada"
+          : validation.missingPi
+            ? `${validation.missingPi} linha(s) sem PI; inclua UASG, NOME UG e PI no primeiro parâmetro do relatório`
+            : `há PI fora da família ${family}: ${validation.mismatched.slice(0, 5).join(", ")}`;
+        return NextResponse.json({ error: `${sourceKind} ${family}: ${detail}.` }, { status: 422 });
+      }
     }
 
     const persisted = await replaceSagBatchPart({
@@ -106,7 +118,9 @@ export async function POST(request: Request) {
       resourceId: `${batchId}:${sourceKind}:${family}`,
       organizationId: session.user.organizationId,
       outcome: "SUCESSO",
-      reason: "Arquivo SAG de uma família de PI interpretado e armazenado como parte de lote pendente.",
+      reason: family === "ALL"
+        ? "Arquivo SAG integral interpretado e armazenado como fonte completa de lote pendente."
+        : "Arquivo SAG de uma família de PI interpretado e armazenado como parte de lote pendente.",
       metadata: {
         batchId,
         sourceKind,
