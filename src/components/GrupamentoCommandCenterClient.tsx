@@ -32,6 +32,11 @@ type SagPairResponse = {
   importedAt: string;
 };
 
+type LegacySagPair = {
+  current: SagImportResult;
+  rpn: RpnImportResult;
+};
+
 function currency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(value);
 }
@@ -43,6 +48,11 @@ function percent(value: number) {
 function fileSize(value: number) {
   if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
   return `${(value / (1024 * 1024)).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB`;
+}
+
+function dateTime(value: string) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString("pt-BR");
 }
 
 function readStored<T>(key: string): T | null {
@@ -61,6 +71,8 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
   const [rpnFile, setRpnFile] = useState<File | null>(null);
   const [monitors, setMonitors] = useState<CcoMonitorConfig[]>(defaultCcoMonitorConfig());
   const [uploading, setUploading] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [legacyPair, setLegacyPair] = useState<LegacySagPair | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -129,6 +141,61 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
     }
   }
 
+  function inspectLegacyRecovery() {
+    setError("");
+    setNotice("");
+
+    const current = readStored<SagImportResult>(GROUP_STORAGE_KEYS.sag);
+    const previous = readStored<RpnImportResult>(GROUP_STORAGE_KEYS.rpn);
+
+    if (!current && !previous) {
+      setLegacyPair(null);
+      setError("Este navegador não contém uma carga SAG legada do CCO.");
+      return;
+    }
+    if (!current || !previous) {
+      setLegacyPair(null);
+      setError("Foi encontrada apenas uma das duas fontes SAG legadas. A recuperação não será feita com par incompleto.");
+      return;
+    }
+    if (!Array.isArray(current.rows) || !current.rows.length || !Array.isArray(previous.rows) || !previous.rows.length) {
+      setLegacyPair(null);
+      setError("A carga local existe, mas não contém linhas válidas suficientes para recuperação.");
+      return;
+    }
+
+    setLegacyPair({ current, rpn: previous });
+  }
+
+  async function confirmLegacyRecovery() {
+    if (!legacyPair) return;
+
+    setRecovering(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/grupamento/sag/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(legacyPair),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao recuperar a carga SAG legada.");
+
+      const recovered = payload as SagPairResponse;
+      setSag(recovered.current);
+      setRpn(recovered.rpn);
+      setLegacyPair(null);
+      window.dispatchEvent(new CustomEvent("mcl-grupamento-sag-updated"));
+      window.dispatchEvent(new CustomEvent("mcl-grupamento-rpn-updated"));
+      setNotice(`Carga SAG legada recuperada e persistida: ${recovered.current.rows.length} linha(s) do Exercício Corrente + ${recovered.rpn.rows.length} linha(s) dos créditos do exercício anterior. A cópia local foi preservada.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Falha ao recuperar a carga SAG legada.");
+    } finally {
+      setRecovering(false);
+    }
+  }
+
   function updateMonitor(id: number, patch: Partial<CcoMonitorConfig>) {
     setMonitors((current) => current.map((monitor) => (monitor.id === id ? { ...monitor, ...patch } : monitor)));
   }
@@ -190,13 +257,50 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
             </button>
           </form>
 
+          {!sag || !rpn ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <div className="text-xs font-bold text-amber-950 dark:text-amber-200">Recuperação da carga anterior deste navegador</div>
+              <p className="mt-1 text-[11px] leading-5 text-amber-900/80 dark:text-amber-300/80">
+                Use somente no computador e perfil de navegador em que o par SAG foi carregado antes da persistência em banco. O MCL apenas lê o snapshot local; nenhuma fonte TG é consultada.
+              </p>
+              {!legacyPair ? (
+                <button type="button" onClick={inspectLegacyRecovery} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-zinc-950 dark:text-amber-200 dark:hover:bg-amber-950/40">
+                  <RefreshCw className="h-4 w-4" /> Recuperar última carga SAG deste navegador
+                </button>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg border border-amber-200 bg-white/80 p-3 dark:border-amber-900/50 dark:bg-zinc-950">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Exercício Corrente</div>
+                      <div className="mt-1 break-all text-xs font-semibold">{legacyPair.current.source.fileName}</div>
+                      <div className="mt-1 text-[11px] text-zinc-500">{dateTime(legacyPair.current.source.importedAt)} · {legacyPair.current.rows.length} linha(s)</div>
+                    </div>
+                    <div className="rounded-lg border border-amber-200 bg-white/80 p-3 dark:border-amber-900/50 dark:bg-zinc-950">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Créditos do exercício anterior</div>
+                      <div className="mt-1 break-all text-xs font-semibold">{legacyPair.rpn.source.fileName}</div>
+                      <div className="mt-1 text-[11px] text-zinc-500">{dateTime(legacyPair.rpn.source.importedAt)} · {legacyPair.rpn.rows.length} linha(s)</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={recovering} onClick={() => { void confirmLegacyRecovery(); }} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-amber-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60">
+                      {recovering ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                      {recovering ? "Persistindo recuperação..." : "Confirmar recuperação no banco"}
+                    </button>
+                    <button type="button" disabled={recovering} onClick={() => setLegacyPair(null)} className="rounded-lg border border-zinc-300 px-3 py-2.5 text-xs font-semibold dark:border-zinc-700">Cancelar</button>
+                  </div>
+                  <p className="text-[10px] leading-4 text-zinc-500">A recuperação é registrada como LEGACY_BROWSER_RECOVERY. O PDF não é relido e a cópia local não é apagada.</p>
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {error ? <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs font-medium text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p> : null}
           {notice ? <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{notice}</p> : null}
 
           <div className="mt-4 space-y-2 border-t border-zinc-200 pt-4 text-xs text-zinc-500 dark:border-zinc-800">
             <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Os relatórios são validados como um par; nenhum número sintético substitui fonte ausente.</p>
             <p className="flex items-start gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0" /> A classificação usa PI exato conforme a matriz fornecida; PI não mapeado permanece explicitamente fora da Classe.</p>
-            <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> A fonte de verdade é persistida no banco com checksum; o navegador não fabrica nem conserva saldos financeiros.</p>
+            <p className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Novas cargas são persistidas no banco com checksum. Snapshots locais legados só entram por recuperação explícita e auditada.</p>
             <p className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Escopo de sessão: {organizationId || "organização não informada"}.</p>
           </div>
         </div>
