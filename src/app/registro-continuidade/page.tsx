@@ -1,3 +1,4 @@
+import { PcaHistory } from "@/components/needs/PcaHistory";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { Badge, Card, MetricCard, PageHeader } from "@/components/ui";
@@ -18,6 +19,9 @@ export default function LogisticsContinuityRegistryPage() {
         action={<Badge tone="info">Ambiente demonstrativo</Badge>}
       />
 
+      <div className="mb-6"><PcaHistory year={new Date().getFullYear()}/></div>
+
+      <h2 className="mb-3 text-lg font-bold">Demonstração dos demais eventos logísticos</h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Eventos registrados" value={state.events.length} detail="Ocorrências imutáveis da trajetória" tone="good" />
         <MetricCard label="Vínculos entre objetos" value={state.objectLinks.length} detail="Correlação sem apagar identificadores" />
