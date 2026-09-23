@@ -18,6 +18,9 @@ import {
 
 const MIN_KIOSK_SCALE = 0.86;
 const SCROLL_EDGE_HOLD_MS = 650;
+const SCREEN_FADE_MS = 450;
+const DATA_REFRESH_MS = 30_000;
+const PAGE_RELOAD_MS = 5 * 60_000;
 
 function load<T>(key: string): T | null {
   try {
@@ -41,14 +44,16 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [monitor, setMonitor] = useState<CcoMonitorConfig>(() => defaultCcoMonitorConfig()[Math.max(0, Math.min(7, monitorId - 1))]);
   const [screenIndex, setScreenIndex] = useState(0);
+  const [transitioning, setTransitioning] = useState(false);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     let cancelled = false;
+
     const hydrate = async () => {
       const stored = load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
       const selected = stored?.find((item) => item.id === monitorId);
-      if (selected) {
+      if (selected && !cancelled) {
         const normalized = normalizeMonitor(selected);
         setMonitor(normalized);
         if (selected.delaySeconds !== normalized.delaySeconds && stored) {
@@ -76,14 +81,18 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     };
 
     const frame = window.requestAnimationFrame(() => { void hydrate(); });
+    const poll = window.setInterval(() => { void hydrate(); }, DATA_REFRESH_MS);
     const refresh = () => { void hydrate(); };
+
     window.addEventListener("storage", refresh);
     window.addEventListener("mcl-grupamento-sag-updated", refresh);
     window.addEventListener("mcl-grupamento-rpn-updated", refresh);
     window.addEventListener("mcl-grupamento-monitors-updated", refresh);
+
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(frame);
+      window.clearInterval(poll);
       window.removeEventListener("storage", refresh);
       window.removeEventListener("mcl-grupamento-sag-updated", refresh);
       window.removeEventListener("mcl-grupamento-rpn-updated", refresh);
@@ -97,12 +106,31 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   }, []);
 
   useEffect(() => {
-    if (monitor.mode !== "loop" || monitor.screens.length <= 1) return;
-    const timer = window.setInterval(
-      () => setScreenIndex((current) => (current + 1) % monitor.screens.length),
-      Math.max(5, monitor.delaySeconds) * 1000,
-    );
+    const timer = window.setInterval(() => {
+      window.location.reload();
+    }, PAGE_RELOAD_MS);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (monitor.mode !== "loop" || monitor.screens.length <= 1) return;
+
+    let switchTimer = 0;
+    const cycleMs = Math.max(5, monitor.delaySeconds) * 1000;
+    const timer = window.setInterval(() => {
+      setTransitioning(true);
+      switchTimer = window.setTimeout(() => {
+        setScreenIndex((current) => (current + 1) % monitor.screens.length);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => setTransitioning(false));
+        });
+      }, SCREEN_FADE_MS);
+    }, cycleMs);
+
+    return () => {
+      window.clearInterval(timer);
+      if (switchTimer) window.clearTimeout(switchTimer);
+    };
   }, [monitor.mode, monitor.screens, monitor.delaySeconds]);
 
   const safeIndex = Math.min(screenIndex, Math.max(0, monitor.screens.length - 1));
@@ -164,22 +192,25 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       ) : null}
 
       <section className="relative z-10 min-h-0 flex-1 overflow-hidden px-6 py-4">
-        <MonitorViewport
-          key={activeScreen}
-          screenKey={activeScreen}
-          cycleSeconds={Math.max(5, monitor.delaySeconds)}
-          loopMode={monitor.mode === "loop" && monitor.screens.length > 1}
+        <div
+          className={`h-full w-full transition-opacity ease-in-out ${transitioning ? "opacity-0" : "opacity-100"}`}
+          style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
-          {screenContent}
-        </MonitorViewport>
+          <MonitorViewport
+            key={activeScreen}
+            screenKey={activeScreen}
+            cycleSeconds={Math.max(5, monitor.delaySeconds)}
+            loopMode={monitor.mode === "loop" && monitor.screens.length > 1}
+          >
+            {screenContent}
+          </MonitorViewport>
+        </div>
       </section>
 
-      <div className={`pointer-events-none absolute bottom-11 right-6 z-30 flex items-center gap-2.5 rounded-xl border px-3 py-2 backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-55" : "border-white/10 bg-slate-950/35 text-white opacity-45"}`}>
-        <BrandLogo className="h-8 w-8" tone={ccol ? "green" : "sky"} sizes="32px" />
-        <div className="leading-none">
-          <div className="text-[11px] font-black tracking-[0.16em]">MCL</div>
-          <div className={`mt-1 text-[7px] font-bold uppercase tracking-[0.13em] ${ccol ? "text-slate-500" : "text-sky-200"}`}>Continuidade Logística</div>
-        </div>
+      <div className={`pointer-events-none absolute bottom-11 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
+        <BrandLogo className="h-11 w-11" tone={ccol ? "green" : "sky"} sizes="44px" />
+        <div className={`mt-1 text-[8px] font-black uppercase tracking-[0.16em] ${ccol ? "text-slate-600" : "text-sky-100"}`}>Continuidade</div>
+        <div className={`mt-0.5 text-[8px] font-black uppercase tracking-[0.22em] ${ccol ? "text-slate-500" : "text-sky-300"}`}>Logística</div>
       </div>
 
       <footer className={`relative z-20 flex h-10 shrink-0 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/85 text-slate-600" : "border-white/10 bg-slate-950/85 text-slate-400"}`}>
@@ -196,6 +227,8 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         <div className="flex shrink-0 items-center gap-3">
           <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
           <span>{monitor.mode === "loop" ? `loop · ${monitor.delaySeconds}s` : "tela fixa"}</span>
+          <span>dados · 30s</span>
+          <span>auto F5 · 5min</span>
           <span>{safeIndex + 1}/{monitor.screens.length}</span>
         </div>
       </footer>
