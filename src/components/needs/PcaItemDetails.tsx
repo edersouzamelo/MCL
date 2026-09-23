@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { PcaHistory } from "@/components/needs/PcaHistory";
+
 type Fields = Record<string, unknown>;
 type Detail = { pncpData: Fields; pgcData: Fields[] | null; pgcSynchronizedAt: string | null; sourceUrl: string | null };
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 4 });
@@ -45,6 +47,7 @@ const pgcFields: Array<[string, string]> = [
 
 export function PcaItemDetails({ id, uasg, year }: { id: string; uasg: string; year: number }) {
   const [data, setData] = useState<Detail | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -71,5 +74,7 @@ export function PcaItemDetails({ id, uasg, year }: { id: string; uasg: string; y
       <p className="mt-4 text-xs text-zinc-500">Esta ficha mostra os dados publicados pela API do PGC. O documento integral, justificativas e anexos não foram disponibilizados por esta integração.</p>
     </section>
     <AllFields data={data.pncpData}/>
+    <button aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)} className="text-sm font-semibold text-sky-700 underline dark:text-sky-400">{showHistory ? "Fechar histórico" : "Consultar versões anteriores"}</button>
+    {showHistory && <PcaHistory key={`${id}-${year}`} itemId={id} uasg={uasg} year={year}/>}
   </div>;
 }
