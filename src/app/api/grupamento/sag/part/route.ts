@@ -76,18 +76,26 @@ export async function POST(request: Request) {
           ? await withPdfTimeout(parseRpnPdf(buffer, file.name), `RPNP ${family}`)
           : parseRpnWorkbook(buffer, file.name));
 
-    const validation = family === "ALL"
-      ? validateCombinedPiRows(parsed.rows)
-      : validatePiFamilyRows(parsed.rows, family as SagPiFamily);
-    if (!validation.valid) {
-      const detail = !validation.rowCount
-        ? "nenhuma linha financeira válida foi encontrada"
-        : validation.missingPi
-          ? `${validation.missingPi} linha(s) sem PI; inclua UASG, NOME UG e PI no primeiro parâmetro do relatório`
-          : family === "ALL"
-            ? `há PI fora das famílias E5/E6/E7/D8: ${validation.unexpected.slice(0, 5).join(", ")}`
+    if (family === "ALL") {
+      const validation = validateCombinedPiRows(parsed.rows);
+      if (!validation.valid) {
+        const detail = !validation.rowCount
+          ? "nenhuma linha financeira válida foi encontrada"
+          : validation.missingPi
+            ? `${validation.missingPi} linha(s) sem PI; inclua UASG, NOME UG e PI no primeiro parâmetro do relatório`
+            : `há PI fora das famílias E5/E6/E7/D8: ${validation.unexpected.slice(0, 5).join(", ")}`;
+        return NextResponse.json({ error: `${sourceKind} ALL: ${detail}.` }, { status: 422 });
+      }
+    } else {
+      const validation = validatePiFamilyRows(parsed.rows, family as SagPiFamily);
+      if (!validation.valid) {
+        const detail = !validation.rowCount
+          ? "nenhuma linha financeira válida foi encontrada"
+          : validation.missingPi
+            ? `${validation.missingPi} linha(s) sem PI; inclua UASG, NOME UG e PI no primeiro parâmetro do relatório`
             : `há PI fora da família ${family}: ${validation.mismatched.slice(0, 5).join(", ")}`;
-      return NextResponse.json({ error: `${sourceKind} ${family}: ${detail}.` }, { status: 422 });
+        return NextResponse.json({ error: `${sourceKind} ${family}: ${detail}.` }, { status: 422 });
+      }
     }
 
     const persisted = await replaceSagBatchPart({
