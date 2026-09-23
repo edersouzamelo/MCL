@@ -370,7 +370,10 @@ export function parseRpnPositionedPages(pages: PositionedPage[], fileName: strin
 }
 
 async function extractPositionedPages(buffer: ArrayBuffer) {
-  const { items } = await extractTextItems(new Uint8Array(buffer));
+  // unpdf/pdf.js may transfer and detach the backing ArrayBuffer it receives.
+  // Parse a defensive copy so callers can still hash/audit the original bytes.
+  const parserBytes = new Uint8Array(buffer.slice(0));
+  const { items } = await extractTextItems(parserBytes);
   return items.map((page) =>
     page.map((item) => ({
       str: item.str,

@@ -67,6 +67,7 @@ export async function POST(request: Request) {
 
   try {
     const buffer = await file.arrayBuffer();
+    const checksum = checksumBuffer(buffer);
     const sourceKind = source as FinancialSourceKind;
     const parsed: SagImportResult | RpnImportResult = sourceKind === "CURRENT"
       ? (extensionOf(file) === "pdf"
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
       sourceKind,
       family,
       fileName: file.name,
-      checksum: checksumBuffer(buffer),
+      checksum,
       rowCount: parsed.rows.length,
       payload: parsed,
       warnings: parsed.warnings,

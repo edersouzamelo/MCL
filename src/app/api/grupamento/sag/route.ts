@@ -40,18 +40,20 @@ async function withPdfTimeout<T>(promise: Promise<T>, label: string) {
 
 async function parseCurrent(file: File) {
   const buffer = await file.arrayBuffer();
+  const checksum = checksumBuffer(buffer);
   const parsed = extensionOf(file) === "pdf"
     ? withPdfTimeout(parseCurrentSagPdf(buffer, file.name), "Exercício Corrente")
     : parseSagWorkbook(buffer, file.name);
-  return { parsed: await parsed, buffer };
+  return { parsed: await parsed, checksum };
 }
 
 async function parseRpn(file: File) {
   const buffer = await file.arrayBuffer();
+  const checksum = checksumBuffer(buffer);
   const parsed = extensionOf(file) === "pdf"
     ? withPdfTimeout(parseRpnPdf(buffer, file.name), "RPNP")
     : parseRpnWorkbook(buffer, file.name);
-  return { parsed: await parsed, buffer };
+  return { parsed: await parsed, checksum };
 }
 
 export async function POST(request: Request) {
@@ -135,7 +137,7 @@ export async function POST(request: Request) {
         organizationId,
         sourceKind: "CURRENT",
         fileName: currentFile.name,
-        checksum: checksumBuffer(currentSource.buffer),
+        checksum: currentSource.checksum,
         rowCount: current.rows.length,
         payload: current,
         warnings: current.warnings,
@@ -146,7 +148,7 @@ export async function POST(request: Request) {
         organizationId,
         sourceKind: "RPNP",
         fileName: rpnFile.name,
-        checksum: checksumBuffer(rpnSource.buffer),
+        checksum: rpnSource.checksum,
         rowCount: rpn.rows.length,
         payload: rpn,
         warnings: rpn.warnings,
