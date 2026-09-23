@@ -50,9 +50,8 @@ function pageContractText(page: PositionedPage) {
 function hasCurrentContract(page: PositionedPage) {
   const text = pageContractText(page);
   return (
-    text.includes("UG") &&
+    (text.includes("UG") || text.includes("UASG")) &&
     text.includes("PI") &&
-    text.includes("NOMEPI") &&
     text.includes("DISPONIVEL") &&
     text.includes("ALIQUIDAR") &&
     text.includes("EMLIQUIDACAO") &&
@@ -64,9 +63,8 @@ function hasCurrentContract(page: PositionedPage) {
 function hasRpnContract(page: PositionedPage) {
   const text = pageContractText(page);
   return (
-    text.includes("UG") &&
+    (text.includes("UG") || text.includes("UASG")) &&
     text.includes("PI") &&
-    text.includes("NOMEPI") &&
     text.includes("TOTALINSCRITO") &&
     text.includes("TOTALALIQUIDAR") &&
     text.includes("TOTALLIQUIDADO") &&

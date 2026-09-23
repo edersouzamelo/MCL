@@ -31,6 +31,7 @@ export type RpnImportResult = {
     importedAt: string;
     origin: "MANUAL_RPNP";
     nature: "DADO_IMPORTADO";
+    files?: Array<{ family: string; fileName: string; rowCount: number }>;
   };
   sheets: string[];
   rows: RpnRow[];
@@ -51,7 +52,7 @@ export type RpnImportResult = {
 };
 
 const HEADER_ALIASES = {
-  ug: ["UG"],
+  ug: ["UG", "UASG"],
   acronym: ["NOME_UG", "NOME UG", "SIGLA"],
   pi: ["PI"],
   piName: ["NOME_PI", "NOME PI"],
@@ -205,6 +206,47 @@ function readSheet(sheetName: string, sheet: XLSX.WorkSheet, warnings: string[])
   }
 
   return rows;
+}
+
+export function mergeRpnImportResults(
+  parts: RpnImportResult[],
+  fileName: string,
+  files: Array<{ family: string; fileName: string; rowCount: number }>,
+): RpnImportResult {
+  const rows = parts.flatMap((part) => part.rows);
+  const piGroups = groupRows(rows, "pi");
+  const ugGroups = groupRows(rows, "ug");
+  const warnings = parts.flatMap((part) => part.warnings.map((warning) => `${part.source.fileName}: ${warning}`));
+
+  return {
+    source: {
+      fileName,
+      importedAt: new Date().toISOString(),
+      origin: "MANUAL_RPNP",
+      nature: "DADO_IMPORTADO",
+      files,
+    },
+    sheets: parts.flatMap((part) => part.sheets.map((sheet) => `${part.source.fileName} · ${sheet}`)),
+    rows,
+    totals: sumRows(rows),
+    byPi: [...piGroups.entries()]
+      .map(([pi, group]) => ({
+        pi,
+        piName: group.find((row) => row.piName)?.piName,
+        snapshot: sumRows(group),
+        rowCount: group.length,
+      }))
+      .sort((a, b) => b.snapshot.inscribed - a.snapshot.inscribed),
+    byUg: [...ugGroups.entries()]
+      .map(([ug, group]) => ({
+        ug,
+        acronym: group.find((row) => row.acronym)?.acronym,
+        snapshot: sumRows(group),
+        rowCount: group.length,
+      }))
+      .sort((a, b) => b.snapshot.inscribed - a.snapshot.inscribed),
+    warnings,
+  };
 }
 
 export function buildRpnImportResult(rows: RpnRow[], fileName: string, sheets: string[], warnings: string[]): RpnImportResult {
