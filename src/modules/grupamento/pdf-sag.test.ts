@@ -26,6 +26,29 @@ describe("SAG PDF coordinate reconstruction", () => {
     expect(result.rows.map((row) => row.pi)).toEqual(["E5MBPDRCOLU", "E5ARPDRCOLU"]);
   });
 
+  it("accepts the SAG direct-export landscape layout as well as browser-print layout", () => {
+    const page: PositionedPage = [
+      item("UG", 12, 560), item("SIGLA", 90, 560), item("PI", 210, 560),
+      item("DISPONIVEL", 330, 560), item("A_LIQUIDAR", 420, 560), item("EM_LIQUIDACAO", 510, 560),
+      item("LIQUIDADO", 610, 560), item("PAGO", 690, 560), item("%EMP", 760, 560), item("%LIQ", 805, 560),
+      item("160136", 12, 535), item("Cmdo 9º Gpt Log", 90, 535), item("E5MBPDRDEGE", 210, 535),
+      item("259,19", 330, 535), item("47.004,24", 420, 535), item("0,00", 510, 535),
+      item("0,00", 610, 535), item("7.575,00", 690, 535), item("99.53%", 760, 535), item("13.81%", 805, 535),
+    ];
+
+    const result = parseCurrentSagPositionedPages([page], "sag-export-direto.pdf");
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      ug: "160136",
+      acronym: "Cmdo 9º Gpt Log",
+      pi: "E5MBPDRDEGE",
+      available: 259.19,
+      toLiquidate: 47004.24,
+      paid: 7575,
+    });
+  });
+
   it("reconstructs current-year financial columns while joining a wrapped PI description", () => {
     const page: PositionedPage = [
       item("UG", 10, 800), item("SIGLA", 70, 800), item("PI", 150, 800), item("NOME_PI", 230, 800),
