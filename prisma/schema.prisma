@@ -161,6 +161,7 @@ model PcaItem {
   @@unique([organizationId, year, pncpItemId])
   @@index([organizationId, year, active])
   @@index([catalogCode])
+  revisions                  PcaItemRevision[]
   pgcData                    Json?
   pgcSynchronizedAt          DateTime?
 
@@ -967,4 +968,19 @@ model EventLog {
   @@index([eventType])
   @@index([objectType, objectId])
   @@index([occurredAt])
+}
+
+model PcaItemRevision {
+  id         String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  pcaItemId  String
+  source     String
+  version    Int
+  kind       String
+  observedAt DateTime
+  recordedAt DateTime @default(now())
+  payload    Json
+  item       PcaItem  @relation(fields: [pcaItemId], references: [id], onDelete: Restrict)
+
+  @@unique([pcaItemId, source, version])
+  @@index([recordedAt(sort: Desc), id])
 }
