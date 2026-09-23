@@ -253,10 +253,13 @@ function MonitorViewport({
   }, [screenKey]);
 
   useEffect(() => {
-    setOffset(0);
-    if (maxOffset <= 2) return;
-
     let animationFrame = 0;
+    if (maxOffset <= 2) {
+      animationFrame = window.requestAnimationFrame(() => setOffset(0));
+      return () => window.cancelAnimationFrame(animationFrame);
+    }
+
+
     const startedAt = performance.now();
     const travelMs = loopMode
       ? Math.max(3_500, cycleSeconds * 1_000 - SCROLL_EDGE_HOLD_MS * 2)
