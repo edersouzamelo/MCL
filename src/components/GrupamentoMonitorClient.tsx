@@ -118,7 +118,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
       <section className="p-8">
         {!monitor.enabled ? (
-          <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCO para voltar a exibir conteúdo." />
+          <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
         ) : !sag || !rpn ? (
           <Empty ccol={ccol} title="Par SAG incompleto" description="Esta tela exige Exercício Corrente e créditos do exercício anterior validados. Não há substituição por números sintéticos." />
         ) : isRuleScreen ? (
