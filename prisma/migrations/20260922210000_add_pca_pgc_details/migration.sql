@@ -1,0 +1,2 @@
+ALTER TABLE "PcaItem" ADD COLUMN "pgcData" JSONB,
+ADD COLUMN "pgcSynchronizedAt" TIMESTAMP(3);
