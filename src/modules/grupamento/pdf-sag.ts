@@ -132,18 +132,29 @@ function textFromItems(items: PositionedTextItem[]) {
     .trim();
 }
 
-function locatePi(block: RowBlock) {
-  return block.items.find(
+function findColumnX(page: PositionedPage, labels: string[]) {
+  const normalizedLabels = new Set(labels.map((label) => compactText(label)));
+  const header = page.find((item) => normalizedLabels.has(compactText(item.str)));
+  return header?.x;
+}
+
+function locatePi(block: RowBlock, piColumnX?: number) {
+  const candidates = block.items.filter(
     (item) =>
       item !== block.start &&
       item.x > block.start.x + 8 &&
       sameFinancialLine(item, block.start) &&
       isPiCode(item.str),
   );
+
+  if (!candidates.length) return undefined;
+  if (piColumnX === undefined) return candidates[0];
+
+  return [...candidates].sort((a, b) => Math.abs(a.x - piColumnX) - Math.abs(b.x - piColumnX))[0];
 }
 
-function rowIdentity(block: RowBlock, expectedMoneyColumns: number) {
-  const piItem = locatePi(block);
+function rowIdentity(block: RowBlock, expectedMoneyColumns: number, piColumnX?: number) {
+  const piItem = locatePi(block, piColumnX);
   if (!piItem) return null;
 
   const moneyItems = block.items
@@ -263,8 +274,9 @@ export function parseCurrentSagPositionedPages(pages: PositionedPage[], fileName
     }
     recognizedPages += 1;
 
+    const piColumnX = findColumnX(page, ["PI"]);
     for (const block of rowBlocks(page)) {
-      const identity = rowIdentity(block, 5);
+      const identity = rowIdentity(block, 5, piColumnX);
       if (!identity) continue;
       const [availableItem, toLiquidateItem, inLiquidationItem, liquidatedItem, paidItem] = identity.moneyItems;
       const financial: SagFinancialValues = {
@@ -315,8 +327,9 @@ export function parseRpnPositionedPages(pages: PositionedPage[], fileName: strin
     }
     recognizedPages += 1;
 
+    const piColumnX = findColumnX(page, ["PI"]);
     for (const block of rowBlocks(page)) {
-      const identity = rowIdentity(block, 4);
+      const identity = rowIdentity(block, 4, piColumnX);
       if (!identity) continue;
       const [inscribedItem, toLiquidateItem, liquidatedItem, cancelledItem] = identity.moneyItems;
       const reportedInscribed = money(inscribedItem, parseRpnNumber);
