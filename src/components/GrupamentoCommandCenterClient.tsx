@@ -78,6 +78,7 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
   const [rpnFiles, setRpnFiles] = useState<Record<SagPiFamily, File | null>>(() => emptyFamilyFiles());
   const [monitors, setMonitors] = useState<CcoMonitorConfig[]>(defaultCcoMonitorConfig());
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const [recovering, setRecovering] = useState(false);
   const [legacyPair, setLegacyPair] = useState<LegacySagPair | null>(null);
   const [error, setError] = useState("");
@@ -121,36 +122,64 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
     event.preventDefault();
     setError("");
     setNotice("");
+    setUploadProgress("");
 
     if (!allFamilyFilesSelected) {
       setError("Selecione os 8 relatórios: E5, E6, E7 e D8 para Exercício Corrente e RPNP.");
       return;
     }
 
-    setUploading(true);
-    try {
-      const body = new FormData();
-      SAG_PI_FAMILIES.forEach((family) => {
-        const current = currentFiles[family];
-        const previous = rpnFiles[family];
-        if (current) body.set(familyFieldName("current", family), current);
-        if (previous) body.set(familyFieldName("rpn", family), previous);
-      });
+    const oversized = [
+      ...SAG_PI_FAMILIES.map((family) => ({ source: "Exercício Corrente", family, file: currentFiles[family] })),
+      ...SAG_PI_FAMILIES.map((family) => ({ source: "RPNP", family, file: rpnFiles[family] })),
+    ].find((item) => item.file && item.file.size > 4 * 1024 * 1024);
+    if (oversized?.file) {
+      setError(`${oversized.source} ${oversized.family}: ${fileSize(oversized.file.size)}. Cada PDF precisa ficar abaixo de 4 MB para o envio seguro. Reduza mais o escopo no SAG.`);
+      return;
+    }
 
-      const response = await fetch("/api/grupamento/sag", { method: "POST", body });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Falha na carga SAG.");
+    setUploading(true);
+    const batchId = window.crypto.randomUUID();
+    try {
+      const jobs = [
+        ...SAG_PI_FAMILIES.map((family) => ({ source: "CURRENT" as const, family, file: currentFiles[family]! })),
+        ...SAG_PI_FAMILIES.map((family) => ({ source: "RPNP" as const, family, file: rpnFiles[family]! })),
+      ];
+
+      for (let index = 0; index < jobs.length; index += 1) {
+        const job = jobs[index];
+        setUploadProgress(`Processando ${index + 1}/8 · ${job.source === "CURRENT" ? "Exercício Corrente" : "RPNP"} ${job.family}`);
+        const body = new FormData();
+        body.set("batchId", batchId);
+        body.set("source", job.source);
+        body.set("family", job.family);
+        body.set("file", job.file);
+
+        const response = await fetch("/api/grupamento/sag/part", { method: "POST", body });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? `Falha em ${job.source} ${job.family}.`);
+      }
+
+      setUploadProgress("Consolidando as 8 partes no banco...");
+      const finalize = await fetch("/api/grupamento/sag/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId }),
+      });
+      const payload = await finalize.json();
+      if (!finalize.ok) throw new Error(payload.error ?? "Falha ao consolidar o lote SAG.");
 
       const parsed = payload as SagPairResponse;
       setSag(parsed.current);
       setRpn(parsed.rpn);
       window.dispatchEvent(new CustomEvent("mcl-grupamento-sag-updated"));
       window.dispatchEvent(new CustomEvent("mcl-grupamento-rpn-updated"));
-      setNotice(`Lote carregado: 4 PDFs do Exercício Corrente + 4 PDFs de RPNP · ${parsed.current.rows.length + parsed.rpn.rows.length} linha(s) válidas.`);
+      setNotice(`Lote consolidado: 4 PDFs do Exercício Corrente + 4 PDFs de RPNP · ${parsed.current.rows.length + parsed.rpn.rows.length} linha(s) válidas.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha na carga SAG.");
     } finally {
       setUploading(false);
+      setUploadProgress("");
     }
   }
 
@@ -290,7 +319,7 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
             />
             <button type="submit" disabled={uploading || !allFamilyFilesSelected} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 dark:disabled:bg-zinc-800">
               {uploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-              {uploading ? "Interpretando os 8 relatórios..." : "Processar os 8 relatórios"}
+              {uploading ? (uploadProgress || "Processando os 8 relatórios...") : "Processar os 8 relatórios"}
             </button>
           </form>
 

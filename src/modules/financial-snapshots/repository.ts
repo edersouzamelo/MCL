@@ -14,7 +14,7 @@ type PersistInput = {
   rowCount: number;
   payload: SagImportResult | RpnImportResult;
   warnings: string[];
-  ingestionMethod: "MANUAL_PAIR" | "MANUAL_FAMILY_BATCH" | "APPS_SCRIPT" | "LEGACY_BROWSER_RECOVERY";
+  ingestionMethod: "MANUAL_PAIR" | "MANUAL_FAMILY_PART" | "MANUAL_FAMILY_BATCH" | "APPS_SCRIPT" | "LEGACY_BROWSER_RECOVERY";
   importedBy?: string;
 };
 
@@ -35,6 +35,73 @@ export function checksumBuffers(buffers: ArrayBuffer[]) {
   const hash = createHash("sha256");
   buffers.forEach((buffer) => hash.update(Buffer.from(buffer)));
   return hash.digest("hex");
+}
+
+type SagBatchPartInput = {
+  organizationId: string;
+  batchId: string;
+  sourceKind: FinancialSourceKind;
+  family: string;
+  fileName: string;
+  checksum: string;
+  rowCount: number;
+  payload: SagImportResult | RpnImportResult;
+  warnings: string[];
+  importedBy?: string;
+};
+
+export function sagBatchPartSourceKind(batchId: string, sourceKind: FinancialSourceKind, family: string) {
+  return `SAG_BATCH:${batchId}:${sourceKind}:${family}`;
+}
+
+export async function replaceSagBatchPart(input: SagBatchPartInput) {
+  const sourceKind = sagBatchPartSourceKind(input.batchId, input.sourceKind, input.family);
+  const staleBefore = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.financialSourceImport.deleteMany({
+      where: {
+        organizationId: input.organizationId,
+        sourceKind: { startsWith: "SAG_BATCH:" },
+        importedAt: { lt: staleBefore },
+      },
+    });
+    await tx.financialSourceImport.deleteMany({
+      where: { organizationId: input.organizationId, sourceKind },
+    });
+    return tx.financialSourceImport.create({
+      data: {
+        organizationId: input.organizationId,
+        sourceKind,
+        fileName: input.fileName,
+        checksum: input.checksum,
+        rowCount: input.rowCount,
+        payload: json(input.payload),
+        warnings: json(input.warnings),
+        ingestionMethod: "MANUAL_FAMILY_PART",
+        importedBy: input.importedBy,
+      },
+    });
+  });
+}
+
+export async function getSagBatchParts(organizationId: string, batchId: string) {
+  return prisma.financialSourceImport.findMany({
+    where: {
+      organizationId,
+      sourceKind: { startsWith: `SAG_BATCH:${batchId}:` },
+    },
+    orderBy: { importedAt: "asc" },
+  });
+}
+
+export async function deleteSagBatchParts(organizationId: string, batchId: string) {
+  return prisma.financialSourceImport.deleteMany({
+    where: {
+      organizationId,
+      sourceKind: { startsWith: `SAG_BATCH:${batchId}:` },
+    },
+  });
 }
 
 function upsertArgs(input: PersistInput): Prisma.FinancialSourceImportUpsertArgs {
