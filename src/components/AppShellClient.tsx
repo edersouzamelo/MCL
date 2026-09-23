@@ -108,7 +108,7 @@ const routeNames: Array<[string, string]> = [
   ["/admin/usuarios", "Gestão de usuários"],
   ["/registro-continuidade", "Registro de Continuidade Logística"],
   ["/guia-tecnico", "Guia técnico e expansão"],
-  ["/grupamento", "Escalão / CCO"],
+  ["/grupamento", "Escalão / CCOL"],
   ["/painel", "Situação geral"],
   ["/assistente", "Assistente IA"],
   ["/necessidades", "Necessidades"],

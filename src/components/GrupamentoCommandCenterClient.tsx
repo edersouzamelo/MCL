@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
+  BookOpen,
   Building2,
   CheckCircle2,
+  Download,
   ExternalLink,
   FileSpreadsheet,
   FileText,
@@ -150,7 +152,7 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
 
     if (!current && !previous) {
       setLegacyPair(null);
-      setError("Este navegador não contém uma carga SAG legada do CCO.");
+      setError("Este navegador não contém uma carga SAG legada do CCOL.");
       return;
     }
     if (!current || !previous) {
@@ -211,23 +213,23 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
 
   function resetMonitors() {
     setMonitors(defaultCcoMonitorConfig());
-    setNotice("Configuração dos 8 monitores restaurada para o padrão do CCO.");
+    setNotice("Configuração dos 8 monitores restaurada para o padrão do CCOL.");
   }
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-sky-200/70 bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 p-6 text-white shadow-xl dark:border-sky-900/50">
+      <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-6 text-slate-950 shadow-sm dark:border-sky-900/50 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950 dark:text-white dark:shadow-xl">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+          <div className="max-w-4xl">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
               <span>Escalão / Grupamento Logístico</span>
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-emerald-300">CCO</span>
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300">CCOL</span>
             </div>
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Centro de Coordenação Logística</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Cockpit do escalão para consolidar o SAG, classificar por PI/Classe e distribuir quadros executivos em até oito monitores.</p>
-            <div className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-300">
-              <ShieldCheck className="h-4 w-4 text-emerald-300" />
-              Matriz PI/Classe incorporada: <strong className="text-white">{CCO_RULE_SOURCE.fileName}</strong> · {CCO_RULE_SOURCE.referenceDate} · {CCO_CLASS_SLIDES.length} quadros de Classe/finalidade
+            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Centro de Coordenação de Operações Logísticas</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">Cockpit do escalão para consolidar o SAG, classificar por PI/Classe e distribuir quadros executivos em até oito monitores.</p>
+            <div className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-white/70 px-3 py-2 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+              <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+              Matriz PI/Classe incorporada: <strong className="text-slate-950 dark:text-white">{CCO_RULE_SOURCE.fileName}</strong> · {CCO_RULE_SOURCE.referenceDate} · {CCO_CLASS_SLIDES.length} quadros de Classe/finalidade
             </div>
           </div>
           <div className="grid min-w-[320px] grid-cols-3 gap-2 text-center text-xs">
@@ -240,12 +242,24 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
 
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-sm font-bold"><Upload className="h-4 w-4" /> Carga SAG — duas fontes</div>
               <p className="mt-1 text-xs leading-5 text-zinc-500">PDF é o formato recomendado. XLS/XLSX permanecem aceitos como alternativa.</p>
             </div>
-            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Importação manual</span>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <a
+                href="/docs/Cartilha_MCL_CCO_SAG_v1.pdf"
+                download
+                className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300 dark:hover:bg-sky-950/50"
+                title="Tutorial de apanha dos relatórios no SAG e importação no MCL"
+              >
+                <BookOpen className="h-4 w-4" />
+                Guia de apanha no SAG
+                <Download className="h-3.5 w-3.5" />
+              </a>
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">Importação manual</span>
+            </div>
           </div>
 
           <form onSubmit={handleUpload} className="space-y-3">
@@ -389,7 +403,7 @@ function SourcePicker({ id, step, title, description, file, onFile }: { id: stri
 }
 
 function Counter({ value, label }: { value: string; label: string }) {
-  return <div className="rounded-xl border border-white/10 bg-white/5 p-3"><div className="text-2xl font-black">{value}</div><div className="text-slate-400">{label}</div></div>;
+  return <div className="rounded-xl border border-sky-200 bg-white/70 p-3 dark:border-white/10 dark:bg-white/5"><div className="text-2xl font-black">{value}</div><div className="text-slate-500 dark:text-slate-400">{label}</div></div>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
