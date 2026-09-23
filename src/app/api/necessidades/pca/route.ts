@@ -5,6 +5,8 @@ import { prisma } from "@/server/db";
 import { suggestPcaUnits } from "@/modules/pca/unit-suggestions";
 import { listPcaItems, syncPcaItems, getPcaItemDetails, syncPgcItems } from "@/modules/pca/repository";
 
+import { pcaHistory } from "@/modules/pca/history";
+
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
@@ -36,6 +38,7 @@ export async function GET(request: Request) {
 
   try {
     const { current, target } = await contextFor(session.user.organizationId, url.searchParams.get("uasg"));
+    if (url.searchParams.get("history") === "1") return NextResponse.json({ ...await pcaHistory(target.id, year, url.searchParams), unitName: target.name });
     const itemId = url.searchParams.get("itemId");
     if (itemId) return NextResponse.json({ item: await getPcaItemDetails(target.id, year, itemId) });
     const items = await listPcaItems(target.id, year);
