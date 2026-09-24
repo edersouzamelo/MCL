@@ -226,10 +226,13 @@ function PieChart({ chart }: { chart: MonitorDocumentChart }) {
 
 function DocumentChart({ chart }: { chart: MonitorDocumentChart }) {
   const singleSeriesLabel = chart.series.length === 1 ? chart.series[0]?.name : undefined;
+  const unitLikeSeriesLabel = singleSeriesLabel && /[/٪%]|tonel|litro|quilo|kg\b|unidade|quantidade|valor|R\$/i.test(singleSeriesLabel)
+    ? singleSeriesLabel
+    : undefined;
   const xAxisTitle = chart.xAxisTitle
-    ?? (chart.type === "bar" && chart.orientation === "vertical" ? singleSeriesLabel : undefined);
+    ?? (chart.type === "bar" && chart.orientation === "vertical" ? unitLikeSeriesLabel : undefined);
   const yAxisTitle = chart.yAxisTitle
-    ?? (chart.type === "bar" && chart.orientation === "horizontal" ? singleSeriesLabel : undefined);
+    ?? (chart.type === "bar" && chart.orientation === "horizontal" ? unitLikeSeriesLabel : undefined);
 
   const chartBody = chart.type === "bar"
     ? (chart.orientation === "horizontal" ? <HorizontalChart chart={chart} /> : <VerticalChart chart={chart} />)
