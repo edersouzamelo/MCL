@@ -260,7 +260,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         >
           <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
-              screenKey={activeItem.key}
+              screenKey={activeItem.kind === "system" ? activeItem.screen : activeItem.key}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               loopMode={effectiveLoop}
               onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
@@ -283,10 +283,17 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
             <Database className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">Fonte: {activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "par incompleto")}</span>
           </span>
-          <span className="hidden items-center gap-1.5 xl:flex">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
-          </span>
+          {activeItem.kind === "system" ? (
+            <span className="hidden items-center gap-1.5 xl:flex">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
+            </span>
+          ) : (
+            <span className="hidden items-center gap-1.5 xl:flex">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Conteúdo documental · aprovação humana registrada
+            </span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
