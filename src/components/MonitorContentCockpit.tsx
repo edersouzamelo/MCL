@@ -11,6 +11,7 @@ type ScenePreview = {
   title: string;
   sourcePage: number | null;
   payload?: {
+    layoutVersion?: number;
     bullets?: string[];
     rows?: string[][];
     columns?: string[];
@@ -113,6 +114,24 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
     }
   }
 
+  async function reprocess(importId: string) {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/grupamento/monitor-content/" + importId + "/reprocess", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao reprocessar a fonte.");
+      setNotice("Fonte reprocessada com reconstrução espacial. Revise a nova prévia antes de recolocar no ar.");
+      window.dispatchEvent(new CustomEvent("mcl-grupamento-document-content-updated"));
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Falha ao reprocessar a fonte.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function setStatus(importId: string, status: "APPROVED" | "ARCHIVED") {
     setBusy(true);
     setError("");
@@ -200,18 +219,31 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
           ) : null}
 
           <div className="mt-4 space-y-2">
-            {imports.filter((item) => item.status === "APPROVED").map((item) => (
-              <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-white p-2.5 dark:border-emerald-900/40 dark:bg-zinc-950">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Em exibição</div>
-                  <div className="text-[11px] font-semibold">{item.fileName} · {item.sceneCount} cena(s)</div>
+            {imports.filter((item) => item.status === "APPROVED").map((item) => {
+              const legacy = item.scenes.some((scene) => scene.payload?.layoutVersion !== 2);
+              return (
+                <div key={item.id} className={"flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-2.5 dark:bg-zinc-950 " + (legacy ? "border-amber-300 dark:border-amber-900/50" : "border-emerald-200 dark:border-emerald-900/40")}>
+                  <div>
+                    <div className={"text-[10px] font-black uppercase tracking-wider " + (legacy ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300")}>
+                      {legacy ? "Fora do ar · reconstrução v1 rejeitada" : "Em exibição"}
+                    </div>
+                    <div className="text-[11px] font-semibold">{item.fileName} · {item.sceneCount} cena(s)</div>
+                    {legacy ? <div className="mt-1 text-[10px] text-zinc-500">O original está preservado. Reprocesse para reconstruir posição, imagens e tipo de gráfico antes de aprovar novamente.</div> : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <a href={"/api/grupamento/monitor-content/" + item.id + "/source"} className="rounded-lg border border-zinc-300 p-2 dark:border-zinc-700" title="Baixar fonte"><Download className="h-3.5 w-3.5" /></a>
+                    {legacy ? (
+                      <button type="button" disabled={busy} onClick={() => void reprocess(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-2.5 py-2 text-[10px] font-bold text-white disabled:opacity-50"><Loader2 className={"h-3.5 w-3.5 " + (busy ? "animate-spin" : "")} /> Reprocessar layout</button>
+                    ) : (
+                      <>
+                        <button type="button" disabled={busy} onClick={() => void reprocess(item.id)} className="inline-flex items-center gap-1 rounded-lg border border-sky-300 px-2.5 py-2 text-[10px] font-bold text-sky-800 dark:border-sky-900 dark:text-sky-300">Reprocessar</button>
+                        <button type="button" disabled={busy} onClick={() => void setStatus(item.id, "ARCHIVED")} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 px-2.5 py-2 text-[10px] font-bold dark:border-zinc-700"><Archive className="h-3.5 w-3.5" /> Retirar</button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <a href={`/api/grupamento/monitor-content/${item.id}/source`} className="rounded-lg border border-zinc-300 p-2 dark:border-zinc-700" title="Baixar fonte"><Download className="h-3.5 w-3.5" /></a>
-                  <button type="button" disabled={busy} onClick={() => void setStatus(item.id, "ARCHIVED")} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 px-2.5 py-2 text-[10px] font-bold dark:border-zinc-700"><Archive className="h-3.5 w-3.5" /> Retirar</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {!imports.length ? <div className="py-3 text-center text-[11px] text-zinc-500">Nenhum documento importado para este monitor.</div> : null}
           </div>
         </div>

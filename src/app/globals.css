@@ -1489,8 +1489,8 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
 /* Premium CCOL motion: stronger broadcast choreography without touching data. */
 @keyframes mclMonitorStripesDrift {
   0% { background-position:0 0, 0 0, 0 0; transform:translate3d(0,0,0) scale(1); }
-  50% { background-position:88px 28px, -42px 18px, 0 0; transform:translate3d(-.7vw,.3vh,0) scale(1.01); }
-  100% { background-position:176px 56px, -84px 36px, 0 0; transform:translate3d(0,0,0) scale(1); }
+  50% { background-position:0 28px, 0 18px, 0 0; transform:translate3d(0,.3vh,0) scale(1.005); }
+  100% { background-position:0 56px, 0 36px, 0 0; transform:translate3d(0,0,0) scale(1); }
 }
 @keyframes mclMonitorHorizonDrift {
   0%,100% { transform:translate3d(-4%,0,0) scaleX(.92); opacity:.18; }
@@ -1549,15 +1549,15 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
 .mcl-monitor-stripes-dark {
   opacity:.50;
   background-image:
-    repeating-linear-gradient(112deg,rgba(56,189,248,.055) 0 1px,transparent 1px 34px),
-    repeating-linear-gradient(112deg,rgba(14,165,233,.026) 0 9px,transparent 9px 68px),
+    repeating-linear-gradient(180deg,rgba(56,189,248,.055) 0 1px,transparent 1px 34px),
+    repeating-linear-gradient(180deg,rgba(14,165,233,.026) 0 9px,transparent 9px 68px),
     linear-gradient(90deg,rgba(2,6,23,.02),rgba(14,165,233,.065) 48%,rgba(2,6,23,.02));
 }
 .mcl-monitor-stripes-light {
   opacity:.20;
   background-image:
-    repeating-linear-gradient(112deg,rgba(3,105,161,.07) 0 1px,transparent 1px 38px),
-    repeating-linear-gradient(112deg,rgba(14,116,144,.028) 0 8px,transparent 8px 74px),
+    repeating-linear-gradient(180deg,rgba(3,105,161,.07) 0 1px,transparent 1px 38px),
+    repeating-linear-gradient(180deg,rgba(14,116,144,.028) 0 8px,transparent 8px 74px),
     linear-gradient(90deg,rgba(255,255,255,.1),rgba(14,165,233,.05) 50%,rgba(255,255,255,.1));
 }
 .mcl-monitor-horizon {
@@ -1646,4 +1646,43 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   .mcl-animated-value,
   .mcl-donut-live,
   .mcl-data-tile { animation:none!important; transform:none!important; filter:none!important; opacity:1!important; }
+}
+
+
+@keyframes mclDocumentElementReveal {
+  0% { opacity:0; transform:translate3d(0,7px,0) scale(.992); filter:blur(2px); }
+  100% { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); }
+}
+@keyframes mclDocumentChartGrow {
+  0% { transform:scaleX(0); opacity:.45; }
+  100% { transform:scaleX(1); opacity:1; }
+}
+@keyframes mclDocumentChartRise {
+  0% { transform:scaleY(0); opacity:.45; }
+  100% { transform:scaleY(1); opacity:1; }
+}
+@keyframes mclDocumentLineDraw {
+  0% { stroke-dashoffset:1400; opacity:.35; }
+  100% { stroke-dashoffset:0; opacity:1; }
+}
+.mcl-document-element {
+  animation:mclDocumentElementReveal .7s cubic-bezier(.16,1,.3,1) both;
+}
+.mcl-document-chart-grow {
+  transform-origin:left center;
+  animation:mclDocumentChartGrow 1.15s cubic-bezier(.16,1,.3,1) both;
+}
+.mcl-document-chart-rise {
+  transform-origin:center bottom;
+  animation:mclDocumentChartRise 1.15s cubic-bezier(.16,1,.3,1) both;
+}
+.mcl-document-line-draw {
+  stroke-dasharray:1400;
+  animation:mclDocumentLineDraw 1.4s cubic-bezier(.16,1,.3,1) both;
+}
+@media(prefers-reduced-motion:reduce) {
+  .mcl-document-element,
+  .mcl-document-chart-grow,
+  .mcl-document-chart-rise,
+  .mcl-document-line-draw { animation:none!important; transform:none!important; opacity:1!important; filter:none!important; }
 }

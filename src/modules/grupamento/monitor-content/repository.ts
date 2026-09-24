@@ -21,6 +21,43 @@ function bytes(value: Buffer) {
   return copy as Uint8Array<ArrayBuffer>;
 }
 
+function replaceAssetKeys(value: unknown, assetIds: Map<string, string>): unknown {
+  if (Array.isArray(value)) return value.map((item) => replaceAssetKeys(item, assetIds));
+  if (!value || typeof value !== "object") return value;
+  const source = value as Record<string, unknown>;
+  const output: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    if (key === "assetKey" && typeof item === "string") {
+      output.assetId = assetIds.get(item) ?? item;
+      continue;
+    }
+    if (key === "assetKeys" && Array.isArray(item)) {
+      output.assetIds = item.map((assetKey) => typeof assetKey === "string" ? (assetIds.get(assetKey) ?? assetKey) : assetKey);
+      continue;
+    }
+    output[key] = replaceAssetKeys(item, assetIds);
+  }
+  return output;
+}
+
+function sceneRowsForImport(
+  importId: string,
+  extraction: MonitorDocumentExtraction,
+  assetIds: Map<string, string>,
+) {
+  return extraction.scenes.map((scene, index) => ({
+    id: randomUUID(),
+    importId,
+    sceneOrder: index,
+    sceneType: scene.sceneType,
+    title: scene.title,
+    payload: json(replaceAssetKeys(scene.payload, assetIds)),
+    sourcePage: scene.sourcePage,
+    durationSeconds: null,
+    active: true,
+  }));
+}
+
 export async function saveMonitorUploadChunk(input: {
   uploadId: string;
   chunkIndex: number;
@@ -149,27 +186,7 @@ export async function persistMonitorContentImport(input: {
     };
   });
 
-  const sceneRows = input.extraction.scenes.map((scene, index) => {
-    const payload = { ...scene.payload };
-    const sourceKeys = payload.assetKeys ?? [];
-    delete payload.assetKeys;
-    const assetIdsForScene = sourceKeys.map((key) => assetIds.get(key)).filter((id): id is string => Boolean(id));
-    const normalizedPayload: MonitorDocumentScenePayload = {
-      ...payload,
-      assetIds: assetIdsForScene.length ? assetIdsForScene : undefined,
-    };
-    return {
-      id: randomUUID(),
-      importId,
-      sceneOrder: index,
-      sceneType: scene.sceneType,
-      title: scene.title,
-      payload: json(normalizedPayload),
-      sourcePage: scene.sourcePage,
-      durationSeconds: null,
-      active: true,
-    };
-  });
+  const sceneRows = sceneRowsForImport(importId, input.extraction, assetIds);
 
   const importRecord = await prisma.$transaction(async (tx) => {
     await tx.monitorContentImport.create({
@@ -197,6 +214,79 @@ export async function persistMonitorContentImport(input: {
   });
 
   return { importRecord, deduplicated: false };
+}
+
+
+export async function replaceMonitorContentExtraction(input: {
+  id: string;
+  organizationId: string;
+  actorId: string;
+  extraction: MonitorDocumentExtraction;
+}) {
+  const existing = await prisma.monitorContentImport.findFirst({
+    where: { id: input.id, organizationId: input.organizationId },
+    select: {
+      id: true,
+      fileName: true,
+      mimeType: true,
+      rawFile: true,
+      monitorId: true,
+      importedBy: true,
+    },
+  });
+  if (!existing) throw new Error("Importação documental não encontrada.");
+
+  const assetIds = new Map<string, string>();
+  const assetRows = input.extraction.assets.map((asset) => {
+    const id = randomUUID();
+    assetIds.set(asset.key, id);
+    return {
+      id,
+      importId: existing.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+      data: bytes(asset.data),
+    };
+  });
+  const sceneRows = sceneRowsForImport(existing.id, input.extraction, assetIds);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.monitorContentScene.deleteMany({ where: { importId: existing.id } });
+    await tx.monitorContentAsset.deleteMany({ where: { importId: existing.id } });
+    if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });
+    if (sceneRows.length) await tx.monitorContentScene.createMany({ data: sceneRows });
+    return tx.monitorContentImport.update({
+      where: { id: existing.id },
+      data: {
+        status: "PREVIEW",
+        sceneCount: sceneRows.length,
+        warnings: json(input.extraction.warnings),
+        importedBy: input.actorId,
+        importedAt: new Date(),
+        approvedBy: null,
+        approvedAt: null,
+        archivedBy: null,
+        archivedAt: null,
+      },
+      include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+    });
+  });
+}
+
+export async function getMonitorContentForReprocess(id: string, organizationId: string) {
+  return prisma.monitorContentImport.findFirst({
+    where: { id, organizationId },
+    select: {
+      id: true,
+      fileName: true,
+      mimeType: true,
+      monitorId: true,
+      rawFile: true,
+      status: true,
+    },
+  });
 }
 
 export async function listMonitorContentImports(organizationId: string, monitorId: number) {
@@ -302,19 +392,21 @@ export async function getApprovedMonitorScenes(organizationId: string, monitorId
     },
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    importId: row.importId,
-    monitorId: row.import.monitorId,
-    sceneOrder: row.sceneOrder,
-    sceneType: row.sceneType as MonitorDocumentSceneDto["sceneType"],
-    title: row.title,
-    payload: row.payload as unknown as MonitorDocumentScenePayload,
-    sourcePage: row.sourcePage,
-    sourceFileName: row.import.fileName,
-    sourceImportedAt: row.import.importedAt.toISOString(),
-    approvedAt: row.import.approvedAt?.toISOString() ?? null,
-  }));
+  return rows
+    .map((row) => ({
+      id: row.id,
+      importId: row.importId,
+      monitorId: row.import.monitorId,
+      sceneOrder: row.sceneOrder,
+      sceneType: row.sceneType as MonitorDocumentSceneDto["sceneType"],
+      title: row.title,
+      payload: row.payload as unknown as MonitorDocumentScenePayload,
+      sourcePage: row.sourcePage,
+      sourceFileName: row.import.fileName,
+      sourceImportedAt: row.import.importedAt.toISOString(),
+      approvedAt: row.import.approvedAt?.toISOString() ?? null,
+    }))
+    .filter((scene) => scene.payload.layoutVersion === 2);
 }
 
 export async function getMonitorContentAsset(id: string, organizationId: string) {
