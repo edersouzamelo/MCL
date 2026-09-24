@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       uploadedBy: session.user.id,
     });
     const extension = assembled.fileName.toLowerCase().split(".").pop() ?? "";
-    if (!["pdf", "pptx", "docx", "ppt", "doc"].includes(extension)) {
+    if (!["pdf", "pptx", "docx"].includes(extension)) {
       return NextResponse.json({ error: "Formato não suportado. Use PDF, PPTX ou DOCX." }, { status: 415 });
     }
 
