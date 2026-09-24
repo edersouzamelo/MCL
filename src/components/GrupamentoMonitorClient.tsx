@@ -22,7 +22,7 @@ import {
 } from "@/modules/grupamento/monitor";
 
 const MIN_KIOSK_SCALE = 0.86;
-const SCREEN_FADE_MS = 600;
+const SCREEN_FADE_MS = 720;
 const DATA_REFRESH_MS = 30_000;
 const PAGE_RELOAD_MS = 5 * 60_000;
 
@@ -156,7 +156,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
   return (
     <main
-      className={`mcl-monitor-shell relative flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
+      className={`mcl-monitor-shell ${ccol ? "mcl-monitor-shell-ccol" : "mcl-monitor-shell-mcl"} relative flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
       style={{
         backgroundImage: ccol
           ? "radial-gradient(circle at 82% 5%, rgba(14,165,233,.10), transparent 30%), radial-gradient(circle at 8% 92%, rgba(6,182,212,.06), transparent 34%), linear-gradient(145deg, #ffffff 0%, #f6f9fb 50%, #edf4f7 100%)"
@@ -167,6 +167,8 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         <div className={`mcl-monitor-ambient mcl-monitor-ambient-one absolute -right-20 -top-24 h-96 w-96 rounded-full blur-3xl ${ccol ? "bg-sky-300/15" : "bg-sky-400/10"}`} />
         <div className={`mcl-monitor-ambient mcl-monitor-ambient-two absolute -bottom-32 left-[8%] h-80 w-[42vw] rounded-full blur-3xl ${ccol ? "bg-cyan-200/20" : "bg-cyan-400/[0.06]"}`} />
         <div className={`absolute inset-x-0 top-0 h-44 bg-gradient-to-b ${ccol ? "from-white/75 to-transparent" : "from-sky-300/[0.025] to-transparent"}`} />
+        <div className={`mcl-monitor-stripes ${ccol ? "mcl-monitor-stripes-light" : "mcl-monitor-stripes-dark"}`} />
+        <div className="mcl-monitor-horizon" />
         <div className="mcl-monitor-broadcast-sweep" />
         <div className="mcl-monitor-scanline" />
       </div>
