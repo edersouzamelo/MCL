@@ -109,7 +109,25 @@ export async function persistMonitorContentImport(input: {
     },
     include: { scenes: { orderBy: { sceneOrder: "asc" } } },
   });
-  if (existing) return { importRecord: existing, deduplicated: true };
+  if (existing) {
+    if (existing.status === "ARCHIVED") {
+      const reactivated = await prisma.monitorContentImport.update({
+        where: { id: existing.id },
+        data: {
+          status: "PREVIEW",
+          approvedBy: null,
+          approvedAt: null,
+          archivedBy: null,
+          archivedAt: null,
+          importedBy: input.importedBy,
+          importedAt: new Date(),
+        },
+        include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+      });
+      return { importRecord: reactivated, deduplicated: true };
+    }
+    return { importRecord: existing, deduplicated: true };
+  }
 
   const importId = randomUUID();
   const assetIds = new Map<string, string>();
