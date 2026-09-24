@@ -4,28 +4,30 @@ import { useEffect } from "react";
 
 export function ServiceWorkerRegister() {
   useEffect(() => {
-    const cleanupLegacyOfflineState = async () => {
-      const registrations = "serviceWorker" in navigator
-        ? await navigator.serviceWorker.getRegistrations()
-        : [];
-      const cacheNames = "caches" in window ? await caches.keys() : [];
+    if (!("serviceWorker" in navigator)) return;
 
-      const registrationResults = await Promise.all(
-        registrations.map((registration) => registration.unregister()),
-      );
-      await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+    let cancelled = false;
+    let updateTimer = 0;
 
-      const removedLegacyState =
-        registrationResults.some(Boolean) || cacheNames.length > 0;
-      const reloadKey = "mcl-legacy-offline-state-cleared-v2";
-
-      if (removedLegacyState && sessionStorage.getItem(reloadKey) !== "1") {
-        sessionStorage.setItem(reloadKey, "1");
-        window.location.reload();
+    const register = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        if (cancelled) return;
+        void registration.update();
+        updateTimer = window.setInterval(() => {
+          void registration.update();
+        }, 10 * 60_000);
+      } catch {
+        // O PWA continua funcional online mesmo se o SW não puder registrar.
       }
     };
 
-    void cleanupLegacyOfflineState();
+    void register();
+
+    return () => {
+      cancelled = true;
+      if (updateTimer) window.clearInterval(updateTimer);
+    };
   }, []);
 
   return null;
