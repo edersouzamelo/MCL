@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Database, Monitor, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square } from "lucide-react";
+import { Clock3, Database, Monitor, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
@@ -13,10 +13,12 @@ import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
   CCO_DEFAULT_LOOP_DELAY_SECONDS,
   CCO_DEFAULT_SCROLL_PX_PER_SECOND,
+  CCO_PI_ROWS_PER_PAGE,
   CCO_PI_SCROLL_PX_PER_SECOND,
   CCO_SCROLL_BOTTOM_HOLD_MS,
   CCO_SCROLL_TOP_HOLD_MS,
   CCO_SCREEN_CATALOG,
+  CCO_UNIT_ROWS_PER_PAGE,
   GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
   readableMonitorCycleMs,
@@ -27,7 +29,6 @@ import {
 const MIN_KIOSK_SCALE = 0.86;
 const SCREEN_FADE_MS = 720;
 const DATA_REFRESH_MS = 30_000;
-const PAGE_RELOAD_MS = 5 * 60_000;
 
 function load<T>(key: string): T | null {
   try {
@@ -36,6 +37,39 @@ function load<T>(key: string): T | null {
   } catch {
     return null;
   }
+}
+
+function monitorCacheKey(monitorId: number, suffix: "sag" | "rpn" | "scenes") {
+  return `mcl:monitor:${monitorId}:${suffix}:v1`;
+}
+
+function store(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // O cache local é contingência. Falha de quota não pode derrubar a exibição.
+  }
+}
+
+function sceneAssetUrls(scenes: MonitorDocumentSceneDto[]) {
+  const urls = new Set<string>();
+  for (const scene of scenes) {
+    for (const assetId of scene.payload.assetIds ?? []) {
+      urls.add(`/api/grupamento/monitor-content/assets/${assetId}`);
+    }
+    for (const element of scene.payload.layout?.elements ?? []) {
+      if (element.kind === "image" && element.assetId) {
+        urls.add(`/api/grupamento/monitor-content/assets/${element.assetId}`);
+      }
+    }
+  }
+  return [...urls];
+}
+
+function pageSizeForScreen(screen: CcoScreenId) {
+  if (screen === "pis") return CCO_PI_ROWS_PER_PAGE;
+  if (screen.startsWith("units-")) return CCO_UNIT_ROWS_PER_PAGE;
+  return 0;
 }
 
 function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
@@ -55,6 +89,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "stopped">("playing");
+  const [connectionState, setConnectionState] = useState<"online" | "offline" | "syncing">("syncing");
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -67,45 +102,78 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         const normalized = normalizeMonitor(selected);
         setMonitor(normalized);
         if (selected.delaySeconds !== normalized.delaySeconds && stored) {
-          window.localStorage.setItem(
+          store(
             GROUP_STORAGE_KEYS.monitors,
-            JSON.stringify(stored.map((item) => (item.id === monitorId ? normalized : item))),
+            stored.map((item) => (item.id === monitorId ? normalized : item)),
           );
         }
       }
+
+      const cachedSag = load<SagImportResult>(monitorCacheKey(monitorId, "sag"));
+      const cachedRpn = load<RpnImportResult>(monitorCacheKey(monitorId, "rpn"));
+      const cachedScenes = load<MonitorDocumentSceneDto[]>(monitorCacheKey(monitorId, "scenes"));
+      if (!cancelled) {
+        if (cachedSag) setSag(cachedSag);
+        if (cachedRpn) setRpn(cachedRpn);
+        if (cachedScenes) setDocumentScenes(cachedScenes);
+      }
+
+      if (!navigator.onLine) {
+        if (!cancelled) setConnectionState("offline");
+        return;
+      }
+
+      if (!cancelled) setConnectionState("syncing");
+      let networkSucceeded = false;
 
       try {
         const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
         if (response.ok) {
           const payload = await response.json();
+          const current = payload.current ?? null;
+          const previous = payload.rpn ?? null;
+          if (current) store(monitorCacheKey(monitorId, "sag"), current);
+          if (previous) store(monitorCacheKey(monitorId, "rpn"), previous);
           if (!cancelled) {
-            setSag(payload.current ?? null);
-            setRpn(payload.rpn ?? null);
+            if (current) setSag(current);
+            if (previous) setRpn(previous);
           }
+          networkSucceeded = true;
         }
       } catch {
-        if (!cancelled) {
-          setSag(null);
-          setRpn(null);
-        }
+        // Mantém o último snapshot local validado.
       }
 
       try {
         const response = await fetch(`/api/grupamento/monitor-content/playlist?monitorId=${monitorId}`, { cache: "no-store" });
         if (response.ok) {
           const payload = await response.json();
-          if (!cancelled) setDocumentScenes(payload.scenes ?? []);
+          const scenes = (payload.scenes ?? []) as MonitorDocumentSceneDto[];
+          store(monitorCacheKey(monitorId, "scenes"), scenes);
+          if (!cancelled) setDocumentScenes(scenes);
+          networkSucceeded = true;
+
+          const assetUrls = sceneAssetUrls(scenes);
+          void Promise.allSettled(assetUrls.map((url) => fetch(url, { cache: "force-cache" })));
         }
       } catch {
-        if (!cancelled) setDocumentScenes([]);
+        // Mantém playlist e assets já disponíveis localmente.
+      }
+
+      if (!cancelled) {
+        setConnectionState(networkSucceeded ? "online" : "offline");
       }
     };
 
     const frame = window.requestAnimationFrame(() => { void hydrate(); });
     const poll = window.setInterval(() => { void hydrate(); }, DATA_REFRESH_MS);
     const refresh = () => { void hydrate(); };
+    const online = () => { setConnectionState("syncing"); void hydrate(); };
+    const offline = () => setConnectionState("offline");
 
     window.addEventListener("storage", refresh);
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
     window.addEventListener("mcl-grupamento-sag-updated", refresh);
     window.addEventListener("mcl-grupamento-rpn-updated", refresh);
     window.addEventListener("mcl-grupamento-monitors-updated", refresh);
@@ -116,6 +184,8 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       window.cancelAnimationFrame(frame);
       window.clearInterval(poll);
       window.removeEventListener("storage", refresh);
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
       window.removeEventListener("mcl-grupamento-sag-updated", refresh);
       window.removeEventListener("mcl-grupamento-rpn-updated", refresh);
       window.removeEventListener("mcl-grupamento-monitors-updated", refresh);
@@ -127,32 +197,42 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      window.location.reload();
-    }, PAGE_RELOAD_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-
   type PlaylistItem =
-    | { kind: "system"; key: string; screen: CcoScreenId; label: string }
+    | { kind: "system"; key: string; screen: CcoScreenId; label: string; page: number; pageSize: number }
     | { kind: "document"; key: string; scene: MonitorDocumentSceneDto; label: string };
 
-  const playlist = useMemo<PlaylistItem[]>(() => [
-    ...monitor.screens.map((screen) => ({
-      kind: "system" as const,
-      key: `system:${screen}`,
-      screen,
-      label: CCO_SCREEN_CATALOG.find((item) => item.id === screen)?.label ?? screen,
-    })),
-    ...documentScenes.map((scene) => ({
-      kind: "document" as const,
-      key: `document:${scene.id}`,
-      scene,
-      label: scene.title,
-    })),
-  ], [documentScenes, monitor.screens]);
+  const playlist = useMemo<PlaylistItem[]>(() => {
+    const systemItems = monitor.screens.flatMap((screen) => {
+      const pageSize = pageSizeForScreen(screen);
+      let rowCount = 0;
+      if (screen === "pis") rowCount = sag?.byPi.length ?? 0;
+      if (screen === "units-current-160") rowCount = sag?.byUg.filter((item) => item.ug.startsWith("160")).length ?? 0;
+      if (screen === "units-current-167") rowCount = sag?.byUg.filter((item) => item.ug.startsWith("167")).length ?? 0;
+      if (screen === "units-rpn-160") rowCount = rpn?.byUg.filter((item) => item.ug.startsWith("160")).length ?? 0;
+      if (screen === "units-rpn-167") rowCount = rpn?.byUg.filter((item) => item.ug.startsWith("167")).length ?? 0;
+
+      const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(rowCount / pageSize)) : 1;
+      const baseLabel = CCO_SCREEN_CATALOG.find((item) => item.id === screen)?.label ?? screen;
+      return Array.from({ length: pageCount }, (_, page) => ({
+        kind: "system" as const,
+        key: `system:${screen}:${page}`,
+        screen,
+        page,
+        pageSize,
+        label: pageCount > 1 ? `${baseLabel} · ${page + 1}/${pageCount}` : baseLabel,
+      }));
+    });
+
+    return [
+      ...systemItems,
+      ...documentScenes.map((scene) => ({
+        kind: "document" as const,
+        key: `document:${scene.id}`,
+        scene,
+        label: scene.title,
+      })),
+    ];
+  }, [documentScenes, monitor.screens, rpn, sag]);
 
   const safeIndex = Math.min(screenIndex, Math.max(0, playlist.length - 1));
   const activeItem = playlist[safeIndex] ?? {
@@ -160,6 +240,8 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     key: "system:overview",
     screen: "overview" as CcoScreenId,
     label: "Visão executiva",
+    page: 0,
+    pageSize: 0,
   };
   const activeScreen = activeItem.kind === "system" ? activeItem.screen : null;
   const screenLabel = activeItem.label;
@@ -215,11 +297,11 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   ) : activeItem.kind === "document" ? (
     <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} />
   ) : !sag || !rpn ? (
-    <Empty ccol={ccol} title="Par SAG incompleto" description="Esta tela exige Exercício Corrente e créditos do exercício anterior validados. Não há substituição por números sintéticos." />
+    <MonitorBootScreen ccol={ccol} connectionState={connectionState} />
   ) : isRuleScreen ? (
     <GrupamentoRuleMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} />
   ) : (
-    <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} />
+    <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} page={activeItem.page} pageSize={activeItem.pageSize || undefined} />
   );
 
   return (
@@ -257,6 +339,15 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
             <div className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
             <div className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
           </div>
+          <div
+            className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${connectionState === "offline"
+              ? (ccol ? "border-amber-300 bg-amber-50 text-amber-700" : "border-amber-400/20 bg-amber-400/10 text-amber-300")
+              : (ccol ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300")}`}
+            title={connectionState === "offline" ? "Offline · exibindo último conteúdo local validado" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
+            aria-label={connectionState === "offline" ? "Monitor offline" : "Monitor online"}
+          >
+            {connectionState === "offline" ? <WifiOff className="h-4 w-4" /> : <Wifi className={`h-4 w-4 ${connectionState === "syncing" ? "animate-pulse" : ""}`} />}
+          </div>
           <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${monitor.enabled ? "mcl-monitor-live " : ""}${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
             {monitor.enabled ? "Saída ativa" : "Saída desativada"}
           </div>
@@ -276,11 +367,11 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         >
           <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
-              screenKey={activeItem.kind === "system" ? activeItem.screen : activeItem.key}
+              screenKey={activeItem.key}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               loopMode={effectiveLoop}
               paused={playbackState !== "playing"}
-              fitMode={activeItem.kind === "document" ? "contain" : "scroll"}
+              fitMode="contain"
               onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
             >
               {screenContent}
@@ -290,7 +381,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       </section>
 
       {playlist.length > 1 ? (
-        <div className={`absolute bottom-12 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
+        <div className={`absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
             <button
@@ -308,38 +399,40 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         </div>
       ) : null}
 
-      <div className={`mcl-monitor-watermark pointer-events-none absolute bottom-11 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
+      <div className={`mcl-monitor-watermark pointer-events-none absolute bottom-5 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
         <BrandLogo className="h-11 w-11" tone={ccol ? "green" : "sky"} sizes="44px" />
         <div className={`mt-1 text-[8px] font-black uppercase tracking-[0.16em] ${ccol ? "text-slate-600" : "text-sky-100"}`}>Continuidade</div>
         <div className={`mt-0.5 text-[8px] font-black uppercase tracking-[0.22em] ${ccol ? "text-slate-500" : "text-sky-300"}`}>Logística</div>
       </div>
 
-      <footer className={`mcl-monitor-footer relative z-20 flex h-10 shrink-0 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/85 text-slate-600" : "border-white/10 bg-slate-950/85 text-slate-400"}`}>
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Database className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Fonte: {activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "par incompleto")}</span>
-          </span>
-          {activeItem.kind === "system" ? (
-            <span className="hidden items-center gap-1.5 xl:flex">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
+      <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50">
+        <footer className={`mcl-monitor-footer relative flex h-10 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/92 text-slate-600" : "border-white/10 bg-slate-950/92 text-slate-400"}`}>
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Database className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Fonte: {activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "aguardando sincronização")}</span>
             </span>
-          ) : (
-            <span className="hidden items-center gap-1.5 xl:flex">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Conteúdo documental · aprovação humana registrada
-            </span>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
-          <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
-          <span>dados · 30s</span>
-          <span>auto F5 · 5min</span>
-          <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
-        </div>
-      </footer>
+            {activeItem.kind === "system" ? (
+              <span className="hidden items-center gap-1.5 xl:flex">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
+              </span>
+            ) : (
+              <span className="hidden items-center gap-1.5 xl:flex">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Conteúdo documental · aprovação humana registrada
+              </span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
+            <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
+            <span>sync · 30s</span>
+            <span>{connectionState === "offline" ? "cache local" : "online"}</span>
+            <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
+          </div>
+        </footer>
+      </div>
     </main>
   );
 }
@@ -473,6 +566,22 @@ function MonitorViewport({
           }}
         >
           {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MonitorBootScreen({ ccol, connectionState }: { ccol: boolean; connectionState: "online" | "offline" | "syncing" }) {
+  return (
+    <div className="flex h-full min-h-[55vh] items-center justify-center">
+      <div className="mcl-monitor-boot text-center">
+        <div className={`mx-auto flex h-40 w-40 items-center justify-center rounded-[2rem] border backdrop-blur-xl ${ccol ? "border-sky-900/10 bg-white/55 shadow-[0_24px_70px_rgba(15,23,42,.10)]" : "border-sky-400/12 bg-slate-950/28 shadow-[0_24px_80px_rgba(14,165,233,.08)]"}`}>
+          <BrandLogo className="h-28 w-28" tone={ccol ? "green" : "sky"} sizes="112px" />
+        </div>
+        <div className={`mt-7 text-[11px] font-black uppercase tracking-[0.34em] ${ccol ? "text-sky-900" : "text-sky-300"}`}>Modelo de Continuidade Logística</div>
+        <div className={`mt-3 text-sm font-semibold ${ccol ? "text-slate-500" : "text-slate-500"}`}>
+          {connectionState === "offline" ? "Aguardando fonte local validada" : "Inicializando quadro logístico"}
         </div>
       </div>
     </div>

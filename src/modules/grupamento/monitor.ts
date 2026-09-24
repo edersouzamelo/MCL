@@ -12,6 +12,8 @@ export const CCO_DEFAULT_SCROLL_PX_PER_SECOND = 36;
 export const CCO_PI_SCROLL_PX_PER_SECOND = 26;
 export const CCO_SCROLL_TOP_HOLD_MS = 1_200;
 export const CCO_SCROLL_BOTTOM_HOLD_MS = 1_400;
+export const CCO_PI_ROWS_PER_PAGE = 11;
+export const CCO_UNIT_ROWS_PER_PAGE = 10;
 
 export function readableMonitorCycleMs(maxOffset: number, baseSeconds: number, screen: string) {
   const baseMs = Math.max(5, baseSeconds) * 1000;
