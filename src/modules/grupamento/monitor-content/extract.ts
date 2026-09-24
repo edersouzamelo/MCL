@@ -372,7 +372,9 @@ function pageText(items: Array<{ str: string; x: number; y: number }>) {
 }
 
 async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
-  const warnings: string[] = [];
+  const warnings: string[] = [
+    "PDF: gráficos vetoriais e elementos desenhados podem não ser decompostos como figura isolada; o arquivo original permanece preservado para conferência.",
+  ];
   const scenes: MonitorDocumentSceneDraft[] = [];
   const assets: MonitorDocumentAssetDraft[] = [];
 
