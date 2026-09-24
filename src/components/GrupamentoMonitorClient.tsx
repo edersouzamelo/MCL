@@ -102,45 +102,78 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         const normalized = normalizeMonitor(selected);
         setMonitor(normalized);
         if (selected.delaySeconds !== normalized.delaySeconds && stored) {
-          window.localStorage.setItem(
+          store(
             GROUP_STORAGE_KEYS.monitors,
-            JSON.stringify(stored.map((item) => (item.id === monitorId ? normalized : item))),
+            stored.map((item) => (item.id === monitorId ? normalized : item)),
           );
         }
       }
+
+      const cachedSag = load<SagImportResult>(monitorCacheKey(monitorId, "sag"));
+      const cachedRpn = load<RpnImportResult>(monitorCacheKey(monitorId, "rpn"));
+      const cachedScenes = load<MonitorDocumentSceneDto[]>(monitorCacheKey(monitorId, "scenes"));
+      if (!cancelled) {
+        if (cachedSag) setSag(cachedSag);
+        if (cachedRpn) setRpn(cachedRpn);
+        if (cachedScenes) setDocumentScenes(cachedScenes);
+      }
+
+      if (!navigator.onLine) {
+        if (!cancelled) setConnectionState("offline");
+        return;
+      }
+
+      if (!cancelled) setConnectionState("syncing");
+      let networkSucceeded = false;
 
       try {
         const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
         if (response.ok) {
           const payload = await response.json();
+          const current = payload.current ?? null;
+          const previous = payload.rpn ?? null;
+          if (current) store(monitorCacheKey(monitorId, "sag"), current);
+          if (previous) store(monitorCacheKey(monitorId, "rpn"), previous);
           if (!cancelled) {
-            setSag(payload.current ?? null);
-            setRpn(payload.rpn ?? null);
+            if (current) setSag(current);
+            if (previous) setRpn(previous);
           }
+          networkSucceeded = true;
         }
       } catch {
-        if (!cancelled) {
-          setSag(null);
-          setRpn(null);
-        }
+        // Mantém o último snapshot local validado.
       }
 
       try {
         const response = await fetch(`/api/grupamento/monitor-content/playlist?monitorId=${monitorId}`, { cache: "no-store" });
         if (response.ok) {
           const payload = await response.json();
-          if (!cancelled) setDocumentScenes(payload.scenes ?? []);
+          const scenes = (payload.scenes ?? []) as MonitorDocumentSceneDto[];
+          store(monitorCacheKey(monitorId, "scenes"), scenes);
+          if (!cancelled) setDocumentScenes(scenes);
+          networkSucceeded = true;
+
+          const assetUrls = sceneAssetUrls(scenes);
+          void Promise.allSettled(assetUrls.map((url) => fetch(url, { cache: "force-cache" })));
         }
       } catch {
-        if (!cancelled) setDocumentScenes([]);
+        // Mantém playlist e assets já disponíveis localmente.
+      }
+
+      if (!cancelled) {
+        setConnectionState(networkSucceeded ? "online" : "offline");
       }
     };
 
     const frame = window.requestAnimationFrame(() => { void hydrate(); });
     const poll = window.setInterval(() => { void hydrate(); }, DATA_REFRESH_MS);
     const refresh = () => { void hydrate(); };
+    const online = () => { setConnectionState("syncing"); void hydrate(); };
+    const offline = () => setConnectionState("offline");
 
     window.addEventListener("storage", refresh);
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
     window.addEventListener("mcl-grupamento-sag-updated", refresh);
     window.addEventListener("mcl-grupamento-rpn-updated", refresh);
     window.addEventListener("mcl-grupamento-monitors-updated", refresh);
@@ -151,6 +184,8 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       window.cancelAnimationFrame(frame);
       window.clearInterval(poll);
       window.removeEventListener("storage", refresh);
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
       window.removeEventListener("mcl-grupamento-sag-updated", refresh);
       window.removeEventListener("mcl-grupamento-rpn-updated", refresh);
       window.removeEventListener("mcl-grupamento-monitors-updated", refresh);
@@ -162,14 +197,6 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      window.location.reload();
-    }, PAGE_RELOAD_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-
   type PlaylistItem =
     | { kind: "system"; key: string; screen: CcoScreenId; label: string }
     | { kind: "document"; key: string; scene: MonitorDocumentSceneDto; label: string };
