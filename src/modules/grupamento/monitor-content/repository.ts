@@ -12,7 +12,13 @@ export function monitorContentChecksum(buffer: Buffer) {
 }
 
 function json(value: unknown) {
-  return value as Prisma.InputJsonValue;
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function bytes(value: Buffer) {
+  const copy = new Uint8Array(value.length);
+  copy.set(value);
+  return copy as Uint8Array<ArrayBuffer>;
 }
 
 export async function saveMonitorUploadChunk(input: {
@@ -33,7 +39,7 @@ export async function saveMonitorUploadChunk(input: {
     await tx.monitorContentUploadChunk.deleteMany({
       where: { uploadId: input.uploadId, chunkIndex: input.chunkIndex },
     });
-    return tx.monitorContentUploadChunk.create({ data: input });
+    return tx.monitorContentUploadChunk.create({ data: { ...input, data: bytes(input.data) } });
   });
 }
 
@@ -117,7 +123,7 @@ export async function persistMonitorContentImport(input: {
       mimeType: asset.mimeType,
       width: asset.width,
       height: asset.height,
-      data: asset.data,
+      data: bytes(asset.data),
     };
   });
 
@@ -156,7 +162,7 @@ export async function persistMonitorContentImport(input: {
         status: "PREVIEW",
         sceneCount: sceneRows.length,
         warnings: json(input.extraction.warnings),
-        rawFile: input.buffer,
+        rawFile: bytes(input.buffer),
         importedBy: input.importedBy,
       },
     });
