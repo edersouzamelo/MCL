@@ -216,9 +216,35 @@ function PieChart({ chart }: { chart: MonitorDocumentChart }) {
 }
 
 function DocumentChart({ chart }: { chart: MonitorDocumentChart }) {
-  if (chart.type === "bar") return chart.orientation === "horizontal" ? <HorizontalChart chart={chart} /> : <VerticalChart chart={chart} />;
-  if (chart.type === "pie" || chart.type === "doughnut") return <PieChart chart={chart} />;
-  return <LineChart chart={chart} />;
+  const singleSeriesLabel = chart.series.length === 1 ? chart.series[0]?.name : undefined;
+  const xAxisTitle = chart.xAxisTitle
+    ?? (chart.type === "bar" && chart.orientation === "vertical" ? singleSeriesLabel : undefined);
+  const yAxisTitle = chart.yAxisTitle
+    ?? (chart.type === "bar" && chart.orientation === "horizontal" ? singleSeriesLabel : undefined);
+
+  const chartBody = chart.type === "bar"
+    ? (chart.orientation === "horizontal" ? <HorizontalChart chart={chart} /> : <VerticalChart chart={chart} />)
+    : chart.type === "pie" || chart.type === "doughnut"
+      ? <PieChart chart={chart} />
+      : <LineChart chart={chart} />;
+
+  return (
+    <div className="relative h-full w-full">
+      {yAxisTitle ? (
+        <div className="pointer-events-none absolute left-0 top-1/2 z-10 -translate-x-[42%] -translate-y-1/2 -rotate-90 whitespace-nowrap text-[clamp(11px,.72vw,14px)] font-bold tracking-wide text-slate-300">
+          {yAxisTitle}
+        </div>
+      ) : null}
+      <div className={"h-full w-full " + (yAxisTitle ? "pl-5 " : "") + (xAxisTitle ? "pb-6" : "")}>
+        {chartBody}
+      </div>
+      {xAxisTitle ? (
+        <div className="pointer-events-none absolute bottom-0 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap text-[clamp(11px,.72vw,14px)] font-bold tracking-wide text-slate-300">
+          {xAxisTitle}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function TextElement({ item, ccol }: { item: MonitorSlideTextElement; ccol: boolean }) {
@@ -229,7 +255,7 @@ function TextElement({ item, ccol }: { item: MonitorSlideTextElement; ccol: bool
   const justify = item.verticalAlign === "middle" ? "center" : item.verticalAlign === "bottom" ? "flex-end" : "flex-start";
   const area = item.w * item.h;
   return (
-    <div className="absolute flex overflow-hidden whitespace-pre-line px-[.15%] py-[.1%] mcl-document-element" style={{
+    <div className="absolute flex overflow-hidden whitespace-pre-line px-[.15%] py-[.1%]" style={{
       ...boxStyle(item),
       alignItems: justify,
       justifyContent: item.align === "center" ? "center" : item.align === "right" ? "flex-end" : "flex-start",
@@ -250,25 +276,44 @@ function TextElement({ item, ccol }: { item: MonitorSlideTextElement; ccol: bool
 function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: boolean }) {
   const layout = scene.payload.layout;
   if (!layout) return null;
-  const sorted = [...layout.elements].sort((a,b) => a.z-b.z);
+  const chartBoxes = layout.elements.filter((element) => element.kind === "chart");
+  const neutralFills = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
+  const sorted = [...layout.elements]
+    .filter((element) => {
+      if (element.kind !== "shape" || !element.fill || !neutralFills.has(element.fill.toUpperCase())) return true;
+      const area = element.w * element.h;
+      if (area < 0.04) return true;
+      const redundantOverChart = chartBoxes.some((chartElement) => {
+        const overlapW = Math.max(0, Math.min(element.x + element.w, chartElement.x + chartElement.w) - Math.max(element.x, chartElement.x));
+        const overlapH = Math.max(0, Math.min(element.y + element.h, chartElement.y + chartElement.h) - Math.max(element.y, chartElement.y));
+        return (overlapW * overlapH) / Math.max(area, 0.0001) >= 0.25;
+      });
+      return !redundantOverChart;
+    })
+    .sort((a,b) => a.z-b.z);
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden">
       <div className="relative w-full overflow-hidden rounded-[18px] border border-white/[0.045] bg-transparent shadow-[0_26px_70px_rgba(2,6,23,.12)]" style={{ aspectRatio: String(layout.width) + " / " + String(layout.height), maxHeight: "100%" }}>
         {sorted.map((item: MonitorSlideElement, index) => {
           if (item.kind === "shape") {
             const area = item.w * item.h;
-            return <div key={"shape-" + String(index)} className="absolute mcl-document-element" style={{...boxStyle(item),background:adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? "1px solid " + item.lineColor : undefined,borderRadius:String((item.radius ?? 0)*100)+"%"}} />;
+            return <div key={"shape-" + String(index)} className="absolute" style={{...boxStyle(item),background:adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? "1px solid " + item.lineColor : undefined,borderRadius:String((item.radius ?? 0)*100)+"%"}} />;
           }
           if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} ccol={ccol} />;
           if (item.kind === "image") {
-            return <div key={"image-" + String(index)} className="absolute flex items-center justify-center overflow-hidden mcl-document-element" style={boxStyle(item)}>
-              {item.assetId ? <img src={"/api/grupamento/monitor-content/assets/" + item.assetId} alt="" className="h-full w-full object-contain drop-shadow-[0_10px_22px_rgba(2,6,23,.16)]" /> : null}
+            const framed = item.w * item.h >= 0.005;
+            return <div
+              key={"image-" + String(index)}
+              className={"absolute flex items-center justify-center overflow-hidden " + (framed ? "rounded-xl border border-slate-300/60 bg-white/95 p-[.3%] shadow-[0_8px_22px_rgba(2,6,23,.16)]" : "")}
+              style={boxStyle(item)}
+            >
+              {item.assetId ? <img src={"/api/grupamento/monitor-content/assets/" + item.assetId} alt="" className={"h-full w-full object-contain " + (framed ? "rounded-lg" : "drop-shadow-[0_8px_16px_rgba(2,6,23,.16)]")} /> : null}
             </div>;
           }
           if (item.kind === "chart") {
-            return <div key={"chart-" + String(index)} className="absolute overflow-hidden rounded-xl border border-white/[0.04] bg-slate-950/10 p-[1.2%] mcl-document-element" style={boxStyle(item)}><DocumentChart chart={item.chart} /></div>;
+            return <div key={"chart-" + String(index)} className="absolute overflow-hidden rounded-xl border border-white/[0.04] bg-slate-950/10 p-[1.2%]" style={boxStyle(item)}><DocumentChart chart={item.chart} /></div>;
           }
-          return <div key={"table-" + String(index)} className="absolute overflow-hidden rounded-lg border border-white/10 bg-slate-950/20 mcl-document-element" style={boxStyle(item)}>
+          return <div key={"table-" + String(index)} className="absolute overflow-hidden rounded-lg border border-white/10 bg-slate-950/20" style={boxStyle(item)}>
             <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
               <thead className="bg-white/[0.08]"><tr>{item.columns.slice(0,8).map((cell,cellIndex)=><th key={cellIndex} className="px-2 py-1 text-left font-black">{cell}</th>)}</tr></thead>
               <tbody>{item.rows.slice(0,12).map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.slice(0,8).map((cell,cellIndex)=><td key={cellIndex} className="truncate px-2 py-1">{cell}</td>)}</tr>)}</tbody>
@@ -302,7 +347,7 @@ export function MonitorDocumentScene({ scene, ccol }: { scene: MonitorDocumentSc
   const payload = scene.payload ?? {};
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
-      <section className="relative h-full min-h-[58vh]">
+      <section className="relative h-full min-h-0 overflow-hidden">
         <LayoutScene scene={scene} ccol={ccol} />
         <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · layout preservado · fonte rastreável
