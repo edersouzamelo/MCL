@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Archive, CheckCircle2, Download, FileText, Loader2, Presentation, Upload } from "lucide-react";
 
 type ScenePreview = {
@@ -38,17 +38,18 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const response = await fetch(`/api/grupamento/monitor-content?monitorId=${monitorId}`, { cache: "no-store" });
     if (!response.ok) return;
     const payload = await response.json();
     setImports(payload.imports ?? []);
-  }
+  }, [monitorId]);
 
   useEffect(() => {
     if (!open) return;
-    void refresh();
-  }, [open, monitorId]);
+    const frame = window.requestAnimationFrame(() => { void refresh(); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, refresh]);
 
   async function upload(file: File) {
     setError("");
