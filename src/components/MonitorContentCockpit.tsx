@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -9,6 +10,14 @@ type ScenePreview = {
   sceneType: string;
   title: string;
   sourcePage: number | null;
+  payload?: {
+    bullets?: string[];
+    rows?: string[][];
+    columns?: string[];
+    series?: Array<{ name: string; categories: string[]; values: number[] }>;
+    assetIds?: string[];
+    note?: string;
+  };
 };
 
 type ImportRecord = {
@@ -166,12 +175,24 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
               </div>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {preview.scenes.slice(0, 8).map((scene) => (
-                  <div key={scene.id} className="rounded-lg border border-amber-200 bg-white/80 p-2.5 dark:border-amber-900/40 dark:bg-zinc-950">
-                    <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-zinc-500"><FileText className="h-3 w-3" /> {scene.sceneType}{scene.sourcePage ? ` · ${scene.sourcePage}` : ""}</div>
-                    <div className="mt-1 line-clamp-2 text-[11px] font-semibold">{scene.title}</div>
-                  </div>
-                ))}
+                {preview.scenes.slice(0, 8).map((scene) => {
+                  const assetId = scene.payload?.assetIds?.[0];
+                  const excerpt = scene.sceneType === "TEXT"
+                    ? scene.payload?.bullets?.slice(0, 2).join(" · ")
+                    : scene.sceneType === "TABLE"
+                      ? scene.payload?.rows?.slice(0, 2).flat().join(" · ")
+                      : scene.sceneType === "CHART"
+                        ? scene.payload?.series?.map((series) => `${series.name}: ${series.values.slice(0, 3).join(", ")}`).join(" · ")
+                        : "Figura extraída do documento original";
+                  return (
+                    <div key={scene.id} className="rounded-lg border border-amber-200 bg-white/80 p-2.5 dark:border-amber-900/40 dark:bg-zinc-950">
+                      <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-zinc-500"><FileText className="h-3 w-3" /> {scene.sceneType}{scene.sourcePage ? ` · ${scene.sourcePage}` : ""}</div>
+                      <div className="mt-1 line-clamp-2 text-[11px] font-semibold">{scene.title}</div>
+                      {excerpt ? <div className="mt-1 line-clamp-2 text-[10px] leading-4 text-zinc-500">{excerpt}</div> : null}
+                      {assetId ? <img src={`/api/grupamento/monitor-content/assets/${assetId}`} alt="" className="mt-2 h-16 w-full rounded-md bg-zinc-100 object-contain dark:bg-zinc-900" /> : null}
+                    </div>
+                  );
+                })}
               </div>
               {preview.sceneCount > 8 ? <div className="mt-2 text-[10px] text-zinc-500">+ {preview.sceneCount - 8} cena(s) adicionais.</div> : null}
               {preview.warnings?.length ? <div className="mt-3 text-[10px] leading-4 text-amber-800 dark:text-amber-300">Lacunas declaradas: {preview.warnings.slice(0, 3).join(" · ")}</div> : null}
