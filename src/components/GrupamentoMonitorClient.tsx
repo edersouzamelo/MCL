@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Database, Monitor, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square } from "lucide-react";
+import { Clock3, Database, Monitor, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
@@ -13,10 +13,12 @@ import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
   CCO_DEFAULT_LOOP_DELAY_SECONDS,
   CCO_DEFAULT_SCROLL_PX_PER_SECOND,
+  CCO_PI_ROWS_PER_PAGE,
   CCO_PI_SCROLL_PX_PER_SECOND,
   CCO_SCROLL_BOTTOM_HOLD_MS,
   CCO_SCROLL_TOP_HOLD_MS,
   CCO_SCREEN_CATALOG,
+  CCO_UNIT_ROWS_PER_PAGE,
   GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
   readableMonitorCycleMs,
@@ -27,7 +29,6 @@ import {
 const MIN_KIOSK_SCALE = 0.86;
 const SCREEN_FADE_MS = 720;
 const DATA_REFRESH_MS = 30_000;
-const PAGE_RELOAD_MS = 5 * 60_000;
 
 function load<T>(key: string): T | null {
   try {
@@ -36,6 +37,39 @@ function load<T>(key: string): T | null {
   } catch {
     return null;
   }
+}
+
+function monitorCacheKey(monitorId: number, suffix: "sag" | "rpn" | "scenes") {
+  return `mcl:monitor:${monitorId}:${suffix}:v1`;
+}
+
+function store(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // O cache local é contingência. Falha de quota não pode derrubar a exibição.
+  }
+}
+
+function sceneAssetUrls(scenes: MonitorDocumentSceneDto[]) {
+  const urls = new Set<string>();
+  for (const scene of scenes) {
+    for (const assetId of scene.payload.assetIds ?? []) {
+      urls.add(`/api/grupamento/monitor-content/assets/${assetId}`);
+    }
+    for (const element of scene.payload.layout?.elements ?? []) {
+      if (element.kind === "image" && element.assetId) {
+        urls.add(`/api/grupamento/monitor-content/assets/${element.assetId}`);
+      }
+    }
+  }
+  return [...urls];
+}
+
+function pageSizeForScreen(screen: CcoScreenId) {
+  if (screen === "pis") return CCO_PI_ROWS_PER_PAGE;
+  if (screen.startsWith("units-")) return CCO_UNIT_ROWS_PER_PAGE;
+  return 0;
 }
 
 function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
@@ -55,6 +89,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "stopped">("playing");
+  const [connectionState, setConnectionState] = useState<"online" | "offline" | "syncing">("syncing");
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
