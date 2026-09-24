@@ -68,7 +68,7 @@ function chartColor(series: MonitorDocumentSeries, index: number) {
 function ChartLegend({ chart }: { chart: MonitorDocumentChart }) {
   if (chart.series.length <= 1) return null;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-2 text-[10px] font-semibold text-slate-400">
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 pt-2 text-[clamp(12px,.82vw,16px)] font-semibold text-slate-300">
       {chart.series.map((series, index) => (
         <span key={series.name + String(index)} className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: chartColor(series, index) }} />
@@ -92,13 +92,13 @@ function HorizontalChart({ chart }: { chart: MonitorDocumentChart }) {
       <div className="min-h-0 flex-1 space-y-[1.2%]">
         {categories.slice(0, 12).map((category, rowIndex) => (
           <div key={category + String(rowIndex)} className="grid grid-cols-[18%_1fr] items-center gap-3" style={{ height: String(100 / Math.max(1, Math.min(categories.length, 12))) + "%" }}>
-            <div className="truncate pr-1 text-right text-[clamp(9px,.72vw,13px)] font-bold text-slate-300">{category}</div>
+            <div className="truncate pr-1 text-right text-[clamp(13px,.9vw,17px)] font-bold text-slate-200">{category}</div>
             <div className="relative h-[72%] min-h-3 overflow-visible rounded-sm bg-white/[0.055]">
               {overlap ? chart.series.map((series, seriesIndex) => {
                 const value = series.values[rowIndex] ?? rawMin;
                 const pct = Math.max(0, Math.min(100, ((value - rawMin) / span) * 100));
                 return (
-                  <div key={series.name + String(seriesIndex)} className="absolute inset-y-0 left-0 origin-left rounded-sm opacity-95 mcl-document-chart-grow" style={{ width: String(pct) + "%", background: chartColor(series, seriesIndex), zIndex: chart.series.length - seriesIndex }} />
+                  <div key={series.name + String(seriesIndex)} className="absolute inset-y-0 left-0 origin-left rounded-sm opacity-95 mcl-document-chart-grow" style={{ width: String(pct) + "%", background: chartColor(series, seriesIndex), zIndex: seriesIndex + 1 }} />
                 );
               }) : chart.grouping === "stacked" || chart.grouping === "percentStacked" ? (
                 <div className="flex h-full overflow-hidden rounded-sm">
@@ -122,7 +122,7 @@ function HorizontalChart({ chart }: { chart: MonitorDocumentChart }) {
           </div>
         ))}
       </div>
-      <div className="mt-1 flex justify-between pl-[19%] text-[9px] font-mono text-slate-500">
+      <div className="mt-1 flex justify-between pl-[19%] text-[clamp(11px,.72vw,14px)] font-mono font-semibold text-slate-400">
         <span>{valueLabel(rawMin, chart)}</span><span>{valueLabel(rawMax, chart)}</span>
       </div>
       <ChartLegend chart={chart} />
@@ -160,7 +160,7 @@ function VerticalChart({ chart }: { chart: MonitorDocumentChart }) {
                   return <div key={series.name + String(seriesIndex)} className="w-full max-w-[38px] rounded-t-sm mcl-document-chart-rise" style={{ height: String(pct) + "%", background: chartColor(series, seriesIndex) }} />;
                 })}
               </div>
-              <div className="mt-1 truncate text-center text-[clamp(8px,.58vw,11px)] font-semibold text-slate-400" title={category}>{category}</div>
+              <div className="mt-1 truncate text-center text-[clamp(11px,.72vw,14px)] font-semibold text-slate-300" title={category}>{category}</div>
             </div>
           ))}
         </div>
@@ -223,7 +223,9 @@ function DocumentChart({ chart }: { chart: MonitorDocumentChart }) {
 
 function TextElement({ item, ccol }: { item: MonitorSlideTextElement; ccol: boolean }) {
   const size = item.fontSizePt ?? 18;
-  const viewportSize = Math.max(0.58, Math.min(4.2, size / 13));
+  const baseViewport = Math.max(0.72, Math.min(4.8, size / 11.2));
+  const minimumPx = item.role === "metric" ? 34 : item.role === "title" ? 24 : item.role === "label" ? 13 : 15;
+  const maximumPx = Math.max(minimumPx + 4, size * (item.role === "metric" ? 1.7 : 1.6));
   const justify = item.verticalAlign === "middle" ? "center" : item.verticalAlign === "bottom" ? "flex-end" : "flex-start";
   const area = item.w * item.h;
   return (
@@ -232,13 +234,13 @@ function TextElement({ item, ccol }: { item: MonitorSlideTextElement; ccol: bool
       alignItems: justify,
       justifyContent: item.align === "center" ? "center" : item.align === "right" ? "flex-end" : "flex-start",
       textAlign: item.align,
-      fontSize: "clamp(9px," + String(viewportSize) + "vw," + String(Math.max(13, size * 1.55)) + "px)",
-      lineHeight: item.role === "metric" ? 1 : 1.12,
-      fontWeight: item.bold || item.role === "metric" || item.role === "title" ? 800 : 600,
+      fontSize: "clamp(" + String(minimumPx) + "px," + String(baseViewport) + "vw," + String(maximumPx) + "px)",
+      lineHeight: item.role === "metric" ? 1 : item.role === "label" ? 1.06 : 1.12,
+      fontWeight: item.bold || item.role === "metric" || item.role === "title" ? 800 : 650,
       color: adaptedTextColor(item.color, ccol),
       textShadow: ccol ? "none" : "0 2px 14px rgba(2,6,23,.55)",
-      letterSpacing: item.role === "label" ? ".035em" : undefined,
-      opacity: area < 0.002 ? 0.9 : 1,
+      letterSpacing: item.role === "label" ? ".02em" : undefined,
+      opacity: area < 0.002 ? 0.94 : 1,
     }}>
       {item.text}
     </div>
@@ -267,7 +269,7 @@ function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: bo
             return <div key={"chart-" + String(index)} className="absolute overflow-hidden rounded-xl border border-white/[0.04] bg-slate-950/10 p-[1.2%] mcl-document-element" style={boxStyle(item)}><DocumentChart chart={item.chart} /></div>;
           }
           return <div key={"table-" + String(index)} className="absolute overflow-hidden rounded-lg border border-white/10 bg-slate-950/20 mcl-document-element" style={boxStyle(item)}>
-            <table className="h-full w-full table-fixed text-[clamp(8px,.6vw,11px)]">
+            <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
               <thead className="bg-white/[0.08]"><tr>{item.columns.slice(0,8).map((cell,cellIndex)=><th key={cellIndex} className="px-2 py-1 text-left font-black">{cell}</th>)}</tr></thead>
               <tbody>{item.rows.slice(0,12).map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.slice(0,8).map((cell,cellIndex)=><td key={cellIndex} className="truncate px-2 py-1">{cell}</td>)}</tr>)}</tbody>
             </table>

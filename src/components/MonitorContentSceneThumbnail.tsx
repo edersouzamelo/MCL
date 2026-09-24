@@ -37,15 +37,27 @@ function ThumbnailChart({ item }: { item: Extract<MonitorSlideElement, { kind: "
 
   if (chart.type === "bar") {
     const values = chart.series.flatMap((series) => series.values);
-    const max = Math.max(1, ...values.map((value) => Math.abs(value)));
+    const min = chart.axisMin ?? Math.min(0, ...values);
+    const max = chart.axisMax ?? Math.max(1, ...values);
+    const span = Math.max(1, max - min);
+    const overlap = (chart.overlap ?? 0) >= 90 && chart.series.length > 1;
     return (
       <div className="flex h-full flex-col justify-around gap-[3%] px-[4%] py-[3%]">
         {categories.slice(0, 10).map((category, rowIndex) => (
-          <div key={category + rowIndex} className="flex min-h-[3px] flex-1 items-center gap-[2px]">
-            {chart.series.map((series, seriesIndex) => {
-              const value = Math.abs(series.values[rowIndex] ?? 0);
-              return <span key={series.name + seriesIndex} className="block h-[62%] rounded-r-[1px]" style={{ width: Math.max(3, value / max * 94) + "%", background: colorFor(chart, seriesIndex) }} />;
-            })}
+          <div key={category + rowIndex} className="relative min-h-[3px] flex-1">
+            {overlap ? chart.series.map((series, seriesIndex) => {
+              const value = series.values[rowIndex] ?? min;
+              const width = Math.max(2, Math.min(96, ((value - min) / span) * 96));
+              return <span key={series.name + seriesIndex} className="absolute left-0 top-[19%] block h-[62%] rounded-r-[1px]" style={{ width: width + "%", background: colorFor(chart, seriesIndex), zIndex: seriesIndex + 1 }} />;
+            }) : (
+              <div className="flex h-full items-center gap-[2px]">
+                {chart.series.map((series, seriesIndex) => {
+                  const value = series.values[rowIndex] ?? 0;
+                  const width = Math.max(3, Math.abs(value) / Math.max(1, ...values.map((item) => Math.abs(item))) * 94);
+                  return <span key={series.name + seriesIndex} className="block h-[62%] rounded-r-[1px]" style={{ width: width + "%", background: colorFor(chart, seriesIndex) }} />;
+                })}
+              </div>
+            )}
           </div>
         ))}
       </div>

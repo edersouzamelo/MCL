@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Database, Monitor, ShieldCheck } from "lucide-react";
+import { Clock3, Database, Monitor, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
@@ -54,6 +54,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [screenIndex, setScreenIndex] = useState(0);
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
+  const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "stopped">("playing");
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -163,6 +164,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const activeScreen = activeItem.kind === "system" ? activeItem.screen : null;
   const screenLabel = activeItem.label;
   const effectiveLoop = monitor.mode === "loop" && playlist.length > 1;
+  const autoAdvance = effectiveLoop && playbackState === "playing";
 
   useEffect(() => {
     if (screenIndex < playlist.length) return;
@@ -171,7 +173,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   }, [playlist.length, screenIndex]);
 
   useEffect(() => {
-    if (!effectiveLoop) return;
+    if (!autoAdvance) return;
 
     let switchTimer = 0;
     const timer = window.setTimeout(() => {
@@ -189,7 +191,21 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       window.clearTimeout(timer);
       if (switchTimer) window.clearTimeout(switchTimer);
     };
-  }, [effectiveLoop, monitor.delaySeconds, playlist.length, screenIndex, screenCycleMs]);
+  }, [autoAdvance, monitor.delaySeconds, playlist.length, screenIndex, screenCycleMs]);
+
+  const stepPlaylist = (direction: -1 | 1) => {
+    if (!playlist.length) return;
+    setTransitioning(false);
+    setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
+    setScreenIndex((current) => (current + direction + playlist.length) % playlist.length);
+  };
+
+  const stopPlayback = () => {
+    setPlaybackState("stopped");
+    setTransitioning(false);
+    setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
+    setScreenIndex(0);
+  };
 
   const ccol = monitor.layout === "ccol";
   const isRuleScreen = activeScreen ? activeScreen === "briefing" || activeScreen.startsWith("class-") : false;
@@ -255,7 +271,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
       <section className="relative z-10 min-h-0 flex-1 overflow-hidden px-6 py-4">
         <div
-          className={`h-full w-full transition-[opacity,transform,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "translate-y-2 scale-[0.997] opacity-0 blur-[2px]" : "translate-y-0 scale-100 opacity-100 blur-0"}`}
+          className={`h-full w-full transition-[opacity,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-0 blur-[1.5px]" : "opacity-100 blur-0"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
           <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
@@ -263,6 +279,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
               screenKey={activeItem.kind === "system" ? activeItem.screen : activeItem.key}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               loopMode={effectiveLoop}
+              paused={playbackState !== "playing"}
               onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
             >
               {screenContent}
@@ -270,6 +287,25 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
           </div>
         </div>
       </section>
+
+      {playlist.length > 1 ? (
+        <div className={`absolute bottom-12 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
+            <button
+              type="button"
+              onClick={() => setPlaybackState((state) => state === "playing" ? "paused" : "playing")}
+              className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300"
+              aria-label={playbackState === "playing" ? "Pausar apresentação" : "Retomar apresentação"}
+              title={playbackState === "playing" ? "Pausar" : "Retomar"}
+            >
+              {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </button>
+            <button type="button" onClick={stopPlayback} className="rounded-full p-2 transition hover:bg-rose-400/10 hover:text-rose-300" aria-label="Parar apresentação" title="Parar e voltar ao primeiro quadro"><Square className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => stepPlaylist(1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Avançar quadro" title="Avançar"><SkipForward className="h-4 w-4" /></button>
+          </div>
+        </div>
+      ) : null}
 
       <div className={`mcl-monitor-watermark pointer-events-none absolute bottom-11 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
         <BrandLogo className="h-11 w-11" tone={ccol ? "green" : "sky"} sizes="44px" />
@@ -297,7 +333,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
-          <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s` : "tela fixa"}</span>
+          <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
           <span>dados · 30s</span>
           <span>auto F5 · 5min</span>
           <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
@@ -312,12 +348,14 @@ function MonitorViewport({
   screenKey,
   cycleSeconds,
   loopMode,
+  paused,
   onRequiredCycleMs,
 }: {
   children: ReactNode;
   screenKey: string;
   cycleSeconds: number;
   loopMode: boolean;
+  paused: boolean;
   onRequiredCycleMs: (requiredMs: number) => void;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -362,6 +400,7 @@ function MonitorViewport({
 
   useEffect(() => {
     let animationFrame = 0;
+    if (paused) return;
     if (maxOffset <= 2) {
       animationFrame = window.requestAnimationFrame(() => setOffset(0));
       return () => window.cancelAnimationFrame(animationFrame);
@@ -406,7 +445,7 @@ function MonitorViewport({
 
     animationFrame = window.requestAnimationFrame(animate);
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [maxOffset, loopMode, screenKey]);
+  }, [maxOffset, loopMode, paused, screenKey]);
 
   return (
     <div ref={frameRef} className="h-full w-full overflow-hidden">
