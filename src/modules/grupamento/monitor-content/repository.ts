@@ -37,7 +37,11 @@ export async function saveMonitorUploadChunk(input: {
   return prisma.$transaction(async (tx) => {
     await tx.monitorContentUploadChunk.deleteMany({ where: { createdAt: { lt: staleBefore } } });
     await tx.monitorContentUploadChunk.deleteMany({
-      where: { uploadId: input.uploadId, chunkIndex: input.chunkIndex },
+      where: {
+        uploadId: input.uploadId,
+        chunkIndex: input.chunkIndex,
+        organizationId: input.organizationId,
+      },
     });
     return tx.monitorContentUploadChunk.create({ data: { ...input, data: bytes(input.data) } });
   });
