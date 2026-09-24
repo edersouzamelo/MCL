@@ -4,7 +4,7 @@ import { type ReactNode } from "react";
 import { BarChart3, Building2, CircleDollarSign, ListTree } from "lucide-react";
 import { AnimatedCurrency, AnimatedPercent, useAnimatedValue } from "@/components/MonitorAnimatedValue";
 import type { CcoLayoutId } from "@/modules/grupamento/cco";
-import type { CcoScreenId } from "@/modules/grupamento/monitor";
+import { CCO_PI_ROWS_PER_PAGE, CCO_UNIT_ROWS_PER_PAGE, type CcoScreenId } from "@/modules/grupamento/monitor";
 import type { RpnImportResult, RpnSnapshot } from "@/modules/grupamento/rpn";
 import type { SagImportResult, SagSnapshot } from "@/modules/grupamento/sag";
 
@@ -25,19 +25,23 @@ export function GrupamentoBaseMonitorScreen({
   sag,
   rpn,
   layout,
+  page = 0,
+  pageSize,
 }: {
   screen: CcoScreenId;
   sag: SagImportResult;
   rpn: RpnImportResult;
   layout: CcoLayoutId;
+  page?: number;
+  pageSize?: number;
 }) {
   if (screen === "execution") return <Execution snapshot={sag.totals} layout={layout} />;
   if (screen === "rpn") return <PreviousCredits rpn={rpn} layout={layout} />;
-  if (screen === "pis") return <PiTable sag={sag} layout={layout} />;
-  if (screen === "units-current-160") return <CurrentUnits sag={sag} prefix="160" layout={layout} />;
-  if (screen === "units-current-167") return <CurrentUnits sag={sag} prefix="167" layout={layout} />;
-  if (screen === "units-rpn-160") return <PreviousUnits rpn={rpn} prefix="160" layout={layout} />;
-  if (screen === "units-rpn-167") return <PreviousUnits rpn={rpn} prefix="167" layout={layout} />;
+  if (screen === "pis") return <PiTable sag={sag} layout={layout} page={page} pageSize={pageSize ?? CCO_PI_ROWS_PER_PAGE} />;
+  if (screen === "units-current-160") return <CurrentUnits sag={sag} prefix="160" layout={layout} page={page} pageSize={pageSize ?? CCO_UNIT_ROWS_PER_PAGE} />;
+  if (screen === "units-current-167") return <CurrentUnits sag={sag} prefix="167" layout={layout} page={page} pageSize={pageSize ?? CCO_UNIT_ROWS_PER_PAGE} />;
+  if (screen === "units-rpn-160") return <PreviousUnits rpn={rpn} prefix="160" layout={layout} page={page} pageSize={pageSize ?? CCO_UNIT_ROWS_PER_PAGE} />;
+  if (screen === "units-rpn-167") return <PreviousUnits rpn={rpn} prefix="167" layout={layout} page={page} pageSize={pageSize ?? CCO_UNIT_ROWS_PER_PAGE} />;
   return <Overview sag={sag} rpn={rpn} layout={layout} />;
 }
 
@@ -117,6 +121,9 @@ function Execution({ snapshot, layout }: { snapshot: SagSnapshot; layout: CcoLay
 
 function PreviousCredits({ rpn, layout }: { rpn: RpnImportResult; layout: CcoLayoutId }) {
   const ccol = layout === "ccol";
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.max(0, Math.min(totalPages - 1, page));
+  const visibleRows = rows.slice(safePage * pageSize, (safePage + 1) * pageSize);
   return (
     <div>
       <div className={`text-xs font-bold uppercase tracking-[0.18em] ${ccol ? "text-violet-800" : "text-violet-300"}`}>Créditos do exercício anterior</div>
@@ -134,17 +141,17 @@ function PreviousCredits({ rpn, layout }: { rpn: RpnImportResult; layout: CcoLay
   );
 }
 
-function CurrentUnits({ sag, prefix, layout }: { sag: SagImportResult; prefix: "160" | "167"; layout: CcoLayoutId }) {
+function CurrentUnits({ sag, prefix, layout, page, pageSize }: { sag: SagImportResult; prefix: "160" | "167"; layout: CcoLayoutId; page: number; pageSize: number }) {
   const rows = sag.byUg.filter((item) => item.ug.startsWith(prefix));
-  return <UnitGrid source="Exercício Corrente" prefix={prefix} rows={rows.map((item) => ({ ug: item.ug, acronym: item.acronym, total: item.snapshot.total, primary: item.snapshot.committedPercent, secondary: item.snapshot.liquidatedPercent }))} layout={layout} />;
+  return <UnitGrid source="Exercício Corrente" prefix={prefix} rows={rows.map((item) => ({ ug: item.ug, acronym: item.acronym, total: item.snapshot.total, primary: item.snapshot.committedPercent, secondary: item.snapshot.liquidatedPercent }))} layout={layout} page={page} pageSize={pageSize} />;
 }
 
-function PreviousUnits({ rpn, prefix, layout }: { rpn: RpnImportResult; prefix: "160" | "167"; layout: CcoLayoutId }) {
+function PreviousUnits({ rpn, prefix, layout, page, pageSize }: { rpn: RpnImportResult; prefix: "160" | "167"; layout: CcoLayoutId; page: number; pageSize: number }) {
   const rows = rpn.byUg.filter((item) => item.ug.startsWith(prefix));
-  return <UnitGrid source="Créditos do exercício anterior" prefix={prefix} rows={rows.map((item) => ({ ug: item.ug, acronym: item.acronym, total: item.snapshot.inscribed, primary: item.snapshot.liquidatedPercent, secondary: item.snapshot.cancelledPercent }))} layout={layout} previous />;
+  return <UnitGrid source="Créditos do exercício anterior" prefix={prefix} rows={rows.map((item) => ({ ug: item.ug, acronym: item.acronym, total: item.snapshot.inscribed, primary: item.snapshot.liquidatedPercent, secondary: item.snapshot.cancelledPercent }))} layout={layout} page={page} pageSize={pageSize} previous />;
 }
 
-function UnitGrid({ source, prefix, rows, layout, previous = false }: { source: string; prefix: string; rows: Array<{ ug: string; acronym?: string; total: number; primary: number; secondary: number }>; layout: CcoLayoutId; previous?: boolean }) {
+function UnitGrid({ source, prefix, rows, layout, page, pageSize, previous = false }: { source: string; prefix: string; rows: Array<{ ug: string; acronym?: string; total: number; primary: number; secondary: number }>; layout: CcoLayoutId; page: number; pageSize: number; previous?: boolean }) {
   const ccol = layout === "ccol";
   return (
     <div>
@@ -154,7 +161,7 @@ function UnitGrid({ source, prefix, rows, layout, previous = false }: { source: 
           <h1 className="mt-2 text-4xl font-black">{source} · série {prefix}xxx</h1>
           <p className={`mt-2 text-sm ${ccol ? "text-slate-600" : "text-slate-400"}`}>A série 160xxx e a série 167xxx são exibidas em quadros separados. Nenhuma OM é descartada por limite arbitrário.</p>
         </div>
-        <div className={`rounded-xl border px-4 py-3 text-center ${ccol ? "border-slate-300 bg-white" : "border-white/10 bg-white/[0.03]"}`}><div className="text-3xl font-black">{rows.length}</div><div className={`text-[10px] uppercase tracking-wider ${ccol ? "text-slate-500" : "text-slate-500"}`}>UG exibidas</div></div>
+        <div className={`rounded-xl border px-4 py-3 text-center ${ccol ? "border-slate-300 bg-white" : "border-white/10 bg-white/[0.03]"}`}><div className="text-2xl font-black">{visibleRows.length}/{rows.length}</div><div className={`text-[10px] uppercase tracking-wider ${ccol ? "text-slate-500" : "text-slate-500"}`}>UG · quadro {safePage + 1}/{totalPages}</div></div>
       </div>
 
       <div className="mt-6 grid gap-3 xl:grid-cols-2">
@@ -173,16 +180,19 @@ function UnitGrid({ source, prefix, rows, layout, previous = false }: { source: 
   );
 }
 
-function PiTable({ sag, layout }: { sag: SagImportResult; layout: CcoLayoutId }) {
+function PiTable({ sag, layout, page, pageSize }: { sag: SagImportResult; layout: CcoLayoutId; page: number; pageSize: number }) {
   const ccol = layout === "ccol";
+  const totalPages = Math.max(1, Math.ceil(sag.byPi.length / pageSize));
+  const safePage = Math.max(0, Math.min(totalPages - 1, page));
+  const rows = sag.byPi.slice(safePage * pageSize, (safePage + 1) * pageSize);
   return (
     <div>
       <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] ${ccol ? "text-sky-800" : "text-sky-300"}`}><ListTree className="h-4 w-4" /> Planos Internos · Exercício Corrente</div>
-      <h1 className="mt-2 text-4xl font-black">Execução por PI</h1>
+      <div className="flex items-end justify-between gap-4"><h1 className="mt-2 text-4xl font-black">Execução por PI</h1><div className={`rounded-lg border px-3 py-2 text-xs font-bold ${ccol ? "border-slate-300 bg-white text-slate-600" : "border-white/10 bg-white/[0.03] text-slate-400"}`}>Quadro {safePage + 1}/{totalPages} · {rows.length}/{sag.byPi.length} PI</div></div>
       <div className={`mcl-broadcast-card mt-6 overflow-hidden rounded-2xl border ${ccol ? "border-slate-300 bg-white" : "border-white/10"}`} style={{ animationDelay: "180ms" }}>
         <table className="w-full text-left text-sm">
           <thead className={ccol ? "bg-sky-950 text-white" : "bg-white/[0.06] text-slate-300"}><tr><th className="px-4 py-3">PI</th><th className="px-4 py-3">Descrição</th><th className="px-4 py-3">Recebido</th><th className="px-4 py-3">% Emp.</th><th className="px-4 py-3">% Liq.</th></tr></thead>
-          <tbody className={ccol ? "divide-y divide-slate-200" : "divide-y divide-white/10"}>{sag.byPi.map((item) => <tr key={item.pi}><td className="px-4 py-2.5 font-mono text-xs">{item.pi}</td><td className="max-w-[440px] truncate px-4 py-2.5" title={item.piName}>{item.piName || "—"}</td><td className="px-4 py-2.5 font-semibold">{currency(item.snapshot.total)}</td><td className="px-4 py-2.5 font-black">{percent(item.snapshot.committedPercent)}</td><td className="px-4 py-2.5 font-black">{percent(item.snapshot.liquidatedPercent)}</td></tr>)}</tbody>
+          <tbody className={ccol ? "divide-y divide-slate-200" : "divide-y divide-white/10"}>{rows.map((item) => <tr key={item.pi}><td className="px-4 py-2.5 font-mono text-xs">{item.pi}</td><td className="max-w-[440px] truncate px-4 py-2.5" title={item.piName}>{item.piName || "—"}</td><td className="px-4 py-2.5 font-semibold">{currency(item.snapshot.total)}</td><td className="px-4 py-2.5 font-black">{percent(item.snapshot.committedPercent)}</td><td className="px-4 py-2.5 font-black">{percent(item.snapshot.liquidatedPercent)}</td></tr>)}</tbody>
         </table>
       </div>
     </div>
