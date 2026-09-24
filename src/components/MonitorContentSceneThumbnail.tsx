@@ -55,11 +55,10 @@ function ThumbnailChart({ item }: { item: Extract<MonitorSlideElement, { kind: "
   if (chart.type === "pie" || chart.type === "doughnut") {
     const values = chart.series[0]?.values ?? [];
     const total = Math.max(1, values.reduce((sum, value) => sum + Math.max(0, value), 0));
-    let acc = 0;
     const stops = values.map((value, index) => {
-      const start = acc;
-      acc += Math.max(0, value) / total * 100;
-      return FALLBACK[index % FALLBACK.length] + " " + start + "% " + acc + "%";
+      const start = values.slice(0, index).reduce((sum, item) => sum + Math.max(0, item), 0) / total * 100;
+      const end = start + Math.max(0, value) / total * 100;
+      return FALLBACK[index % FALLBACK.length] + " " + start + "% " + end + "%";
     });
     return <div className="m-auto aspect-square h-[78%] rounded-full" style={{ background: "conic-gradient(" + stops.join(",") + ")" }} />;
   }
