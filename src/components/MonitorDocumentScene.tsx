@@ -56,6 +56,38 @@ function excelDate(value: number) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "2-digit", timeZone: "UTC" }).format(date);
 }
 
+function excelMonth(value: number) {
+  const date = new Date(Date.UTC(1899, 11, 30) + Math.round(value) * 86400000);
+  return new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit", timeZone: "UTC" }).format(date).replace(".", "");
+}
+
+function excelSerial(date: Date) {
+  return (date.getTime() - Date.UTC(1899, 11, 30)) / 86400000;
+}
+
+function horizontalAxisTicks(chart: MonitorDocumentChart, min: number, max: number) {
+  const span = Math.max(1, max - min);
+  const dateAxis = Boolean(chart.valueFormat && /[dmy]/i.test(chart.valueFormat) && min > 20000);
+  if (dateAxis) {
+    const startDate = new Date(Date.UTC(1899, 11, 30) + Math.round(min) * 86400000);
+    let cursor = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1));
+    if (excelSerial(cursor) < min - 2) cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+    const ticks: Array<{ value: number; label: string; pct: number }> = [];
+    for (let guard = 0; guard < 18; guard += 1) {
+      const value = excelSerial(cursor);
+      if (value > max + 2) break;
+      if (value >= min - 2) ticks.push({ value, label: excelMonth(value), pct: ((value - min) / span) * 100 });
+      cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+    }
+    if (ticks.length >= 4) return ticks;
+  }
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const value = min + span * (index / 6);
+    return { value, label: valueLabel(value, chart), pct: (index / 6) * 100 };
+  });
+}
+
 function valueLabel(value: number, chart: MonitorDocumentChart) {
   if (chart.valueFormat && /[dmy]/i.test(chart.valueFormat) && value > 20000) return excelDate(value);
   return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -86,44 +118,86 @@ function HorizontalChart({ chart }: { chart: MonitorDocumentChart }) {
   const rawMax = chart.axisMax ?? Math.max(1, ...values);
   const span = Math.max(1, rawMax - rawMin);
   const overlap = (chart.overlap ?? 0) >= 90 && chart.series.length > 1;
+  const visibleCategories = categories.slice(0, 12);
+  const ticks = horizontalAxisTicks(chart, rawMin, rawMax);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 space-y-[1.2%]">
-        {categories.slice(0, 12).map((category, rowIndex) => (
-          <div key={category + String(rowIndex)} className="grid grid-cols-[18%_1fr] items-center gap-3" style={{ height: String(100 / Math.max(1, Math.min(categories.length, 12))) + "%" }}>
-            <div className="truncate pr-1 text-right text-[clamp(13px,.9vw,17px)] font-bold text-slate-200">{category}</div>
-            <div className="relative h-[72%] min-h-3 overflow-visible rounded-sm bg-white/[0.055]">
-              {overlap ? chart.series.map((series, seriesIndex) => {
-                const value = series.values[rowIndex] ?? rawMin;
-                const pct = Math.max(0, Math.min(100, ((value - rawMin) / span) * 100));
-                return (
-                  <div key={series.name + String(seriesIndex)} className="absolute inset-y-0 left-0 origin-left rounded-sm opacity-95 mcl-document-chart-grow" style={{ width: String(pct) + "%", background: chartColor(series, seriesIndex), zIndex: seriesIndex + 1 }} />
-                );
-              }) : chart.grouping === "stacked" || chart.grouping === "percentStacked" ? (
-                <div className="flex h-full overflow-hidden rounded-sm">
-                  {chart.series.map((series, seriesIndex) => {
-                    const rowValues = chart.series.map((item) => Math.max(0, item.values[rowIndex] ?? 0));
-                    const total = Math.max(1, rowValues.reduce((sum, item) => sum + item, 0));
-                    const value = Math.max(0, series.values[rowIndex] ?? 0);
-                    return <div key={series.name + String(seriesIndex)} className="h-full mcl-document-chart-grow" style={{ width: String((value / total) * 100) + "%", background: chartColor(series, seriesIndex) }} />;
-                  })}
-                </div>
-              ) : (
-                <div className="flex h-full items-stretch gap-[2px]">
-                  {chart.series.map((series, seriesIndex) => {
-                    const value = series.values[rowIndex] ?? 0;
-                    const pct = Math.max(0, Math.min(100, ((value - rawMin) / span) * 100));
-                    return <div key={series.name + String(seriesIndex)} className="h-full min-w-[2px] origin-left rounded-sm mcl-document-chart-grow" style={{ width: String(pct / Math.max(1, chart.series.length)) + "%", background: chartColor(series, seriesIndex) }} />;
-                  })}
-                </div>
-              )}
+      <div className="grid min-h-0 flex-1 grid-cols-[18%_1fr] gap-x-3">
+        <div
+          className="grid min-h-0"
+          style={{ gridTemplateRows: `repeat(${Math.max(1, visibleCategories.length)}, minmax(0, 1fr))` }}
+        >
+          {visibleCategories.map((category, rowIndex) => (
+            <div key={category + String(rowIndex)} className="flex items-center justify-end pr-1 text-right text-[clamp(12px,.86vw,16px)] font-bold text-slate-200">
+              <span className="truncate">{category}</span>
             </div>
+          ))}
+        </div>
+
+        <div className="relative min-h-0">
+          <div className="pointer-events-none absolute inset-0 z-0">
+            {ticks.map((tick, index) => (
+              <span
+                key={tick.label + String(index)}
+                className="absolute inset-y-0 border-l border-slate-400/[0.18]"
+                style={{ left: `${Math.max(0, Math.min(100, tick.pct))}%` }}
+              />
+            ))}
           </div>
-        ))}
+
+          <div
+            className="relative z-10 grid h-full min-h-0"
+            style={{ gridTemplateRows: `repeat(${Math.max(1, visibleCategories.length)}, minmax(0, 1fr))` }}
+          >
+            {visibleCategories.map((category, rowIndex) => (
+              <div key={category + String(rowIndex)} className="flex items-center">
+                <div className="relative h-[58%] min-h-3 w-full overflow-hidden rounded-sm bg-white/[0.055]">
+                  {overlap ? chart.series.map((series, seriesIndex) => {
+                    const value = series.values[rowIndex] ?? rawMin;
+                    const pct = Math.max(0, Math.min(100, ((value - rawMin) / span) * 100));
+                    return (
+                      <div
+                        key={series.name + String(seriesIndex)}
+                        className="absolute inset-y-0 left-0 origin-left rounded-sm opacity-95 mcl-document-chart-grow"
+                        style={{ width: String(pct) + "%", background: chartColor(series, seriesIndex), zIndex: seriesIndex + 1 }}
+                      />
+                    );
+                  }) : chart.grouping === "stacked" || chart.grouping === "percentStacked" ? (
+                    <div className="flex h-full overflow-hidden rounded-sm">
+                      {chart.series.map((series, seriesIndex) => {
+                        const rowValues = chart.series.map((item) => Math.max(0, item.values[rowIndex] ?? 0));
+                        const total = Math.max(1, rowValues.reduce((sum, item) => sum + item, 0));
+                        const value = Math.max(0, series.values[rowIndex] ?? 0);
+                        return <div key={series.name + String(seriesIndex)} className="h-full mcl-document-chart-grow" style={{ width: String((value / total) * 100) + "%", background: chartColor(series, seriesIndex) }} />;
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex h-full items-stretch gap-[2px]">
+                      {chart.series.map((series, seriesIndex) => {
+                        const value = series.values[rowIndex] ?? 0;
+                        const pct = Math.max(0, Math.min(100, ((value - rawMin) / span) * 100));
+                        return <div key={series.name + String(seriesIndex)} className="h-full min-w-[2px] origin-left rounded-sm mcl-document-chart-grow" style={{ width: String(pct / Math.max(1, chart.series.length)) + "%", background: chartColor(series, seriesIndex) }} />;
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="mt-1 flex justify-between pl-[19%] text-[clamp(11px,.72vw,14px)] font-mono font-semibold text-slate-400">
-        <span>{valueLabel(rawMin, chart)}</span><span>{valueLabel(rawMax, chart)}</span>
+
+      <div className="relative ml-[18%] mt-1 h-7">
+        {ticks.map((tick, index) => (
+          <span
+            key={tick.label + String(index)}
+            className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-[clamp(9px,.6vw,12px)] font-mono font-semibold text-slate-400"
+            style={{ left: `${Math.max(0, Math.min(100, tick.pct))}%` }}
+          >
+            {tick.label}
+          </span>
+        ))}
       </div>
       <ChartLegend chart={chart} />
     </div>
@@ -230,9 +304,9 @@ function DocumentChart({ chart }: { chart: MonitorDocumentChart }) {
     ? singleSeriesLabel
     : undefined;
   const xAxisTitle = chart.xAxisTitle
-    ?? (chart.type === "bar" && chart.orientation === "vertical" ? unitLikeSeriesLabel : undefined);
-  const yAxisTitle = chart.yAxisTitle
     ?? (chart.type === "bar" && chart.orientation === "horizontal" ? unitLikeSeriesLabel : undefined);
+  const yAxisTitle = chart.yAxisTitle
+    ?? (chart.type === "bar" && chart.orientation === "vertical" ? unitLikeSeriesLabel : undefined);
 
   const chartBody = chart.type === "bar"
     ? (chart.orientation === "horizontal" ? <HorizontalChart chart={chart} /> : <VerticalChart chart={chart} />)
