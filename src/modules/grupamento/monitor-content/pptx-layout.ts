@@ -188,6 +188,12 @@ function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
   return result.slice(0, 8);
 }
 
+function axisTitle(axisXml: string) {
+  const titleXml = axisXml.match(/<c:title\b[^>]*>([\s\S]*?)<\/c:title>/)?.[1] ?? "";
+  const value = clean(textNodes(titleXml).join(" "));
+  return value || undefined;
+}
+
 function chart(xml: string, theme: Theme) {
   const choices = [["barChart","bar"],["lineChart","line"],["pieChart","pie"],["doughnutChart","doughnut"],["areaChart","area"],["scatterChart","scatter"]] as const;
   const found = choices.find(([tag]) => new RegExp("<c:" + tag + "\\b").test(xml));
@@ -196,10 +202,16 @@ function chart(xml: string, theme: Theme) {
   const rawGrouping = block.match(/<c:grouping\b[^>]*\bval="([^"]+)"/)?.[1];
   const grouping: MonitorDocumentChart["grouping"] = rawGrouping === "stacked" ? "stacked" : rawGrouping === "percentStacked" ? "percentStacked" : rawGrouping === "clustered" ? "clustered" : "standard";
   const overlap = Number(block.match(/<c:overlap\b[^>]*\bval="(-?\d+)"/)?.[1] ?? "0");
-  const axis = xml.match(/<c:valAx\b[^>]*>([\s\S]*?)<\/c:valAx>/)?.[1] ?? "";
-  const format = decode(axis.match(/<c:numFmt\b[^>]*\bformatCode="([^"]+)"/)?.[1] ?? "");
-  const min = Number(axis.match(/<c:min\b[^>]*\bval="([^"]+)"/)?.[1] ?? "NaN");
-  const max = Number(axis.match(/<c:max\b[^>]*\bval="([^"]+)"/)?.[1] ?? "NaN");
+  const categoryAxis = xml.match(/<c:catAx\b[^>]*>([\s\S]*?)<\/c:catAx>/)?.[1] ?? "";
+  const valueAxis = xml.match(/<c:valAx\b[^>]*>([\s\S]*?)<\/c:valAx>/)?.[1] ?? "";
+  const categoryTitle = axisTitle(categoryAxis);
+  const valueTitle = axisTitle(valueAxis);
+  const format = decode(valueAxis.match(/<c:numFmt\b[^>]*\bformatCode="([^"]+)"/)?.[1] ?? "");
+  const min = Number(valueAxis.match(/<c:min\b[^>]*\bval="([^"]+)"/)?.[1] ?? "NaN");
+  const max = Number(valueAxis.match(/<c:max\b[^>]*\bval="([^"]+)"/)?.[1] ?? "NaN");
+  const horizontalBar = found?.[1] === "bar" && dir === "bar";
+  const xAxisTitle = horizontalBar ? valueTitle : categoryTitle;
+  const yAxisTitle = horizontalBar ? categoryTitle : valueTitle;
   return {
     type: (found?.[1] ?? "unknown") as "bar"|"line"|"pie"|"doughnut"|"area"|"scatter"|"unknown",
     orientation: found?.[1] === "bar" ? (dir === "bar" ? "horizontal" as const : "vertical" as const) : undefined,
@@ -209,6 +221,8 @@ function chart(xml: string, theme: Theme) {
     valueFormat: format || undefined,
     axisMin: Number.isFinite(min) ? min : undefined,
     axisMax: Number.isFinite(max) ? max : undefined,
+    xAxisTitle,
+    yAxisTitle,
   };
 }
 
@@ -275,7 +289,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     const page = index + 1;
     const xml = entries.get(slidePath)!.toString("utf8");
     const rels = relationships(entries, slidePath);
-    const elements: MonitorSlideElement[] = [];
+    let elements: MonitorSlideElement[] = [];
     const searchable: string[] = [];
     let z = 0;
     for (const item of blocks(xml)) {
@@ -308,6 +322,8 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
           const parsed = chart(entries.get(target)?.toString("utf8") ?? "",theme);
           if (parsed.series.length) {
             parsed.series.forEach((s) => searchable.push(s.name,...s.categories,...s.values.map(String)));
+            if (parsed.xAxisTitle) searchable.push(parsed.xAxisTitle);
+            if (parsed.yAxisTitle) searchable.push(parsed.yAxisTitle);
             elements.push({kind:"chart",...b,chart:parsed,z:z*10+1});
           }
         }
@@ -316,6 +332,21 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
       }
       z += 1;
     }
+    const chartBoxes = elements.filter((element) => element.kind === "chart");
+    const neutralFills = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
+    elements = elements.filter((element) => {
+      if (element.kind !== "shape" || !element.fill || !neutralFills.has(element.fill.toUpperCase())) return true;
+      const area = element.w * element.h;
+      if (area < 0.04) return true;
+      const overlapsChart = chartBoxes.some((chartElement) => {
+        const overlapW = Math.max(0, Math.min(element.x + element.w, chartElement.x + chartElement.w) - Math.max(element.x, chartElement.x));
+        const overlapH = Math.max(0, Math.min(element.y + element.h, chartElement.y + chartElement.h) - Math.max(element.y, chartElement.y));
+        const overlapArea = overlapW * overlapH;
+        return overlapArea / Math.max(area, 0.0001) >= 0.25;
+      });
+      return !overlapsChart;
+    });
+
     if (/p:grpSp\b/.test(xml)) warnings.push("Slide " + page + ": grupo de objetos detectado; revisar prévia.");
     scenes.push({
       sceneType:"TEXT",

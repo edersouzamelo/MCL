@@ -16,6 +16,8 @@ export type MonitorDocumentChart = {
   valueFormat?: string;
   axisMin?: number;
   axisMax?: number;
+  xAxisTitle?: string;
+  yAxisTitle?: string;
   legendPosition?: "top" | "bottom" | "left" | "right" | "none";
 };
 
