@@ -121,9 +121,6 @@ function Execution({ snapshot, layout }: { snapshot: SagSnapshot; layout: CcoLay
 
 function PreviousCredits({ rpn, layout }: { rpn: RpnImportResult; layout: CcoLayoutId }) {
   const ccol = layout === "ccol";
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const safePage = Math.max(0, Math.min(totalPages - 1, page));
-  const visibleRows = rows.slice(safePage * pageSize, (safePage + 1) * pageSize);
   return (
     <div>
       <div className={`text-xs font-bold uppercase tracking-[0.18em] ${ccol ? "text-violet-800" : "text-violet-300"}`}>Créditos do exercício anterior</div>
@@ -153,25 +150,32 @@ function PreviousUnits({ rpn, prefix, layout, page, pageSize }: { rpn: RpnImport
 
 function UnitGrid({ source, prefix, rows, layout, page, pageSize, previous = false }: { source: string; prefix: string; rows: Array<{ ug: string; acronym?: string; total: number; primary: number; secondary: number }>; layout: CcoLayoutId; page: number; pageSize: number; previous?: boolean }) {
   const ccol = layout === "ccol";
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.max(0, Math.min(totalPages - 1, page));
+  const visibleRows = rows.slice(safePage * pageSize, (safePage + 1) * pageSize);
+
   return (
     <div>
       <div className="flex items-end justify-between gap-5">
         <div>
           <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] ${ccol ? "text-sky-800" : "text-sky-300"}`}><Building2 className="h-4 w-4" /> Organizações / UG</div>
           <h1 className="mt-2 text-4xl font-black">{source} · série {prefix}xxx</h1>
-          <p className={`mt-2 text-sm ${ccol ? "text-slate-600" : "text-slate-400"}`}>A série 160xxx e a série 167xxx são exibidas em quadros separados. Nenhuma OM é descartada por limite arbitrário.</p>
+          <p className={`mt-2 text-sm ${ccol ? "text-slate-600" : "text-slate-400"}`}>A série 160xxx e a série 167xxx são exibidas em quadros separados. Nenhuma OM é descartada.</p>
         </div>
-        <div className={`rounded-xl border px-4 py-3 text-center ${ccol ? "border-slate-300 bg-white" : "border-white/10 bg-white/[0.03]"}`}><div className="text-2xl font-black">{visibleRows.length}/{rows.length}</div><div className={`text-[10px] uppercase tracking-wider ${ccol ? "text-slate-500" : "text-slate-500"}`}>UG · quadro {safePage + 1}/{totalPages}</div></div>
+        <div className={`rounded-xl border px-4 py-3 text-center ${ccol ? "border-slate-300 bg-white" : "border-white/10 bg-white/[0.03]"}`}>
+          <div className="text-2xl font-black">{visibleRows.length}/{rows.length}</div>
+          <div className={`text-[10px] uppercase tracking-wider ${ccol ? "text-slate-500" : "text-slate-500"}`}>UG · quadro {safePage + 1}/{totalPages}</div>
+        </div>
       </div>
 
       <div className="mt-6 grid gap-3 xl:grid-cols-2">
-        {rows.map((row, index) => (
-          <div key={row.ug} className={`mcl-broadcast-row grid grid-cols-[90px_1fr_150px_80px_80px] items-center gap-3 rounded-xl border px-4 py-3 text-sm ${ccol ? "border-slate-300 bg-white" : "border-white/10 bg-white/[0.025]"}`} style={{ animationDelay: `${120 + (index % 12) * 45}ms` }}>
+        {visibleRows.map((row, index) => (
+          <div key={row.ug} className={`mcl-broadcast-row grid grid-cols-[90px_1fr_150px_80px_80px] items-center gap-3 rounded-xl border px-4 py-3 text-sm ${ccol ? "border-slate-300 bg-white" : "border-white/10 bg-white/[0.025]"}`} style={{ animationDelay: `${120 + index * 45}ms` }}>
             <strong className="font-mono">{row.ug}</strong>
             <span className="truncate font-semibold" title={row.acronym || ""}>{row.acronym || "—"}</span>
             <strong className="text-right">{currency(row.total)}</strong>
-            <div className="text-right"><div className="font-black"><AnimatedPercent value={row.primary} delay={120 + (rows.indexOf(row) % 12) * 35} /></div><div className={`text-[9px] uppercase ${ccol ? "text-slate-400" : "text-slate-500"}`}>{previous ? "liq." : "emp."}</div></div>
-            <div className="text-right"><div className="font-black"><AnimatedPercent value={row.secondary} delay={180 + (rows.indexOf(row) % 12) * 35} /></div><div className={`text-[9px] uppercase ${ccol ? "text-slate-400" : "text-slate-500"}`}>{previous ? "canc." : "liq."}</div></div>
+            <div className="text-right"><div className="font-black"><AnimatedPercent value={row.primary} delay={120 + index * 35} /></div><div className={`text-[9px] uppercase ${ccol ? "text-slate-400" : "text-slate-500"}`}>{previous ? "liq." : "emp."}</div></div>
+            <div className="text-right"><div className="font-black"><AnimatedPercent value={row.secondary} delay={180 + index * 35} /></div><div className={`text-[9px] uppercase ${ccol ? "text-slate-400" : "text-slate-500"}`}>{previous ? "canc." : "liq."}</div></div>
           </div>
         ))}
         {!rows.length ? <div className={`col-span-full rounded-2xl border border-dashed p-10 text-center ${ccol ? "border-slate-300 text-slate-500" : "border-white/10 text-slate-500"}`}>Nenhuma UG da série {prefix}xxx foi encontrada nesta fonte.</div> : null}
