@@ -86,7 +86,10 @@ describe("monitor content extraction", () => {
       "<c:spPr><a:solidFill><a:srgbClr val=\"4F81BD\"/></a:solidFill></c:spPr>",
       "<c:cat><c:strCache><c:pt><c:v>Açúcar</c:v></c:pt><c:pt><c:v>Arroz</c:v></c:pt></c:strCache></c:cat>",
       "<c:val><c:numCache><c:pt><c:v>7.1</c:v></c:pt><c:pt><c:v>20.1</c:v></c:pt></c:numCache></c:val>",
-      "</c:ser></c:barChart></c:plotArea></c:chart></c:chartSpace>",
+      "</c:ser></c:barChart>",
+      "<c:catAx><c:title><c:tx><c:rich><a:p><a:r><a:t>Itens de suprimento</a:t></a:r></a:p></c:rich></c:tx></c:title></c:catAx>",
+      "<c:valAx><c:title><c:tx><c:rich><a:p><a:r><a:t>Toneladas/litros</a:t></a:r></a:p></c:rich></c:tx></c:title></c:valAx>",
+      "</c:plotArea></c:chart></c:chartSpace>",
     ].join(""));
 
     const entries: Entry[] = [
@@ -121,12 +124,15 @@ describe("monitor content extraction", () => {
       expect(graph.chart.grouping).toBe("clustered");
       expect(graph.chart.series[0]?.values).toEqual([7.1, 20.1]);
       expect(graph.chart.series[0]?.color).toBe("#4F81BD");
+      expect(graph.chart.xAxisTitle).toBe("Itens de suprimento");
+      expect(graph.chart.yAxisTitle).toBe("Toneladas/litros");
     }
   });
 
   it("preserves horizontal chart semantics, overlap and multiple colored series", async () => {
     const slide = Buffer.from([
       "<p:sld xmlns:p=\"p\" xmlns:a=\"a\" xmlns:c=\"c\" xmlns:r=\"r\"><p:cSld><p:spTree>",
+      "<p:sp><p:spPr><a:xfrm><a:off x=\"500000\" y=\"5000000\"/><a:ext cx=\"5200000\" cy=\"1100000\"/></a:xfrm><a:solidFill><a:srgbClr val=\"F8FAFC\"/></a:solidFill><a:prstGeom prst=\"roundRect\"/></p:spPr></p:sp>",
       "<p:graphicFrame><p:xfrm><a:off x=\"1000000\" y=\"1000000\"/><a:ext cx=\"10000000\" cy=\"5000000\"/></p:xfrm>",
       "<a:graphic><a:graphicData><c:chart r:id=\"rId1\"/></a:graphicData></a:graphic></p:graphicFrame>",
       "</p:spTree></p:cSld></p:sld>",
@@ -138,7 +144,10 @@ describe("monitor content extraction", () => {
       "<c:ser><c:tx><c:v>Estoque OP</c:v></c:tx><c:spPr><a:solidFill><a:srgbClr val=\"3C7D0E\"/></a:solidFill></c:spPr><c:cat><c:strCache><c:pt><c:v>Açúcar</c:v></c:pt></c:strCache></c:cat><c:val><c:numCache><c:pt><c:v>46432</c:v></c:pt></c:numCache></c:val></c:ser>",
       "<c:ser><c:tx><c:v>Estoque OM</c:v></c:tx><c:spPr><a:solidFill><a:srgbClr val=\"4F81BD\"/></a:solidFill></c:spPr><c:cat><c:strCache><c:pt><c:v>Açúcar</c:v></c:pt></c:strCache></c:cat><c:val><c:numCache><c:pt><c:v>46507</c:v></c:pt></c:numCache></c:val></c:ser>",
       "<c:ser><c:tx><c:v>A receber</c:v></c:tx><c:spPr><a:solidFill><a:srgbClr val=\"FFFF00\"/></a:solidFill></c:spPr><c:cat><c:strCache><c:pt><c:v>Açúcar</c:v></c:pt></c:strCache></c:cat><c:val><c:numCache><c:pt><c:v>46640</c:v></c:pt></c:numCache></c:val></c:ser>",
-      "</c:barChart><c:valAx><c:scaling><c:min val=\"46200\"/><c:max val=\"46700\"/></c:scaling><c:numFmt formatCode=\"dd/mm/yy\"/></c:valAx></c:plotArea></c:chart></c:chartSpace>",
+      "</c:barChart>",
+      "<c:catAx><c:title><c:tx><c:rich><a:p><a:r><a:t>Itens</a:t></a:r></a:p></c:rich></c:tx></c:title></c:catAx>",
+      "<c:valAx><c:title><c:tx><c:rich><a:p><a:r><a:t>Período</a:t></a:r></a:p></c:rich></c:tx></c:title><c:scaling><c:min val=\"46200\"/><c:max val=\"46700\"/></c:scaling><c:numFmt formatCode=\"dd/mm/yy\"/></c:valAx>",
+      "</c:plotArea></c:chart></c:chartSpace>",
     ].join(""));
 
     const result = await extractMonitorDocument(storedZip([
@@ -157,7 +166,10 @@ describe("monitor content extraction", () => {
       expect(graph.chart.axisMin).toBe(46200);
       expect(graph.chart.axisMax).toBe(46700);
       expect(graph.chart.series.map((item) => item.color)).toEqual(["#3C7D0E", "#4F81BD", "#FFFF00"]);
+      expect(graph.chart.xAxisTitle).toBe("Período");
+      expect(graph.chart.yAxisTitle).toBe("Itens");
     }
+    expect(result.scenes[0]?.payload.layout?.elements.some((item) => item.kind === "shape" && item.fill === "#F8FAFC")).toBe(false);
   });
 
   it("extracts paragraphs, tables and figures from DOCX deterministically", async () => {
