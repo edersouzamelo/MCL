@@ -25,7 +25,7 @@ export function useAnimatedValue(
       return () => window.cancelAnimationFrame(frame);
     }
 
-    setDisplay(0);
+    frame = window.requestAnimationFrame(() => setDisplay(0));
     timer = window.setTimeout(() => {
       const startedAt = performance.now();
 
