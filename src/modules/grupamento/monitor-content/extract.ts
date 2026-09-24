@@ -13,6 +13,8 @@ const MAX_UNCOMPRESSED_BYTES = 48 * 1024 * 1024;
 const MAX_PDF_PAGES = 80;
 const MAX_PDF_IMAGES = 20;
 const MAX_IMAGE_PIXELS = 4_000_000;
+const MAX_OFFICE_ASSETS = 24;
+const MAX_OFFICE_ASSET_BYTES = 12 * 1024 * 1024;
 
 function decodeXml(value: string) {
   return value
@@ -153,6 +155,10 @@ function registerAsset(
   if (registry.has(path)) return registry.get(path)!;
   const data = entries.get(path);
   if (!data) return null;
+  if (assets.length >= MAX_OFFICE_ASSETS || assets.reduce((total, asset) => total + asset.data.length, 0) + data.length > MAX_OFFICE_ASSET_BYTES) {
+    warnings.push("Limite de figuras extraídas atingido; o arquivo original foi preservado integralmente para conferência.");
+    return null;
+  }
   const mimeType = mimeFromName(path);
   if (!mimeType) {
     warnings.push(`Figura ${posix.basename(path)} preservada no arquivo original, mas o formato não é exibível diretamente no navegador.`);
