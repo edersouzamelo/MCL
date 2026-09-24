@@ -16,8 +16,10 @@ self.addEventListener("activate", (event) => {
 
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4500);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { signal: controller.signal });
     if (response && response.ok) {
       await cache.put(request, response.clone());
     }
@@ -26,6 +28,8 @@ async function networkFirst(request, cacheName) {
     const cached = await cache.match(request);
     if (cached) return cached;
     throw new Error("offline-and-not-cached");
+  } finally {
+    clearTimeout(timer);
   }
 }
 
