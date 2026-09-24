@@ -2,23 +2,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Archive, CheckCircle2, Download, FileText, Loader2, Presentation, Upload } from "lucide-react";
+import { Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, FileText, Loader2, Presentation, Upload, X } from "lucide-react";
+import { MonitorContentSceneThumbnail } from "@/components/MonitorContentSceneThumbnail";
+import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
+import type { MonitorDocumentSceneDto, MonitorDocumentScenePayload } from "@/modules/grupamento/monitor-content/types";
 
 type ScenePreview = {
   id: string;
   sceneOrder: number;
-  sceneType: string;
+  sceneType: MonitorDocumentSceneDto["sceneType"];
   title: string;
   sourcePage: number | null;
-  payload?: {
-    layoutVersion?: number;
-    bullets?: string[];
-    rows?: string[][];
-    columns?: string[];
-    series?: Array<{ name: string; categories: string[]; values: number[] }>;
-    assetIds?: string[];
-    note?: string;
-  };
+  payload?: MonitorDocumentScenePayload;
 };
 
 type ImportRecord = {
@@ -47,6 +42,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/grupamento/monitor-content?monitorId=${monitorId}`, { cache: "no-store" });
@@ -155,6 +151,31 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
   }
 
   const preview = imports.find((item) => item.status === "PREVIEW");
+  const selectedScene = preview?.scenes.find((scene) => scene.id === selectedSceneId) ?? null;
+  const selectedIndex = selectedScene && preview ? preview.scenes.findIndex((scene) => scene.id === selectedScene.id) : -1;
+
+  function sceneDto(scene: ScenePreview): MonitorDocumentSceneDto {
+    if (!preview) throw new Error("Prévia documental indisponível.");
+    return {
+      id: scene.id,
+      importId: preview.id,
+      monitorId,
+      sceneOrder: scene.sceneOrder,
+      sceneType: scene.sceneType,
+      title: scene.title,
+      payload: scene.payload ?? {},
+      sourcePage: scene.sourcePage,
+      sourceFileName: preview.fileName,
+      sourceImportedAt: preview.importedAt,
+      approvedAt: null,
+    };
+  }
+
+  function movePreview(direction: -1 | 1) {
+    if (!preview?.scenes.length || selectedIndex < 0) return;
+    const next = (selectedIndex + direction + preview.scenes.length) % preview.scenes.length;
+    setSelectedSceneId(preview.scenes[next].id);
+  }
 
   return (
     <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
@@ -193,27 +214,25 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {preview.scenes.slice(0, 8).map((scene) => {
-                  const assetId = scene.payload?.assetIds?.[0];
-                  const excerpt = scene.sceneType === "TEXT"
-                    ? scene.payload?.bullets?.slice(0, 2).join(" · ")
-                    : scene.sceneType === "TABLE"
-                      ? scene.payload?.rows?.slice(0, 2).flat().join(" · ")
-                      : scene.sceneType === "CHART"
-                        ? scene.payload?.series?.map((series) => `${series.name}: ${series.values.slice(0, 3).join(", ")}`).join(" · ")
-                        : "Figura extraída do documento original";
-                  return (
-                    <div key={scene.id} className="rounded-lg border border-amber-200 bg-white/80 p-2.5 dark:border-amber-900/40 dark:bg-zinc-950">
-                      <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-zinc-500"><FileText className="h-3 w-3" /> {scene.sceneType}{scene.sourcePage ? ` · ${scene.sourcePage}` : ""}</div>
-                      <div className="mt-1 line-clamp-2 text-[11px] font-semibold">{scene.title}</div>
-                      {excerpt ? <div className="mt-1 line-clamp-2 text-[10px] leading-4 text-zinc-500">{excerpt}</div> : null}
-                      {assetId ? <img src={`/api/grupamento/monitor-content/assets/${assetId}`} alt="" className="mt-2 h-16 w-full rounded-md bg-zinc-100 object-contain dark:bg-zinc-900" /> : null}
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {preview.scenes.map((scene) => (
+                  <button
+                    key={scene.id}
+                    type="button"
+                    onClick={() => setSelectedSceneId(scene.id)}
+                    className="group overflow-hidden rounded-xl border border-amber-200 bg-white text-left transition hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md dark:border-amber-900/40 dark:bg-zinc-950"
+                  >
+                    <MonitorContentSceneThumbnail payload={scene.payload} title={scene.title} />
+                    <div className="flex items-center justify-between gap-3 p-2.5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-zinc-500"><FileText className="h-3 w-3" /> Slide {scene.sourcePage ?? scene.sceneOrder + 1}</div>
+                        <div className="mt-1 truncate text-[11px] font-bold" title={scene.title}>{scene.title}</div>
+                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-zinc-950 px-2 py-1.5 text-[9px] font-bold text-white dark:bg-white dark:text-zinc-950"><Eye className="h-3 w-3" /> Ver</span>
                     </div>
-                  );
-                })}
+                  </button>
+                ))}
               </div>
-              {preview.sceneCount > 8 ? <div className="mt-2 text-[10px] text-zinc-500">+ {preview.sceneCount - 8} cena(s) adicionais.</div> : null}
               {preview.warnings?.length ? <div className="mt-3 text-[10px] leading-4 text-amber-800 dark:text-amber-300">Lacunas declaradas: {preview.warnings.slice(0, 3).join(" · ")}</div> : null}
             </div>
           ) : null}
@@ -245,6 +264,32 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
               );
             })}
             {!imports.length ? <div className="py-3 text-center text-[11px] text-zinc-500">Nenhum documento importado para este monitor.</div> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {selectedScene && preview ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Prévia da cena documental">
+          <div className="flex h-[92vh] w-[96vw] max-w-[1700px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#07111f] shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 px-5 py-3 text-white">
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-300">Prévia real antes da aprovação</div>
+                <div className="mt-1 truncate text-sm font-bold">Slide {selectedScene.sourcePage ?? selectedScene.sceneOrder + 1} · {selectedScene.title}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => movePreview(-1)} className="rounded-lg border border-white/15 p-2 text-white hover:bg-white/10" title="Slide anterior"><ChevronLeft className="h-4 w-4" /></button>
+                <span className="min-w-14 text-center text-xs font-bold text-slate-400">{selectedIndex + 1}/{preview.scenes.length}</span>
+                <button type="button" onClick={() => movePreview(1)} className="rounded-lg border border-white/15 p-2 text-white hover:bg-white/10" title="Próximo slide"><ChevronRight className="h-4 w-4" /></button>
+                <button type="button" onClick={() => setSelectedSceneId(null)} className="ml-2 rounded-lg border border-white/15 p-2 text-white hover:bg-white/10" title="Fechar prévia"><X className="h-4 w-4" /></button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden p-4">
+              <MonitorDocumentScene scene={sceneDto(selectedScene)} ccol={false} />
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-4 border-t border-white/10 px-5 py-2.5 text-[10px] text-slate-400">
+              <span>Esta é a mesma composição que será enviada ao loop do monitor.</span>
+              <span>Fonte: {preview.fileName}</span>
+            </div>
           </div>
         </div>
       ) : null}
