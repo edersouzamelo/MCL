@@ -1,6 +1,7 @@
 import { inflateRawSync, deflateSync } from "node:zlib";
 import { posix } from "node:path";
 import { extractImages, extractTextItems, getDocumentProxy } from "unpdf";
+import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
 import type {
   MonitorDocumentAssetDraft,
   MonitorDocumentExtraction,
@@ -281,7 +282,7 @@ function extractDocx(buffer: Buffer): MonitorDocumentExtraction {
     const candidate = group[0] ?? "";
     const title = candidate.length <= 120 ? candidate : `Documento · trecho ${Math.floor(index / 6) + 1}`;
     const bullets = candidate === title ? group.slice(1) : group;
-    scenes.push({ sceneType: "TEXT", title, sourcePage: Math.floor(index / 6) + 1, payload: { bullets: bullets.slice(0, 7) } });
+    scenes.push({ sceneType: "TEXT", title, sourcePage: Math.floor(index / 6) + 1, payload: { layoutVersion: 2, bullets: bullets.slice(0, 7), searchableText: group } });
   }
 
   const tables = [...xml.matchAll(/<w:tbl\b[^>]*>([\s\S]*?)<\/w:tbl>/g)].map((table) =>
@@ -294,7 +295,7 @@ function extractDocx(buffer: Buffer): MonitorDocumentExtraction {
     sceneType: "TABLE",
     title: `Tabela ${index + 1} do documento`,
     sourcePage: index + 1,
-    payload: { columns: rows[0] ?? [], rows: rows.slice(1, 10) },
+    payload: { layoutVersion: 2, columns: rows[0] ?? [], rows: rows.slice(1, 10), searchableText: rows.flat() },
   }));
 
   const media = [...entries.keys()].filter((name) => name.startsWith("word/media/"));
@@ -306,7 +307,7 @@ function extractDocx(buffer: Buffer): MonitorDocumentExtraction {
     scenes.push({
       sceneType: "FIGURE",
       title: `Figura do documento · ${Math.floor(index / 2) + 1}`,
-      payload: { assetKeys: imageKeys.slice(index, index + 2) },
+      payload: { layoutVersion: 2, assetKeys: imageKeys.slice(index, index + 2) },
     });
   }
 
@@ -418,8 +419,8 @@ async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
       title,
       sourcePage: pageNumber,
       payload: lines.length
-        ? { bullets: lines.slice(1, 9), assetKeys, note: "Página do PDF reinterpretada como cena MCL; o arquivo original permanece preservado." }
-        : { assetKeys },
+        ? { layoutVersion: 2, bullets: lines.slice(1, 9), assetKeys, searchableText: lines, note: "Página do PDF reinterpretada como cena MCL; o arquivo original permanece preservado." }
+        : { layoutVersion: 2, assetKeys },
     });
   }
 
@@ -429,7 +430,7 @@ async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
 
 export async function extractMonitorDocument(buffer: Buffer, fileName: string): Promise<MonitorDocumentExtraction> {
   const extension = fileName.toLowerCase().split(".").pop() ?? "";
-  if (extension === "pptx") return extractPptx(buffer);
+  if (extension === "pptx") return extractPptxLayout(buffer);
   if (extension === "docx") return extractDocx(buffer);
   if (extension === "pdf") return extractPdf(buffer);
   if (extension === "ppt" || extension === "doc") {
