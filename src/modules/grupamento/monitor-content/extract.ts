@@ -14,8 +14,6 @@ const MAX_PDF_PAGES = 80;
 const MAX_PDF_IMAGES = 20;
 const MAX_IMAGE_PIXELS = 4_000_000;
 
-type ZipEntry = { name: string; data: Buffer };
-
 function decodeXml(value: string) {
   return value
     .replace(/&lt;/g, "<")
