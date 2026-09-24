@@ -280,6 +280,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               loopMode={effectiveLoop}
               paused={playbackState !== "playing"}
+              fitMode={activeItem.kind === "document" ? "contain" : "scroll"}
               onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
             >
               {screenContent}
@@ -349,6 +350,7 @@ function MonitorViewport({
   cycleSeconds,
   loopMode,
   paused,
+  fitMode,
   onRequiredCycleMs,
 }: {
   children: ReactNode;
@@ -356,6 +358,7 @@ function MonitorViewport({
   cycleSeconds: number;
   loopMode: boolean;
   paused: boolean;
+  fitMode: "contain" | "scroll";
   onRequiredCycleMs: (requiredMs: number) => void;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -377,9 +380,11 @@ function MonitorViewport({
       if (!frameWidth || !frameHeight || !contentWidth || !contentHeight) return;
 
       const fitRatio = Math.min(frameWidth / contentWidth, frameHeight / contentHeight, 1);
-      const nextScale = Math.max(MIN_KIOSK_SCALE, fitRatio);
-      const nextMaxOffset = Math.max(0, contentHeight * nextScale - frameHeight);
-      const requiredCycleMs = readableMonitorCycleMs(nextMaxOffset, cycleSeconds, screenKey);
+      const nextScale = fitMode === "contain" ? fitRatio : Math.max(MIN_KIOSK_SCALE, fitRatio);
+      const nextMaxOffset = fitMode === "contain" ? 0 : Math.max(0, contentHeight * nextScale - frameHeight);
+      const requiredCycleMs = fitMode === "contain"
+        ? Math.max(5, cycleSeconds) * 1000
+        : readableMonitorCycleMs(nextMaxOffset, cycleSeconds, screenKey);
 
       setScale((current) => Math.abs(current - nextScale) > 0.005 ? nextScale : current);
       setMaxOffset(nextMaxOffset);
@@ -396,10 +401,14 @@ function MonitorViewport({
       window.cancelAnimationFrame(frameId);
       observer.disconnect();
     };
-  }, [cycleSeconds, onRequiredCycleMs, screenKey]);
+  }, [cycleSeconds, fitMode, onRequiredCycleMs, screenKey]);
 
   useEffect(() => {
     let animationFrame = 0;
+    if (fitMode === "contain") {
+      animationFrame = window.requestAnimationFrame(() => setOffset(0));
+      return () => window.cancelAnimationFrame(animationFrame);
+    }
     if (paused) return;
     if (maxOffset <= 2) {
       animationFrame = window.requestAnimationFrame(() => setOffset(0));
@@ -445,12 +454,12 @@ function MonitorViewport({
 
     animationFrame = window.requestAnimationFrame(animate);
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [maxOffset, loopMode, paused, screenKey]);
+  }, [fitMode, maxOffset, loopMode, paused, screenKey]);
 
   return (
     <div ref={frameRef} className="h-full w-full overflow-hidden">
       <div
-        className="w-full will-change-transform"
+        className={fitMode === "contain" ? "h-full w-full will-change-transform" : "w-full will-change-transform"}
         style={{
           transform: `scale(${scale})`,
           transformOrigin: "top center",
@@ -458,7 +467,7 @@ function MonitorViewport({
       >
         <div
           ref={contentRef}
-          className="w-full will-change-transform"
+          className={fitMode === "contain" ? "h-full w-full will-change-transform" : "w-full will-change-transform"}
           style={{
             transform: `translate3d(0, -${scale > 0 ? offset / scale : 0}px, 0)`,
           }}
