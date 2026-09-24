@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
+import { MonitorContentCockpit } from "@/components/MonitorContentCockpit";
 import { CCO_CLASS_SLIDES, CCO_RULE_SOURCE, findUnmappedPis } from "@/modules/grupamento/cco";
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
@@ -465,6 +466,7 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
                   return <button key={screen.id} type="button" onClick={() => toggleScreen(monitor.id, screen.id)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition ${selected ? "border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-300" : "border-zinc-200 text-zinc-500 dark:border-zinc-800"}`}>{selected ? <CheckCircle2 className="mr-1 inline h-3 w-3" /> : null}{screen.label}</button>;
                 })}
               </div>
+              <MonitorContentCockpit monitorId={monitor.id} />
             </article>
           ))}
         </div>
