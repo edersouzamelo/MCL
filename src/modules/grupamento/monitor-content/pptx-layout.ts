@@ -255,7 +255,7 @@ function blocks(xml: string) {
 
 function slideTitle(elements: MonitorSlideElement[], page: number) {
   const texts = elements.filter((item): item is MonitorSlideTextElement => item.kind === "text");
-  const best = [...texts].filter((item) => item.y < 0.42).sort((a,b) => (b.fontSizePt ?? 0)-(a.fontSizePt ?? 0) || a.y-b.y)[0];
+  const best = [...texts].filter((item) => item.y < 0.28).sort((a,b) => (b.fontSizePt ?? 0)-(a.fontSizePt ?? 0) || a.y-b.y)[0];
   const value = clean(best?.text.split("\n")[0] ?? "");
   return value ? value.slice(0,110) : "Slide " + page;
 }
@@ -297,6 +297,9 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const rid = item.xml.match(/<a:blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
         const target = rid ? rels.get(rid)?.target : undefined;
         const assetKey = target ? addAsset(entries,target,assets,registry,warnings) : null;
+        const meta = item.xml.match(/<p:cNvPr\b([^>]*)\/?\s*>/)?.[1] ?? "";
+        const imageLabel = clean(attribute(meta, "descr") || attribute(meta, "title") || attribute(meta, "name"));
+        if (imageLabel) searchable.push(imageLabel);
         if (assetKey) elements.push({kind:"image",...b,assetKey,z:z*10+1});
       } else {
         const rid = item.xml.match(/<c:chart\b[^>]*\br:id="([^"]+)"/)?.[1];
