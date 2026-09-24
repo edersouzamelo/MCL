@@ -198,23 +198,41 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     return () => window.clearInterval(timer);
   }, []);
   type PlaylistItem =
-    | { kind: "system"; key: string; screen: CcoScreenId; label: string }
+    | { kind: "system"; key: string; screen: CcoScreenId; label: string; page: number; pageSize: number }
     | { kind: "document"; key: string; scene: MonitorDocumentSceneDto; label: string };
 
-  const playlist = useMemo<PlaylistItem[]>(() => [
-    ...monitor.screens.map((screen) => ({
-      kind: "system" as const,
-      key: `system:${screen}`,
-      screen,
-      label: CCO_SCREEN_CATALOG.find((item) => item.id === screen)?.label ?? screen,
-    })),
-    ...documentScenes.map((scene) => ({
-      kind: "document" as const,
-      key: `document:${scene.id}`,
-      scene,
-      label: scene.title,
-    })),
-  ], [documentScenes, monitor.screens]);
+  const playlist = useMemo<PlaylistItem[]>(() => {
+    const systemItems = monitor.screens.flatMap((screen) => {
+      const pageSize = pageSizeForScreen(screen);
+      let rowCount = 0;
+      if (screen === "pis") rowCount = sag?.byPi.length ?? 0;
+      if (screen === "units-current-160") rowCount = sag?.byUg.filter((item) => item.ug.startsWith("160")).length ?? 0;
+      if (screen === "units-current-167") rowCount = sag?.byUg.filter((item) => item.ug.startsWith("167")).length ?? 0;
+      if (screen === "units-rpn-160") rowCount = rpn?.byUg.filter((item) => item.ug.startsWith("160")).length ?? 0;
+      if (screen === "units-rpn-167") rowCount = rpn?.byUg.filter((item) => item.ug.startsWith("167")).length ?? 0;
+
+      const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(rowCount / pageSize)) : 1;
+      const baseLabel = CCO_SCREEN_CATALOG.find((item) => item.id === screen)?.label ?? screen;
+      return Array.from({ length: pageCount }, (_, page) => ({
+        kind: "system" as const,
+        key: `system:${screen}:${page}`,
+        screen,
+        page,
+        pageSize,
+        label: pageCount > 1 ? `${baseLabel} · ${page + 1}/${pageCount}` : baseLabel,
+      }));
+    });
+
+    return [
+      ...systemItems,
+      ...documentScenes.map((scene) => ({
+        kind: "document" as const,
+        key: `document:${scene.id}`,
+        scene,
+        label: scene.title,
+      })),
+    ];
+  }, [documentScenes, monitor.screens, rpn, sag]);
 
   const safeIndex = Math.min(screenIndex, Math.max(0, playlist.length - 1));
   const activeItem = playlist[safeIndex] ?? {
@@ -222,6 +240,8 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     key: "system:overview",
     screen: "overview" as CcoScreenId,
     label: "Visão executiva",
+    page: 0,
+    pageSize: 0,
   };
   const activeScreen = activeItem.kind === "system" ? activeItem.screen : null;
   const screenLabel = activeItem.label;
@@ -277,11 +297,11 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   ) : activeItem.kind === "document" ? (
     <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} />
   ) : !sag || !rpn ? (
-    <Empty ccol={ccol} title="Par SAG incompleto" description="Esta tela exige Exercício Corrente e créditos do exercício anterior validados. Não há substituição por números sintéticos." />
+    <MonitorBootScreen ccol={ccol} connectionState={connectionState} />
   ) : isRuleScreen ? (
     <GrupamentoRuleMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} />
   ) : (
-    <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} />
+    <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} page={activeItem.page} pageSize={activeItem.pageSize || undefined} />
   );
 
   return (
@@ -338,11 +358,11 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         >
           <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
-              screenKey={activeItem.kind === "system" ? activeItem.screen : activeItem.key}
+              screenKey={activeItem.key}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               loopMode={effectiveLoop}
               paused={playbackState !== "playing"}
-              fitMode={activeItem.kind === "document" ? "contain" : "scroll"}
+              fitMode="contain"
               onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
             >
               {screenContent}
