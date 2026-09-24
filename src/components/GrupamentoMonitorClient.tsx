@@ -22,7 +22,7 @@ import {
 } from "@/modules/grupamento/monitor";
 
 const MIN_KIOSK_SCALE = 0.86;
-const SCREEN_FADE_MS = 450;
+const SCREEN_FADE_MS = 600;
 const DATA_REFRESH_MS = 30_000;
 const PAGE_RELOAD_MS = 5 * 60_000;
 
@@ -156,7 +156,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
   return (
     <main
-      className={`relative flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
+      className={`mcl-monitor-shell relative flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
       style={{
         backgroundImage: ccol
           ? "radial-gradient(circle at 82% 5%, rgba(14,165,233,.10), transparent 30%), radial-gradient(circle at 8% 92%, rgba(6,182,212,.06), transparent 34%), linear-gradient(145deg, #ffffff 0%, #f6f9fb 50%, #edf4f7 100%)"
@@ -164,14 +164,17 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       }}
     >
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-        <div className={`absolute -right-20 -top-24 h-96 w-96 rounded-full blur-3xl ${ccol ? "bg-sky-300/15" : "bg-sky-400/10"}`} />
-        <div className={`absolute -bottom-32 left-[8%] h-80 w-[42vw] rounded-full blur-3xl ${ccol ? "bg-cyan-200/20" : "bg-cyan-400/[0.06]"}`} />
+        <div className={`mcl-monitor-ambient mcl-monitor-ambient-one absolute -right-20 -top-24 h-96 w-96 rounded-full blur-3xl ${ccol ? "bg-sky-300/15" : "bg-sky-400/10"}`} />
+        <div className={`mcl-monitor-ambient mcl-monitor-ambient-two absolute -bottom-32 left-[8%] h-80 w-[42vw] rounded-full blur-3xl ${ccol ? "bg-cyan-200/20" : "bg-cyan-400/[0.06]"}`} />
         <div className={`absolute inset-x-0 top-0 h-44 bg-gradient-to-b ${ccol ? "from-white/75 to-transparent" : "from-sky-300/[0.025] to-transparent"}`} />
+        <div className="mcl-monitor-broadcast-sweep" />
+        <div className="mcl-monitor-scanline" />
       </div>
 
-      <header className={`relative z-20 flex h-[76px] shrink-0 items-center justify-between gap-5 border-b px-7 py-3 backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/80" : "border-white/10 bg-slate-950/72"}`}>
+      <header className={`mcl-monitor-header relative z-20 flex h-[76px] shrink-0 items-center justify-between gap-5 overflow-hidden border-b px-7 py-3 backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/80" : "border-white/10 bg-slate-950/72"}`}>
+        <div aria-hidden className="mcl-monitor-header-glint" />
         <div className="flex min-w-0 items-center gap-4">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${ccol ? "border-sky-800/20 bg-sky-900 text-white" : "border-sky-400/20 bg-sky-400/10 text-sky-300"}`}>
+          <div className={`mcl-monitor-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${ccol ? "border-sky-800/20 bg-sky-900 text-white" : "border-sky-400/20 bg-sky-400/10 text-sky-300"}`}>
             <Monitor className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -184,7 +187,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
             <div className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
             <div className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
           </div>
-          <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
+          <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${monitor.enabled ? "mcl-monitor-live " : ""}${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
             {monitor.enabled ? "Saída ativa" : "Saída desativada"}
           </div>
         </div>
@@ -198,28 +201,29 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
       <section className="relative z-10 min-h-0 flex-1 overflow-hidden px-6 py-4">
         <div
-          className={`h-full w-full transition-opacity ease-in-out ${transitioning ? "opacity-0" : "opacity-100"}`}
+          className={`h-full w-full transition-[opacity,transform,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "translate-y-2 scale-[0.997] opacity-0 blur-[2px]" : "translate-y-0 scale-100 opacity-100 blur-0"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
-          <MonitorViewport
-            key={activeScreen}
-            screenKey={activeScreen}
-            cycleSeconds={Math.max(5, monitor.delaySeconds)}
-            loopMode={monitor.mode === "loop" && monitor.screens.length > 1}
-            onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
-          >
-            {screenContent}
-          </MonitorViewport>
+          <div key={activeScreen} className="mcl-monitor-scene h-full w-full">
+            <MonitorViewport
+              screenKey={activeScreen}
+              cycleSeconds={Math.max(5, monitor.delaySeconds)}
+              loopMode={monitor.mode === "loop" && monitor.screens.length > 1}
+              onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
+            >
+              {screenContent}
+            </MonitorViewport>
+          </div>
         </div>
       </section>
 
-      <div className={`pointer-events-none absolute bottom-11 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
+      <div className={`mcl-monitor-watermark pointer-events-none absolute bottom-11 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
         <BrandLogo className="h-11 w-11" tone={ccol ? "green" : "sky"} sizes="44px" />
         <div className={`mt-1 text-[8px] font-black uppercase tracking-[0.16em] ${ccol ? "text-slate-600" : "text-sky-100"}`}>Continuidade</div>
         <div className={`mt-0.5 text-[8px] font-black uppercase tracking-[0.22em] ${ccol ? "text-slate-500" : "text-sky-300"}`}>Logística</div>
       </div>
 
-      <footer className={`relative z-20 flex h-10 shrink-0 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/85 text-slate-600" : "border-white/10 bg-slate-950/85 text-slate-400"}`}>
+      <footer className={`mcl-monitor-footer relative z-20 flex h-10 shrink-0 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/85 text-slate-600" : "border-white/10 bg-slate-950/85 text-slate-400"}`}>
         <div className="flex min-w-0 items-center gap-4">
           <span className="flex min-w-0 items-center gap-1.5">
             <Database className="h-3.5 w-3.5 shrink-0" />
