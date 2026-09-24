@@ -317,11 +317,11 @@ function DocumentChart({ chart }: { chart: MonitorDocumentChart }) {
   return (
     <div className="relative h-full w-full">
       {yAxisTitle ? (
-        <div className="pointer-events-none absolute left-0 top-1/2 z-10 -translate-x-[42%] -translate-y-1/2 -rotate-90 whitespace-nowrap text-[clamp(11px,.72vw,14px)] font-bold tracking-wide text-slate-300">
+        <div className="pointer-events-none absolute left-2 top-1/2 z-10 -translate-y-1/2 -rotate-90 whitespace-nowrap text-[clamp(11px,.72vw,14px)] font-bold tracking-wide text-slate-300">
           {yAxisTitle}
         </div>
       ) : null}
-      <div className={"h-full w-full " + (yAxisTitle ? "pl-5 " : "") + (xAxisTitle ? "pb-6" : "")}>
+      <div className={"h-full w-full " + (yAxisTitle ? "pl-8 " : "") + (xAxisTitle ? "pb-6" : "")}>
         {chartBody}
       </div>
       {xAxisTitle ? (
