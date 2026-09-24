@@ -271,7 +271,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
       <section className="relative z-10 min-h-0 flex-1 overflow-hidden px-6 py-4">
         <div
-          className={`h-full w-full transition-[opacity,transform,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "translate-y-2 scale-[0.997] opacity-0 blur-[2px]" : "translate-y-0 scale-100 opacity-100 blur-0"}`}
+          className={`h-full w-full transition-[opacity,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-0 blur-[1.5px]" : "opacity-100 blur-0"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
           <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
