@@ -129,6 +129,7 @@ model Organization {
   needs                  Need[]
   procurementInstruments ProcurementInstrument[]
   financialSourceImports FinancialSourceImport[]
+  monitorContentImports  MonitorContentImport[]
   pcaItems               PcaItem[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -200,6 +201,80 @@ model TgUploadChunk {
 
   @@id([uploadId, chunkIndex])
   @@index([createdAt])
+}
+
+
+model MonitorContentUploadChunk {
+  uploadId       String
+  chunkIndex     Int
+  chunkCount     Int
+  organizationId String
+  monitorId      Int
+  fileName       String
+  mimeType       String
+  totalSize      Int
+  uploadedBy     String
+  data           Bytes
+  createdAt      DateTime @default(now())
+
+  @@id([uploadId, chunkIndex])
+  @@index([organizationId, createdAt])
+}
+
+model MonitorContentImport {
+  id             String       @id @default(uuid())
+  organizationId String
+  monitorId      Int
+  fileName       String
+  mimeType       String
+  fileSize       Int
+  checksum       String
+  status         String       @default("PREVIEW")
+  sceneCount     Int
+  warnings       Json
+  rawFile        Bytes
+  importedBy     String
+  importedAt     DateTime     @default(now())
+  approvedBy     String?
+  approvedAt     DateTime?
+  archivedBy     String?
+  archivedAt     DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scenes         MonitorContentScene[]
+  assets         MonitorContentAsset[]
+
+  @@unique([organizationId, monitorId, checksum])
+  @@index([organizationId, monitorId, status, importedAt])
+}
+
+model MonitorContentScene {
+  id              String               @id @default(uuid())
+  importId        String
+  sceneOrder      Int
+  sceneType       String
+  title           String
+  payload         Json
+  sourcePage      Int?
+  durationSeconds Int?
+  active          Boolean              @default(true)
+  import          MonitorContentImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([importId, sceneOrder])
+  @@index([importId, active, sceneOrder])
+}
+
+model MonitorContentAsset {
+  id        String               @id @default(uuid())
+  importId  String
+  fileName  String
+  mimeType  String
+  width     Int?
+  height    Int?
+  data      Bytes
+  createdAt DateTime             @default(now())
+  import    MonitorContentImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId])
 }
 
 model SupplyItem {

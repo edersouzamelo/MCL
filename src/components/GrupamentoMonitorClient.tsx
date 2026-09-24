@@ -1,10 +1,12 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, Database, Monitor, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
+import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
+import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 import { CCO_RULE_SOURCE } from "@/modules/grupamento/cco";
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
@@ -19,6 +21,7 @@ import {
   defaultCcoMonitorConfig,
   readableMonitorCycleMs,
   type CcoMonitorConfig,
+  type CcoScreenId,
 } from "@/modules/grupamento/monitor";
 
 const MIN_KIOSK_SCALE = 0.86;
@@ -46,6 +49,7 @@ function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
 export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
+  const [documentScenes, setDocumentScenes] = useState<MonitorDocumentSceneDto[]>([]);
   const [monitor, setMonitor] = useState<CcoMonitorConfig>(() => defaultCcoMonitorConfig()[Math.max(0, Math.min(7, monitorId - 1))]);
   const [screenIndex, setScreenIndex] = useState(0);
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
@@ -71,17 +75,28 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
       try {
         const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
-        if (!response.ok) return;
-        const payload = await response.json();
-        if (!cancelled) {
-          setSag(payload.current ?? null);
-          setRpn(payload.rpn ?? null);
+        if (response.ok) {
+          const payload = await response.json();
+          if (!cancelled) {
+            setSag(payload.current ?? null);
+            setRpn(payload.rpn ?? null);
+          }
         }
       } catch {
         if (!cancelled) {
           setSag(null);
           setRpn(null);
         }
+      }
+
+      try {
+        const response = await fetch(`/api/grupamento/monitor-content/playlist?monitorId=${monitorId}`, { cache: "no-store" });
+        if (response.ok) {
+          const payload = await response.json();
+          if (!cancelled) setDocumentScenes(payload.scenes ?? []);
+        }
+      } catch {
+        if (!cancelled) setDocumentScenes([]);
       }
     };
 
@@ -93,6 +108,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     window.addEventListener("mcl-grupamento-sag-updated", refresh);
     window.addEventListener("mcl-grupamento-rpn-updated", refresh);
     window.addEventListener("mcl-grupamento-monitors-updated", refresh);
+    window.addEventListener("mcl-grupamento-document-content-updated", refresh);
 
     return () => {
       cancelled = true;
@@ -102,6 +118,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       window.removeEventListener("mcl-grupamento-sag-updated", refresh);
       window.removeEventListener("mcl-grupamento-rpn-updated", refresh);
       window.removeEventListener("mcl-grupamento-monitors-updated", refresh);
+      window.removeEventListener("mcl-grupamento-document-content-updated", refresh);
     };
   }, [monitorId]);
 
@@ -117,18 +134,51 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const safeIndex = Math.min(screenIndex, Math.max(0, monitor.screens.length - 1));
-  const activeScreen = monitor.screens[safeIndex] ?? "overview";
+  type PlaylistItem =
+    | { kind: "system"; key: string; screen: CcoScreenId; label: string }
+    | { kind: "document"; key: string; scene: MonitorDocumentSceneDto; label: string };
+
+  const playlist = useMemo<PlaylistItem[]>(() => [
+    ...monitor.screens.map((screen) => ({
+      kind: "system" as const,
+      key: `system:${screen}`,
+      screen,
+      label: CCO_SCREEN_CATALOG.find((item) => item.id === screen)?.label ?? screen,
+    })),
+    ...documentScenes.map((scene) => ({
+      kind: "document" as const,
+      key: `document:${scene.id}`,
+      scene,
+      label: scene.title,
+    })),
+  ], [documentScenes, monitor.screens]);
+
+  const safeIndex = Math.min(screenIndex, Math.max(0, playlist.length - 1));
+  const activeItem = playlist[safeIndex] ?? {
+    kind: "system" as const,
+    key: "system:overview",
+    screen: "overview" as CcoScreenId,
+    label: "Visão executiva",
+  };
+  const activeScreen = activeItem.kind === "system" ? activeItem.screen : null;
+  const screenLabel = activeItem.label;
+  const effectiveLoop = monitor.mode === "loop" && playlist.length > 1;
 
   useEffect(() => {
-    if (monitor.mode !== "loop" || monitor.screens.length <= 1) return;
+    if (screenIndex < playlist.length) return;
+    const frame = window.requestAnimationFrame(() => setScreenIndex(0));
+    return () => window.cancelAnimationFrame(frame);
+  }, [playlist.length, screenIndex]);
+
+  useEffect(() => {
+    if (!effectiveLoop) return;
 
     let switchTimer = 0;
     const timer = window.setTimeout(() => {
       setTransitioning(true);
       switchTimer = window.setTimeout(() => {
         setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
-        setScreenIndex((current) => (current + 1) % monitor.screens.length);
+        setScreenIndex((current) => (current + 1) % playlist.length);
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => setTransitioning(false));
         });
@@ -139,19 +189,21 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       window.clearTimeout(timer);
       if (switchTimer) window.clearTimeout(switchTimer);
     };
-  }, [monitor.mode, monitor.screens, monitor.delaySeconds, screenIndex, screenCycleMs]);
-  const screenLabel = CCO_SCREEN_CATALOG.find((item) => item.id === activeScreen)?.label ?? "Visão executiva";
+  }, [effectiveLoop, monitor.delaySeconds, playlist.length, screenIndex, screenCycleMs]);
+
   const ccol = monitor.layout === "ccol";
-  const isRuleScreen = activeScreen === "briefing" || activeScreen.startsWith("class-");
+  const isRuleScreen = activeScreen ? activeScreen === "briefing" || activeScreen.startsWith("class-") : false;
 
   const screenContent = !monitor.enabled ? (
     <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
+  ) : activeItem.kind === "document" ? (
+    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} />
   ) : !sag || !rpn ? (
     <Empty ccol={ccol} title="Par SAG incompleto" description="Esta tela exige Exercício Corrente e créditos do exercício anterior validados. Não há substituição por números sintéticos." />
   ) : isRuleScreen ? (
-    <GrupamentoRuleMonitorScreen screen={activeScreen} sag={sag} rpn={rpn} layout={monitor.layout} />
+    <GrupamentoRuleMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} />
   ) : (
-    <GrupamentoBaseMonitorScreen screen={activeScreen} sag={sag} rpn={rpn} layout={monitor.layout} />
+    <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} />
   );
 
   return (
@@ -206,11 +258,11 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
           className={`h-full w-full transition-[opacity,transform,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "translate-y-2 scale-[0.997] opacity-0 blur-[2px]" : "translate-y-0 scale-100 opacity-100 blur-0"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
-          <div key={activeScreen} className="mcl-monitor-scene h-full w-full">
+          <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
-              screenKey={activeScreen}
+              screenKey={activeItem.kind === "system" ? activeItem.screen : activeItem.key}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
-              loopMode={monitor.mode === "loop" && monitor.screens.length > 1}
+              loopMode={effectiveLoop}
               onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
             >
               {screenContent}
@@ -229,19 +281,26 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         <div className="flex min-w-0 items-center gap-4">
           <span className="flex min-w-0 items-center gap-1.5">
             <Database className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Fonte: {sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "par incompleto"}</span>
+            <span className="truncate">Fonte: {activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "par incompleto")}</span>
           </span>
-          <span className="hidden items-center gap-1.5 xl:flex">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
-          </span>
+          {activeItem.kind === "system" ? (
+            <span className="hidden items-center gap-1.5 xl:flex">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
+            </span>
+          ) : (
+            <span className="hidden items-center gap-1.5 xl:flex">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Conteúdo documental · aprovação humana registrada
+            </span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
-          <span>{monitor.mode === "loop" ? `loop · ${monitor.delaySeconds}s` : "tela fixa"}</span>
+          <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s` : "tela fixa"}</span>
           <span>dados · 30s</span>
           <span>auto F5 · 5min</span>
-          <span>{safeIndex + 1}/{monitor.screens.length}</span>
+          <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
         </div>
       </footer>
     </main>
