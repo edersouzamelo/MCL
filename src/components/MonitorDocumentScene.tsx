@@ -133,15 +133,23 @@ function HorizontalChart({ chart }: { chart: MonitorDocumentChart }) {
 function VerticalChart({ chart }: { chart: MonitorDocumentChart }) {
   const categories = chart.series[0]?.categories ?? [];
   const values = chart.series.flatMap((item) => item.values);
-  const min = Math.min(0, ...values);
-  const max = Math.max(1, ...values);
+  const min = chart.axisMin ?? Math.min(0, ...values);
+  const max = chart.axisMax ?? Math.max(1, ...values);
   const span = Math.max(1, max - min);
   const visible = categories.slice(0, 14);
+  const ticks = [1, 0.75, 0.5, 0.25, 0].map((ratio) => min + span * ratio);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="relative min-h-0 flex-1 border-b border-l border-white/10">
-        <div className="absolute inset-0 flex items-end justify-around gap-[1.2%] px-[2%]">
+      <div className="relative min-h-0 flex-1 pl-11">
+        <div className="absolute inset-y-0 left-0 flex w-10 flex-col justify-between py-1 text-right text-[clamp(10px,.68vw,13px)] font-mono font-semibold text-slate-400">
+          {ticks.map((tick, index) => <span key={index}>{valueLabel(tick, chart)}</span>)}
+        </div>
+        <div className="relative h-full border-b border-l border-white/10">
+          <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+            {ticks.map((_, index) => <span key={index} className="block border-t border-white/[0.055]" />)}
+          </div>
+          <div className="absolute inset-0 flex items-end justify-around gap-[1.2%] px-[2%]">
           {visible.map((category, rowIndex) => (
             <div key={category + String(rowIndex)} className="flex h-full min-w-0 flex-1 flex-col justify-end">
               <div className="flex min-h-0 flex-1 items-end justify-center gap-[3px]">
@@ -163,6 +171,7 @@ function VerticalChart({ chart }: { chart: MonitorDocumentChart }) {
               <div className="mt-1 truncate text-center text-[clamp(11px,.72vw,14px)] font-semibold text-slate-300" title={category}>{category}</div>
             </div>
           ))}
+          </div>
         </div>
       </div>
       <ChartLegend chart={chart} />
