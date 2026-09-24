@@ -2,6 +2,7 @@ import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
 import type {
   MonitorDocumentAssetDraft,
+  MonitorDocumentChart,
   MonitorDocumentExtraction,
   MonitorDocumentSceneDraft,
   MonitorDocumentSeries,
@@ -193,7 +194,7 @@ function chart(xml: string, theme: Theme) {
   const block = found ? xml.match(new RegExp("<c:" + found[0] + "\\b[^>]*>([\\s\\S]*?)<\\/c:" + found[0] + ">"))?.[1] ?? xml : xml;
   const dir = block.match(/<c:barDir\b[^>]*\bval="([^"]+)"/)?.[1];
   const rawGrouping = block.match(/<c:grouping\b[^>]*\bval="([^"]+)"/)?.[1];
-  const grouping = rawGrouping === "stacked" ? "stacked" : rawGrouping === "percentStacked" ? "percentStacked" : rawGrouping === "clustered" ? "clustered" : "standard";
+  const grouping: MonitorDocumentChart["grouping"] = rawGrouping === "stacked" ? "stacked" : rawGrouping === "percentStacked" ? "percentStacked" : rawGrouping === "clustered" ? "clustered" : "standard";
   const overlap = Number(block.match(/<c:overlap\b[^>]*\bval="(-?\d+)"/)?.[1] ?? "0");
   const axis = xml.match(/<c:valAx\b[^>]*>([\s\S]*?)<\/c:valAx>/)?.[1] ?? "";
   const format = decode(axis.match(/<c:numFmt\b[^>]*\bformatCode="([^"]+)"/)?.[1] ?? "");
