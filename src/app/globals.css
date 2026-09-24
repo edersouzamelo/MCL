@@ -1399,8 +1399,8 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   50% { box-shadow:0 0 0 5px rgba(16,185,129,.045),0 0 18px rgba(16,185,129,.08); }
 }
 @keyframes mclMonitorSceneReveal {
-  0% { transform:translate3d(0,7px,0) scale(.998); filter:blur(2.5px); }
-  100% { transform:translate3d(0,0,0) scale(1); filter:blur(0); }
+  0% { opacity:0; filter:blur(1.5px); }
+  100% { opacity:1; filter:blur(0); }
 }
 @keyframes mclMonitorWatermarkFloat {
   0%,100% { transform:translate3d(0,0,0); }
@@ -1460,8 +1460,8 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
 .mcl-monitor-icon { animation:mclMonitorIconBreath 8s ease-in-out infinite; }
 .mcl-monitor-live { animation:mclMonitorLivePulse 4.2s ease-in-out infinite; }
 .mcl-monitor-scene {
-  will-change:transform,filter;
-  animation:mclMonitorSceneReveal .82s cubic-bezier(.22,1,.36,1) both;
+  will-change:opacity,filter;
+  animation:mclMonitorSceneReveal .62s ease-out both;
 }
 .mcl-monitor-watermark { animation:mclMonitorWatermarkFloat 9s ease-in-out infinite; }
 .mcl-monitor-footer::before {
@@ -1650,8 +1650,8 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
 
 
 @keyframes mclDocumentElementReveal {
-  0% { opacity:0; transform:translate3d(0,7px,0) scale(.992); filter:blur(2px); }
-  100% { opacity:1; transform:translate3d(0,0,0) scale(1); filter:blur(0); }
+  0% { opacity:0; filter:blur(1px); }
+  100% { opacity:1; filter:blur(0); }
 }
 @keyframes mclDocumentChartGrow {
   0% { transform:scaleX(0); opacity:.45; }
@@ -1666,7 +1666,7 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   100% { stroke-dashoffset:0; opacity:1; }
 }
 .mcl-document-element {
-  animation:mclDocumentElementReveal .7s cubic-bezier(.16,1,.3,1) both;
+  animation:mclDocumentElementReveal .48s ease-out both;
 }
 .mcl-document-chart-grow {
   transform-origin:left center;
