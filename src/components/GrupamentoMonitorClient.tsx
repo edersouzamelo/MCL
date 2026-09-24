@@ -339,6 +339,15 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
             <div className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
             <div className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
           </div>
+          <div
+            className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${connectionState === "offline"
+              ? (ccol ? "border-amber-300 bg-amber-50 text-amber-700" : "border-amber-400/20 bg-amber-400/10 text-amber-300")
+              : (ccol ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300")}`}
+            title={connectionState === "offline" ? "Offline · exibindo último conteúdo local validado" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
+            aria-label={connectionState === "offline" ? "Monitor offline" : "Monitor online"}
+          >
+            {connectionState === "offline" ? <WifiOff className="h-4 w-4" /> : <Wifi className={`h-4 w-4 ${connectionState === "syncing" ? "animate-pulse" : ""}`} />}
+          </div>
           <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${monitor.enabled ? "mcl-monitor-live " : ""}${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
             {monitor.enabled ? "Saída ativa" : "Saída desativada"}
           </div>
@@ -372,7 +381,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       </section>
 
       {playlist.length > 1 ? (
-        <div className={`absolute bottom-12 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
+        <div className={`absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
             <button
@@ -390,38 +399,40 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         </div>
       ) : null}
 
-      <div className={`mcl-monitor-watermark pointer-events-none absolute bottom-11 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
+      <div className={`mcl-monitor-watermark pointer-events-none absolute bottom-5 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
         <BrandLogo className="h-11 w-11" tone={ccol ? "green" : "sky"} sizes="44px" />
         <div className={`mt-1 text-[8px] font-black uppercase tracking-[0.16em] ${ccol ? "text-slate-600" : "text-sky-100"}`}>Continuidade</div>
         <div className={`mt-0.5 text-[8px] font-black uppercase tracking-[0.22em] ${ccol ? "text-slate-500" : "text-sky-300"}`}>Logística</div>
       </div>
 
-      <footer className={`mcl-monitor-footer relative z-20 flex h-10 shrink-0 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/85 text-slate-600" : "border-white/10 bg-slate-950/85 text-slate-400"}`}>
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <Database className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Fonte: {activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "par incompleto")}</span>
-          </span>
-          {activeItem.kind === "system" ? (
-            <span className="hidden items-center gap-1.5 xl:flex">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
+      <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50">
+        <footer className={`mcl-monitor-footer relative flex h-10 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/92 text-slate-600" : "border-white/10 bg-slate-950/92 text-slate-400"}`}>
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Database className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Fonte: {activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "aguardando sincronização")}</span>
             </span>
-          ) : (
-            <span className="hidden items-center gap-1.5 xl:flex">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Conteúdo documental · aprovação humana registrada
-            </span>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
-          <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
-          <span>dados · 30s</span>
-          <span>auto F5 · 5min</span>
-          <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
-        </div>
-      </footer>
+            {activeItem.kind === "system" ? (
+              <span className="hidden items-center gap-1.5 xl:flex">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
+              </span>
+            ) : (
+              <span className="hidden items-center gap-1.5 xl:flex">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Conteúdo documental · aprovação humana registrada
+              </span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
+            <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
+            <span>sync · 30s</span>
+            <span>{connectionState === "offline" ? "cache local" : "online"}</span>
+            <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
+          </div>
+        </footer>
+      </div>
     </main>
   );
 }
@@ -555,6 +566,22 @@ function MonitorViewport({
           }}
         >
           {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MonitorBootScreen({ ccol, connectionState }: { ccol: boolean; connectionState: "online" | "offline" | "syncing" }) {
+  return (
+    <div className="flex h-full min-h-[55vh] items-center justify-center">
+      <div className="mcl-monitor-boot text-center">
+        <div className={`mx-auto flex h-40 w-40 items-center justify-center rounded-[2rem] border backdrop-blur-xl ${ccol ? "border-sky-900/10 bg-white/55 shadow-[0_24px_70px_rgba(15,23,42,.10)]" : "border-sky-400/12 bg-slate-950/28 shadow-[0_24px_80px_rgba(14,165,233,.08)]"}`}>
+          <BrandLogo className="h-28 w-28" tone={ccol ? "green" : "sky"} sizes="112px" />
+        </div>
+        <div className={`mt-7 text-[11px] font-black uppercase tracking-[0.34em] ${ccol ? "text-sky-900" : "text-sky-300"}`}>Modelo de Continuidade Logística</div>
+        <div className={`mt-3 text-sm font-semibold ${ccol ? "text-slate-500" : "text-slate-500"}`}>
+          {connectionState === "offline" ? "Aguardando fonte local validada" : "Inicializando quadro logístico"}
         </div>
       </div>
     </div>
