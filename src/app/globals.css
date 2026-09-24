@@ -1464,15 +1464,28 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   animation:mclMonitorSceneReveal .62s ease-out both;
 }
 .mcl-monitor-watermark { animation:mclMonitorWatermarkFloat 9s ease-in-out infinite; }
+.mcl-monitor-footer-drawer {
+  transform:translateY(calc(100% - 5px));
+  transition:transform .42s cubic-bezier(.16,1,.3,1);
+  will-change:transform;
+}
+.mcl-monitor-footer-drawer:hover,
+.mcl-monitor-footer-drawer:focus-within {
+  transform:translateY(0);
+}
 .mcl-monitor-footer::before {
   content:"";
   position:absolute;
   left:0;
   top:-1px;
-  width:22%;
+  width:28%;
   height:1px;
-  background:linear-gradient(90deg,rgba(56,189,248,.52),rgba(56,189,248,.08),transparent);
-  opacity:.75;
+  background:linear-gradient(90deg,transparent,rgba(56,189,248,.85),rgba(56,189,248,.10),transparent);
+  opacity:.82;
+  animation:mclCardTrace 9s ease-in-out infinite;
+}
+.mcl-monitor-boot > div:first-child {
+  animation:mclBootHalo 5.5s ease-in-out infinite;
 }
 @media(prefers-reduced-motion:reduce) {
   .mcl-monitor-ambient,
@@ -1488,9 +1501,9 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
 
 /* Premium CCOL motion: stronger broadcast choreography without touching data. */
 @keyframes mclMonitorStripesDrift {
-  0% { background-position:0 0, 0 0, 0 0; transform:translate3d(0,0,0) scale(1); }
-  50% { background-position:0 28px, 0 18px, 0 0; transform:translate3d(0,.3vh,0) scale(1.005); }
-  100% { background-position:0 56px, 0 36px, 0 0; transform:translate3d(0,0,0) scale(1); }
+  0% { background-position:0 0, 0 0; }
+  50% { background-position:0 18px, 0 0; }
+  100% { background-position:0 36px, 0 0; }
 }
 @keyframes mclMonitorHorizonDrift {
   0%,100% { transform:translate3d(-4%,0,0) scaleX(.92); opacity:.18; }
@@ -1533,8 +1546,20 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   100% { opacity:1; transform:scale(1) rotate(0); filter:blur(0); }
 }
 @keyframes mclDataTileFloat {
-  0%,100% { transform:translate3d(0,0,0); box-shadow:0 5px 14px rgba(2,6,23,.035); }
-  50% { transform:translate3d(0,-2px,0); box-shadow:0 10px 22px rgba(2,6,23,.075); }
+  0%,100% { box-shadow:0 5px 14px rgba(2,6,23,.035); }
+  50% { box-shadow:0 10px 22px rgba(2,6,23,.075); }
+}
+
+@keyframes mclCardTrace {
+  0%,12% { transform:translateX(-140%); opacity:0; }
+  22% { opacity:.8; }
+  65% { opacity:.35; }
+  82%,100% { transform:translateX(430%); opacity:0; }
+}
+
+@keyframes mclBootHalo {
+  0%,100% { box-shadow:0 0 0 rgba(56,189,248,0),0 22px 70px rgba(2,6,23,.16); }
+  50% { box-shadow:0 0 42px rgba(56,189,248,.12),0 28px 90px rgba(2,6,23,.22); }
 }
 
 .mcl-monitor-stripes {
@@ -1547,18 +1572,16 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   animation:mclMonitorStripesDrift 24s linear infinite;
 }
 .mcl-monitor-stripes-dark {
-  opacity:.50;
+  opacity:.42;
   background-image:
-    repeating-linear-gradient(180deg,rgba(56,189,248,.055) 0 1px,transparent 1px 34px),
-    repeating-linear-gradient(180deg,rgba(14,165,233,.026) 0 9px,transparent 9px 68px),
-    linear-gradient(90deg,rgba(2,6,23,.02),rgba(14,165,233,.065) 48%,rgba(2,6,23,.02));
+    repeating-linear-gradient(180deg,rgba(56,189,248,.040) 0 18px,rgba(2,6,23,.018) 18px 36px),
+    linear-gradient(90deg,rgba(2,6,23,.02),rgba(14,165,233,.055) 48%,rgba(2,6,23,.02));
 }
 .mcl-monitor-stripes-light {
-  opacity:.20;
+  opacity:.18;
   background-image:
-    repeating-linear-gradient(180deg,rgba(3,105,161,.07) 0 1px,transparent 1px 38px),
-    repeating-linear-gradient(180deg,rgba(14,116,144,.028) 0 8px,transparent 8px 74px),
-    linear-gradient(90deg,rgba(255,255,255,.1),rgba(14,165,233,.05) 50%,rgba(255,255,255,.1));
+    repeating-linear-gradient(180deg,rgba(3,105,161,.052) 0 18px,rgba(255,255,255,.018) 18px 36px),
+    linear-gradient(90deg,rgba(255,255,255,.1),rgba(14,165,233,.045) 50%,rgba(255,255,255,.1));
 }
 .mcl-monitor-horizon {
   position:absolute;
@@ -1585,6 +1608,7 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
 }
 .mcl-broadcast-card {
   --mcl-card-x:-22px;
+  position:relative;
   will-change:transform,opacity,filter,box-shadow;
   animation-name:mclBroadcastCardDock,mclSuspendedGlow;
   animation-duration:.92s,6.8s;
@@ -1595,6 +1619,19 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   backdrop-filter:blur(8px);
 }
 .mcl-broadcast-card:nth-child(even) { --mcl-card-x:22px; }
+.mcl-broadcast-card::before {
+  content:"";
+  position:absolute;
+  z-index:3;
+  top:0;
+  left:0;
+  width:28%;
+  height:1px;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(56,189,248,.92),rgba(125,211,252,.32),transparent);
+  transform:translateX(-140%);
+  animation:mclCardTrace 10.5s ease-in-out infinite;
+}
 .mcl-broadcast-row {
   will-change:transform,opacity,filter;
   animation:mclBroadcastRowDock .78s cubic-bezier(.16,1,.3,1) both;
