@@ -198,11 +198,10 @@ function PieChart({ chart }: { chart: MonitorDocumentChart }) {
   const values = chart.series[0]?.values ?? [];
   const categories = chart.series[0]?.categories ?? [];
   const total = Math.max(1, values.reduce((sum, value) => sum + Math.max(0, value), 0));
-  let cursor = 0;
   const stops = values.map((value, index) => {
-    const start = cursor;
-    cursor += (Math.max(0, value) / total) * 100;
-    return FALLBACK_COLORS[index % FALLBACK_COLORS.length] + " " + String(start) + "% " + String(cursor) + "%";
+    const start = values.slice(0, index).reduce((sum, item) => sum + Math.max(0, item), 0) / total * 100;
+    const end = start + (Math.max(0, value) / total) * 100;
+    return FALLBACK_COLORS[index % FALLBACK_COLORS.length] + " " + String(start) + "% " + String(end) + "%";
   });
   return (
     <div className="flex h-full items-center justify-center gap-8">
