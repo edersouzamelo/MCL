@@ -1,5 +1,6 @@
 import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
+import { prepareMonitorElements } from "./presentation-layout";
 import type {
   MonitorDocumentAssetDraft,
   MonitorDocumentChart,
@@ -388,6 +389,10 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
       return !overlapsChart;
     });
 
+    const presentation = prepareMonitorElements(elements);
+    for (const reason of new Set(presentation.omitted.map((item) => item.reason))) {
+      warnings.push("Slide " + page + ": " + reason + ". Omitido na exibição institucional; original preservado.");
+    }
     if (/p:grpSp\b/.test(xml)) warnings.push("Slide " + page + ": grupo de objetos detectado; revisar prévia.");
     scenes.push({
       sceneType:"TEXT",
