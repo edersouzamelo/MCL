@@ -3,7 +3,7 @@ import { extractMonitorDocument } from "@/modules/grupamento/monitor-content/ext
 
 type Entry = { name: string; data: Buffer };
 
-function storedZip(entries: Entry[]) {
+export function storedZip(entries: Entry[]) {
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
   let offset = 0;

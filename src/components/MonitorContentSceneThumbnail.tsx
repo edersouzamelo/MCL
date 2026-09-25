@@ -2,93 +2,10 @@
 "use client";
 
 import type {
-  MonitorDocumentChart,
   MonitorDocumentScenePayload,
-  MonitorSlideElement,
 } from "@/modules/grupamento/monitor-content/types";
 
-const FALLBACK = ["#16a34a", "#4f86c6", "#eab308", "#0ea5e9", "#f97316", "#a855f7"];
-
-function colorFor(chart: MonitorDocumentChart, index: number) {
-  return chart.series[index]?.color || FALLBACK[index % FALLBACK.length];
-}
-
-function ThumbnailChart({ item }: { item: Extract<MonitorSlideElement, { kind: "chart" }> }) {
-  const chart = item.chart;
-  const categories = chart.series[0]?.categories ?? [];
-  if (!chart.series.length) return null;
-
-  if (chart.type === "bar" && chart.orientation === "vertical") {
-    const values = chart.series.flatMap((series) => series.values);
-    const max = Math.max(1, ...values.map((value) => Math.abs(value)));
-    return (
-      <div className="flex h-full items-end justify-around gap-[2%] px-[3%] pb-[4%]">
-        {categories.slice(0, 12).map((category, rowIndex) => (
-          <div key={category + rowIndex} className="flex h-full min-w-0 flex-1 items-end justify-center gap-[2px]">
-            {chart.series.map((series, seriesIndex) => {
-              const value = Math.abs(series.values[rowIndex] ?? 0);
-              return <span key={series.name + seriesIndex} className="block min-w-[2px] flex-1 rounded-t-[1px]" style={{ height: Math.max(4, value / max * 92) + "%", background: colorFor(chart, seriesIndex) }} />;
-            })}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (chart.type === "bar") {
-    const values = chart.series.flatMap((series) => series.values);
-    const min = chart.axisMin ?? Math.min(0, ...values);
-    const max = chart.axisMax ?? Math.max(1, ...values);
-    const span = Math.max(1, max - min);
-    const overlap = (chart.overlap ?? 0) >= 90 && chart.series.length > 1;
-    return (
-      <div className="flex h-full flex-col justify-around gap-[3%] px-[4%] py-[3%]">
-        {categories.slice(0, 10).map((category, rowIndex) => (
-          <div key={category + rowIndex} className="relative min-h-[3px] flex-1">
-            {overlap ? chart.series.map((series, seriesIndex) => {
-              const value = series.values[rowIndex] ?? min;
-              const width = Math.max(2, Math.min(96, ((value - min) / span) * 96));
-              return <span key={series.name + seriesIndex} className="absolute left-0 top-[19%] block h-[62%] rounded-r-[1px]" style={{ width: width + "%", background: colorFor(chart, seriesIndex), zIndex: seriesIndex + 1 }} />;
-            }) : (
-              <div className="flex h-full items-center gap-[2px]">
-                {chart.series.map((series, seriesIndex) => {
-                  const value = series.values[rowIndex] ?? 0;
-                  const width = Math.max(3, Math.abs(value) / Math.max(1, ...values.map((item) => Math.abs(item))) * 94);
-                  return <span key={series.name + seriesIndex} className="block h-[62%] rounded-r-[1px]" style={{ width: width + "%", background: colorFor(chart, seriesIndex) }} />;
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (chart.type === "pie" || chart.type === "doughnut") {
-    const values = chart.series[0]?.values ?? [];
-    const total = Math.max(1, values.reduce((sum, value) => sum + Math.max(0, value), 0));
-    const stops = values.map((value, index) => {
-      const start = values.slice(0, index).reduce((sum, item) => sum + Math.max(0, item), 0) / total * 100;
-      const end = start + Math.max(0, value) / total * 100;
-      return FALLBACK[index % FALLBACK.length] + " " + start + "% " + end + "%";
-    });
-    return <div className="m-auto aspect-square h-[78%] rounded-full" style={{ background: "conic-gradient(" + stops.join(",") + ")" }} />;
-  }
-
-  return (
-    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-full w-full p-[4%]">
-      {chart.series.slice(0, 4).map((series, seriesIndex) => {
-        const max = Math.max(1, ...series.values.map((value) => Math.abs(value)));
-        const points = series.values.map((value, index) => {
-          const x = series.values.length <= 1 ? 0 : index / (series.values.length - 1) * 100;
-          const y = 38 - Math.abs(value) / max * 34;
-          return x + "," + y;
-        }).join(" ");
-        return <polyline key={series.name + seriesIndex} points={points} fill="none" stroke={colorFor(chart, seriesIndex)} strokeWidth="1.5" />;
-      })}
-    </svg>
-  );
-}
+import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
 
 function elementStyle(item: { x: number; y: number; w: number; h: number; z: number }) {
   return {
@@ -155,7 +72,7 @@ export function MonitorContentSceneThumbnail({
           );
         }
         if (item.kind === "chart") {
-          return <div key={index} className="absolute overflow-hidden rounded-sm bg-white/[0.03]" style={elementStyle(item)}><ThumbnailChart item={item} /></div>;
+          return <div key={index} className="absolute overflow-hidden rounded-sm bg-white/[0.03]" style={elementStyle(item)}><MonitorDocumentChart chart={item.chart} /></div>;
         }
         return (
           <div key={index} className="absolute overflow-hidden border border-white/10 bg-white/[0.03]" style={elementStyle(item)}>

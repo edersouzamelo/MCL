@@ -173,6 +173,19 @@ function role(text: string, size: number | undefined, y: number) {
   return s <= 12 ? "label" as const : "body" as const;
 }
 
+function cachedPoints(xml: string) {
+  const points = new Map<number, string>();
+  let next = 0;
+  for (const match of xml.matchAll(/<c:pt\b([^>]*)>([\s\S]*?)<\/c:pt>/g)) {
+    const rawIndex = attribute(match[1], "idx");
+    const index = rawIndex ? Number(rawIndex) : next;
+    const value = match[2].match(/<c:v\b[^>]*>([\s\S]*?)<\/c:v>/)?.[1];
+    if (Number.isInteger(index) && index >= 0 && index < 10000 && value !== undefined) points.set(index, clean(value));
+    next = index + 1;
+  }
+  return points;
+}
+
 function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
   const result: MonitorDocumentSeries[] = [];
   for (const match of xml.matchAll(/<c:ser\b[^>]*>([\s\S]*?)<\/c:ser>/g)) {
@@ -180,12 +193,26 @@ function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
     const name = clean(block.match(/<c:tx\b[^>]*>[\s\S]*?<c:v>([\s\S]*?)<\/c:v>/)?.[1] ?? "Série " + (result.length + 1));
     const cat = block.match(/<c:cat\b[^>]*>([\s\S]*?)<\/c:cat>/)?.[1] ?? "";
     const val = block.match(/<c:val\b[^>]*>([\s\S]*?)<\/c:val>/)?.[1] ?? "";
-    const categories = [...cat.matchAll(/<c:v>([\s\S]*?)<\/c:v>/g)].map((m) => clean(m[1]));
-    const values = [...val.matchAll(/<c:v>([\s\S]*?)<\/c:v>/g)].map((m) => Number(m[1].replace(",", "."))).filter(Number.isFinite);
-    const explicit = fill(block, theme);
-    if (values.length) result.push({ name, categories, values, color: explicit ?? theme["accent" + Math.min(6, result.length + 1)] });
+    const cats = cachedPoints(cat);
+    const vals = cachedPoints(val);
+    const count = Math.max(0, ...cats.keys(), ...vals.keys()) + 1;
+    const categories = Array.from({ length: count }, (_, index) => cats.get(index) ?? "");
+    const missingValueIndices: number[] = [];
+    const values = Array.from({ length: count }, (_, index) => {
+      const raw = vals.get(index);
+      const number = raw ? Number(raw.replace(",", ".")) : NaN;
+      if (!Number.isFinite(number)) { missingValueIndices.push(index); return 0; }
+      return number;
+    });
+    const pointColors: Array<string | null> = Array.from({ length: count }, () => null);
+    for (const point of block.matchAll(/<c:dPt\b[^>]*>([\s\S]*?)<\/c:dPt>/g)) {
+      const index = Number(point[1].match(/<c:idx\b[^>]*\bval="(\d+)"/)?.[1]);
+      if (index >= 0 && index < count) pointColors[index] = fill(point[1], theme) ?? null;
+    }
+    const seriesStyle = block.replace(/<c:dPt\b[^>]*>[\s\S]*?<\/c:dPt>/g, "").match(/<c:spPr\b[^>]*>([\s\S]*?)<\/c:spPr>/)?.[1] ?? "";
+    if (vals.size) result.push({ name, categories, values, missingValueIndices, pointColors, color: fill(seriesStyle, theme) ?? theme["accent" + ((result.length % 6) + 1)] });
   }
-  return result.slice(0, 8);
+  return result;
 }
 
 function axisTitle(axisXml: string) {
@@ -202,7 +229,7 @@ function chart(xml: string, theme: Theme) {
   const rawGrouping = block.match(/<c:grouping\b[^>]*\bval="([^"]+)"/)?.[1];
   const grouping: MonitorDocumentChart["grouping"] = rawGrouping === "stacked" ? "stacked" : rawGrouping === "percentStacked" ? "percentStacked" : rawGrouping === "clustered" ? "clustered" : "standard";
   const overlap = Number(block.match(/<c:overlap\b[^>]*\bval="(-?\d+)"/)?.[1] ?? "0");
-  const categoryAxis = xml.match(/<c:catAx\b[^>]*>([\s\S]*?)<\/c:catAx>/)?.[1] ?? "";
+  const categoryAxis = xml.match(/<c:(?:catAx|dateAx)\b[^>]*>([\s\S]*?)<\/c:(?:catAx|dateAx)>/)?.[1] ?? "";
   const valueAxis = xml.match(/<c:valAx\b[^>]*>([\s\S]*?)<\/c:valAx>/)?.[1] ?? "";
   const categoryTitle = axisTitle(categoryAxis);
   const valueTitle = axisTitle(valueAxis);
@@ -212,7 +239,20 @@ function chart(xml: string, theme: Theme) {
   const horizontalBar = found?.[1] === "bar" && dir === "bar";
   const xAxisTitle = horizontalBar ? valueTitle : categoryTitle;
   const yAxisTitle = horizontalBar ? categoryTitle : valueTitle;
+  const majorUnit = Number(valueAxis.match(/<c:majorUnit\b[^>]*\bval="([^"]+)"/)?.[1]);
+  const legend = xml.match(/<c:legend\b[^>]*>([\s\S]*?)<\/c:legend>/)?.[1];
+  const position = legend?.match(/<c:legendPos\b[^>]*\bval="([^"]+)"/)?.[1];
+  const positions: Record<string, MonitorDocumentChart["legendPosition"]> = { t: "top", b: "bottom", l: "left", r: "right", tr: "right" };
+  const gridXml = valueAxis.match(/<c:majorGridlines\b[^>]*>([\s\S]*?)<\/c:majorGridlines>/)?.[1] ?? "";
   return {
+    semanticVersion: 3 as const,
+    categoryFormat: decode(categoryAxis.match(/<c:numFmt\b[^>]*\bformatCode="([^"]+)"/)?.[1] ?? "") || undefined,
+    categoryReverse: /<c:orientation\b[^>]*val="maxMin"/.test(categoryAxis),
+    valueReverse: /<c:orientation\b[^>]*val="maxMin"/.test(valueAxis),
+    majorUnit: Number.isFinite(majorUnit) && majorUnit > 0 ? majorUnit : undefined,
+    legendPosition: legend === undefined ? "none" as const : positions[position ?? "r"] ?? "right" as const,
+    showGridlines: /<c:majorGridlines\b/.test(valueAxis),
+    gridlineColor: line(gridXml, theme),
     type: (found?.[1] ?? "unknown") as "bar"|"line"|"pie"|"doughnut"|"area"|"scatter"|"unknown",
     orientation: found?.[1] === "bar" ? (dir === "bar" ? "horizontal" as const : "vertical" as const) : undefined,
     grouping,
@@ -320,6 +360,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const target = rid ? rels.get(rid)?.target : undefined;
         if (target) {
           const parsed = chart(entries.get(target)?.toString("utf8") ?? "",theme);
+          if (["unknown", "area", "scatter"].includes(parsed.type)) warnings.push("Slide " + page + ": gráfico " + parsed.type + " requer consulta ao original; renderização fiel ainda não disponível.");
           if (parsed.series.length) {
             parsed.series.forEach((s) => searchable.push(s.name,...s.categories,...s.values.map(String)));
             if (parsed.xAxisTitle) searchable.push(parsed.xAxisTitle);
