@@ -9,6 +9,7 @@ import type {
 } from "@/modules/grupamento/monitor-content/types";
 
 import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
+import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
 
 function SceneIcon({ type }: { type: MonitorDocumentSceneDto["sceneType"] }) {
   if (type === "CHART") return <BarChart3 className="h-4 w-4" />;
@@ -75,20 +76,7 @@ function TextElement({ item, ccol, slideWidth }: { item: MonitorSlideTextElement
 function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: boolean }) {
   const layout = scene.payload.layout;
   if (!layout) return null;
-  const chartBoxes = layout.elements.filter((element) => element.kind === "chart");
-  const neutralFills = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
-  const sorted = [...layout.elements]
-    .filter((element) => {
-      if (element.kind !== "shape" || !element.fill || !neutralFills.has(element.fill.toUpperCase())) return true;
-      const area = element.w * element.h;
-      if (area < 0.04) return true;
-      const redundantOverChart = chartBoxes.some((chartElement) => {
-        const overlapW = Math.max(0, Math.min(element.x + element.w, chartElement.x + chartElement.w) - Math.max(element.x, chartElement.x));
-        const overlapH = Math.max(0, Math.min(element.y + element.h, chartElement.y + chartElement.h) - Math.max(element.y, chartElement.y));
-        return (overlapW * overlapH) / Math.max(area, 0.0001) >= 0.25;
-      });
-      return !redundantOverChart;
-    })
+  const sorted = prepareMonitorElements(layout.elements).elements
     .sort((a,b) => a.z-b.z);
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden" style={{ containerType: "size" }}>

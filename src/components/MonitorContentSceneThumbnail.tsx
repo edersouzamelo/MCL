@@ -6,6 +6,7 @@ import type {
 } from "@/modules/grupamento/monitor-content/types";
 
 import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
+import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
 
 function elementStyle(item: { x: number; y: number; w: number; h: number; z: number }) {
   return {
@@ -33,24 +34,12 @@ export function MonitorContentSceneThumbnail({
     );
   }
 
-  const chartBoxes = layout.elements.filter((element) => element.kind === "chart");
-  const neutralFills = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
-  const visibleElements = [...layout.elements]
-    .filter((element) => {
-      if (element.kind !== "shape" || !element.fill || !neutralFills.has(element.fill.toUpperCase())) return true;
-      const area = element.w * element.h;
-      if (area < 0.04) return true;
-      const redundantOverChart = chartBoxes.some((chartElement) => {
-        const overlapW = Math.max(0, Math.min(element.x + element.w, chartElement.x + chartElement.w) - Math.max(element.x, chartElement.x));
-        const overlapH = Math.max(0, Math.min(element.y + element.h, chartElement.y + chartElement.h) - Math.max(element.y, chartElement.y));
-        return (overlapW * overlapH) / Math.max(area, 0.0001) >= 0.25;
-      });
-      return !redundantOverChart;
-    })
-    .sort((a, b) => a.z - b.z);
+  const presentation = prepareMonitorElements(layout.elements);
+  const visibleElements = presentation.elements.sort((a, b) => a.z - b.z);
 
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-slate-800 bg-[#07111f] shadow-inner">
+      {presentation.omitted.length > 0 && <span className="absolute bottom-1 right-1 z-[1000] rounded bg-slate-950/90 px-1.5 py-1 text-[8px] text-amber-200" title={[...new Set(presentation.omitted.map((item) => item.reason))].join("; ")}>{presentation.omitted.length} adornos omitidos · original preservado</span>}
       {visibleElements.map((item, index) => {
         if (item.kind === "shape") {
           return <div key={index} className="absolute" style={{ ...elementStyle(item), background: item.fill || "transparent", border: item.lineColor ? "1px solid " + item.lineColor : undefined }} />;
