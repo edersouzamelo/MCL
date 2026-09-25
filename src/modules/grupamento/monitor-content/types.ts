@@ -5,6 +5,8 @@ export type MonitorDocumentSeries = {
   categories: string[];
   values: number[];
   color?: string;
+  pointColors?: Array<string | null>;
+  missingValueIndices?: number[];
 };
 
 export type MonitorDocumentChart = {
@@ -19,6 +21,14 @@ export type MonitorDocumentChart = {
   xAxisTitle?: string;
   yAxisTitle?: string;
   legendPosition?: "top" | "bottom" | "left" | "right" | "none";
+  semanticVersion?: 3;
+  categoryFormat?: string;
+  categoryReverse?: boolean;
+  valueReverse?: boolean;
+  majorUnit?: number;
+  valueAxisTicks?: number[];
+  showGridlines?: boolean;
+  gridlineColor?: string;
 };
 
 export type MonitorSlideBox = {

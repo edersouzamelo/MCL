@@ -1723,3 +1723,54 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   .mcl-document-chart-rise,
   .mcl-document-line-draw { animation:none!important; transform:none!important; opacity:1!important; filter:none!important; }
 }
+
+/* Monitor: stable geometry. Motion belongs to light, never to the data frame. */
+.mcl-monitor-shell .mcl-broadcast-card,
+.mcl-monitor-shell .mcl-broadcast-row,
+.mcl-monitor-shell .mcl-broadcast-title,
+.mcl-monitor-shell .mcl-broadcast-subtitle,
+.mcl-monitor-shell .mcl-data-tile,
+.mcl-monitor-shell .mcl-donut-live {
+  animation: none;
+  transform: none;
+  filter: none;
+  opacity: 1;
+}
+.mcl-monitor-shell .mcl-broadcast-card::before {
+  width: 100%;
+  transform: none;
+  animation: mclMonitorEdgeLight 12s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgba(56,189,248,.65), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+}
+.mcl-monitor-shell .mcl-data-tile { position: relative; }
+.mcl-monitor-shell .mcl-data-tile::after {
+  content: "";
+  position: absolute;
+  inset: auto 15% 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56,189,248,.35), transparent);
+}
+@keyframes mclMonitorEdgeLight {
+  0%,100% { background-position: -70% 0; opacity: .15; }
+  50% { background-position: 170% 0; opacity: .7; }
+}
+.mcl-monitor-footer-drawer { transform: translateY(100%); }
+.mcl-monitor-footer-drawer::before { content: ""; position: absolute; inset: -12px 0 auto; height: 12px; }
+.mcl-monitor-footer-drawer[data-open="true"] { transform: translateY(0); }
+.mcl-monitor-footer-toggle { opacity: 0; pointer-events: none; }
+.mcl-monitor-footer-toggle:focus-visible { opacity: 1; pointer-events: auto; bottom: 44px; }
+.mcl-monitor-footer-drawer[data-open="true"] .mcl-monitor-footer { padding-left: 48px; }
+@media (hover: none), (pointer: coarse) {
+  .mcl-monitor-footer-toggle { opacity: .65; pointer-events: auto; }
+  .mcl-monitor-footer-drawer { z-index: 45; }
+  .mcl-monitor-footer-drawer:hover { transform: translateY(100%); }
+  .mcl-monitor-footer-drawer[data-open="true"] { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mcl-monitor-shell *, .mcl-monitor-shell *::before, .mcl-monitor-shell *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

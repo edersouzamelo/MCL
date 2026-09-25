@@ -1,10 +1,12 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Database, Monitor, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronUp, Clock3, Database, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
+import { MonitorViewport } from "@/components/MonitorViewport";
+import { prepareMonitorNavigation, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
 import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 import { CCO_RULE_SOURCE } from "@/modules/grupamento/cco";
@@ -12,21 +14,15 @@ import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
   CCO_DEFAULT_LOOP_DELAY_SECONDS,
-  CCO_DEFAULT_SCROLL_PX_PER_SECOND,
   CCO_PI_ROWS_PER_PAGE,
-  CCO_PI_SCROLL_PX_PER_SECOND,
-  CCO_SCROLL_BOTTOM_HOLD_MS,
-  CCO_SCROLL_TOP_HOLD_MS,
   CCO_SCREEN_CATALOG,
   CCO_UNIT_ROWS_PER_PAGE,
   GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
-  readableMonitorCycleMs,
   type CcoMonitorConfig,
   type CcoScreenId,
 } from "@/modules/grupamento/monitor";
 
-const MIN_KIOSK_SCALE = 0.86;
 const SCREEN_FADE_MS = 720;
 const DATA_REFRESH_MS = 30_000;
 
@@ -37,33 +33,6 @@ function load<T>(key: string): T | null {
   } catch {
     return null;
   }
-}
-
-function monitorCacheKey(monitorId: number, suffix: "sag" | "rpn" | "scenes") {
-  return `mcl:monitor:${monitorId}:${suffix}:v1`;
-}
-
-function store(key: string, value: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // O cache local é contingência. Falha de quota não pode derrubar a exibição.
-  }
-}
-
-function sceneAssetUrls(scenes: MonitorDocumentSceneDto[]) {
-  const urls = new Set<string>();
-  for (const scene of scenes) {
-    for (const assetId of scene.payload.assetIds ?? []) {
-      urls.add(`/api/grupamento/monitor-content/assets/${assetId}`);
-    }
-    for (const element of scene.payload.layout?.elements ?? []) {
-      if (element.kind === "image" && element.assetId) {
-        urls.add(`/api/grupamento/monitor-content/assets/${element.assetId}`);
-      }
-    }
-  }
-  return [...urls];
 }
 
 function pageSizeForScreen(screen: CcoScreenId) {
@@ -80,7 +49,7 @@ function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
   };
 }
 
-export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
+export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitorId: number; organizationId: string }) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [documentScenes, setDocumentScenes] = useState<MonitorDocumentSceneDto[]>([]);
@@ -90,108 +59,80 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   const [transitioning, setTransitioning] = useState(false);
   const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "stopped">("playing");
   const [connectionState, setConnectionState] = useState<"online" | "offline" | "syncing">("syncing");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cacheIssue, setCacheIssue] = useState<string | null>(null);
+  const activeVersion = useRef<string | null>(null);
+  const pendingSnapshot = useRef<MonitorSnapshot | null>(null);
+  const hasSnapshot = useRef(false);
   const [now, setNow] = useState(new Date());
+
+  const applySnapshot = useCallback((snapshot: MonitorSnapshot) => {
+    if (snapshot.version === activeVersion.current) return;
+    activeVersion.current = snapshot.version;
+    hasSnapshot.current = true;
+    setSag(snapshot.sag);
+    setRpn(snapshot.rpn);
+    setDocumentScenes(snapshot.scenes);
+    setMonitor(normalizeMonitor(snapshot.monitor));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-
-    const hydrate = async () => {
-      const stored = load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
-      const selected = stored?.find((item) => item.id === monitorId);
-      if (selected && !cancelled) {
-        const normalized = normalizeMonitor(selected);
-        setMonitor(normalized);
-        if (selected.delaySeconds !== normalized.delaySeconds && stored) {
-          store(
-            GROUP_STORAGE_KEYS.monitors,
-            stored.map((item) => (item.id === monitorId ? normalized : item)),
-          );
-        }
-      }
-
-      const cachedSag = load<SagImportResult>(monitorCacheKey(monitorId, "sag"));
-      const cachedRpn = load<RpnImportResult>(monitorCacheKey(monitorId, "rpn"));
-      const cachedScenes = load<MonitorDocumentSceneDto[]>(monitorCacheKey(monitorId, "scenes"));
-      if (!cancelled) {
-        if (cachedSag) setSag(cachedSag);
-        if (cachedRpn) setRpn(cachedRpn);
-        if (cachedScenes) setDocumentScenes(cachedScenes);
-      }
-
-      if (!navigator.onLine) {
-        if (!cancelled) setConnectionState("offline");
-        return;
-      }
-
-      if (!cancelled) setConnectionState("syncing");
-      let networkSucceeded = false;
-
+    let running = false;
+    let hydrated = false;
+    let navigationReady = false;
+    let selected = defaultCcoMonitorConfig()[Math.max(0, Math.min(7, monitorId - 1))];
+    const refresh = async () => {
+      if (running) return;
+      running = true;
       try {
-        const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
-        if (response.ok) {
-          const payload = await response.json();
-          const current = payload.current ?? null;
-          const previous = payload.rpn ?? null;
-          if (current) store(monitorCacheKey(monitorId, "sag"), current);
-          if (previous) store(monitorCacheKey(monitorId, "rpn"), previous);
-          if (!cancelled) {
-            if (current) setSag(current);
-            if (previous) setRpn(previous);
-          }
-          networkSucceeded = true;
+        if (!hydrated) {
+          const cached = await readMonitorSnapshot(organizationId, monitorId);
+          if (cancelled) return;
+          if (cached) { selected = cached.monitor; applySnapshot(cached); }
+          hydrated = true;
         }
-      } catch {
-        // Mantém o último snapshot local validado.
-      }
-
-      try {
-        const response = await fetch(`/api/grupamento/monitor-content/playlist?monitorId=${monitorId}`, { cache: "no-store" });
-        if (response.ok) {
-          const payload = await response.json();
-          const scenes = (payload.scenes ?? []) as MonitorDocumentSceneDto[];
-          store(monitorCacheKey(monitorId, "scenes"), scenes);
-          if (!cancelled) setDocumentScenes(scenes);
-          networkSucceeded = true;
-
-          const assetUrls = sceneAssetUrls(scenes);
-          void Promise.allSettled(assetUrls.map((url) => fetch(url, { cache: "force-cache" })));
+        selected = normalizeMonitor(load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors)?.find((item) => item.id === monitorId) ?? selected);
+        if (!navigator.onLine) { setConnectionState("offline"); return; }
+        // Background synchronization never replaces the scene while it is being read.
+        const snapshot = await synchronizeMonitor(organizationId, selected);
+        if (cancelled) return;
+        setCacheIssue(null);
+        setConnectionState("online");
+        if (!hasSnapshot.current) applySnapshot(snapshot);
+        else pendingSnapshot.current = snapshot.version !== activeVersion.current ? snapshot : null;
+        if (!navigationReady) { await prepareMonitorNavigation(monitorId); navigationReady = true; }
+      } catch (error) {
+        if (!cancelled) {
+          setConnectionState("offline");
+          setCacheIssue(error instanceof Error ? error.message : "Falha de sincronização/cache");
+          console.warn("MCL monitor: última versão preservada", error);
         }
-      } catch {
-        // Mantém playlist e assets já disponíveis localmente.
-      }
-
-      if (!cancelled) {
-        setConnectionState(networkSucceeded ? "online" : "offline");
-      }
+      } finally { running = false; }
     };
-
-    const frame = window.requestAnimationFrame(() => { void hydrate(); });
-    const poll = window.setInterval(() => { void hydrate(); }, DATA_REFRESH_MS);
-    const refresh = () => { void hydrate(); };
-    const online = () => { setConnectionState("syncing"); void hydrate(); };
+    void refresh();
+    const poll = window.setInterval(() => { void refresh(); }, DATA_REFRESH_MS);
+    const refreshEvent = () => { void refresh(); };
     const offline = () => setConnectionState("offline");
-
-    window.addEventListener("storage", refresh);
-    window.addEventListener("online", online);
+    const events = ["storage", "online", "mcl-grupamento-sag-updated", "mcl-grupamento-rpn-updated", "mcl-grupamento-monitors-updated", "mcl-grupamento-document-content-updated"];
+    events.forEach((event) => window.addEventListener(event, refreshEvent));
     window.addEventListener("offline", offline);
-    window.addEventListener("mcl-grupamento-sag-updated", refresh);
-    window.addEventListener("mcl-grupamento-rpn-updated", refresh);
-    window.addEventListener("mcl-grupamento-monitors-updated", refresh);
-    window.addEventListener("mcl-grupamento-document-content-updated", refresh);
-
     return () => {
       cancelled = true;
-      window.cancelAnimationFrame(frame);
-      window.clearInterval(poll);
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("online", online);
+      clearInterval(poll);
+      events.forEach((event) => window.removeEventListener(event, refreshEvent));
       window.removeEventListener("offline", offline);
-      window.removeEventListener("mcl-grupamento-sag-updated", refresh);
-      window.removeEventListener("mcl-grupamento-rpn-updated", refresh);
-      window.removeEventListener("mcl-grupamento-monitors-updated", refresh);
-      window.removeEventListener("mcl-grupamento-document-content-updated", refresh);
     };
-  }, [monitorId]);
+  }, [monitorId, organizationId, applySnapshot]);
+
+  const commitPending = useCallback(() => {
+    if (!pendingSnapshot.current) return;
+    applySnapshot(pendingSnapshot.current);
+    pendingSnapshot.current = null;
+  }, [applySnapshot]);
+  const onPageCount = useCallback((count: number) => {
+    setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000 * count);
+  }, [monitor.delaySeconds]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -202,7 +143,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
     | { kind: "document"; key: string; scene: MonitorDocumentSceneDto; label: string };
 
   const playlist = useMemo<PlaylistItem[]>(() => {
-    const systemItems = monitor.screens.flatMap((screen) => {
+    const systemItems = (sag && rpn ? monitor.screens : []).flatMap((screen) => {
       const pageSize = pageSizeForScreen(screen);
       let rowCount = 0;
       if (screen === "pis") rowCount = sag?.byPi.length ?? 0;
@@ -255,12 +196,17 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
   }, [playlist.length, screenIndex]);
 
   useEffect(() => {
-    if (!autoAdvance) return;
+    if (playbackState !== "playing") return;
 
+    if (!autoAdvance) {
+      const timer = window.setInterval(commitPending, screenCycleMs);
+      return () => clearInterval(timer);
+    }
     let switchTimer = 0;
     const timer = window.setTimeout(() => {
       setTransitioning(true);
       switchTimer = window.setTimeout(() => {
+        commitPending();
         setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
         setScreenIndex((current) => (current + 1) % playlist.length);
         window.requestAnimationFrame(() => {
@@ -273,10 +219,11 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
       window.clearTimeout(timer);
       if (switchTimer) window.clearTimeout(switchTimer);
     };
-  }, [autoAdvance, monitor.delaySeconds, playlist.length, screenIndex, screenCycleMs]);
+  }, [autoAdvance, monitor.delaySeconds, playlist.length, screenIndex, screenCycleMs, commitPending, playbackState]);
 
   const stepPlaylist = (direction: -1 | 1) => {
     if (!playlist.length) return;
+    commitPending();
     setTransitioning(false);
     setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
     setScreenIndex((current) => (current + direction + playlist.length) % playlist.length);
@@ -284,6 +231,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
   const stopPlayback = () => {
     setPlaybackState("stopped");
+    commitPending();
     setTransitioning(false);
     setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
     setScreenIndex(0);
@@ -306,7 +254,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
   return (
     <main
-      className={`mcl-monitor-shell ${ccol ? "mcl-monitor-shell-ccol" : "mcl-monitor-shell-mcl"} relative flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
+      className={`mcl-monitor-shell fixed inset-0 overscroll-none ${ccol ? "mcl-monitor-shell-ccol" : "mcl-monitor-shell-mcl"} flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
       style={{
         backgroundImage: ccol
           ? "radial-gradient(circle at 82% 5%, rgba(14,165,233,.10), transparent 30%), radial-gradient(circle at 8% 92%, rgba(6,182,212,.06), transparent 34%), linear-gradient(145deg, #ffffff 0%, #f6f9fb 50%, #edf4f7 100%)"
@@ -327,7 +275,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         <div aria-hidden className="mcl-monitor-header-glint" />
         <div className="flex min-w-0 items-center gap-4">
           <div className={`mcl-monitor-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${ccol ? "border-sky-800/20 bg-sky-900 text-white" : "border-sky-400/20 bg-sky-400/10 text-sky-300"}`}>
-            <Monitor className="h-5 w-5" />
+            <BrandLogo className="h-8 w-8" tone={ccol ? "green" : "sky"} sizes="32px" />
           </div>
           <div className="min-w-0">
             <div className={`truncate text-[11px] font-bold uppercase tracking-[0.22em] ${ccol ? "text-sky-800" : "text-sky-300"}`}>MCL · Escalão / Grupamento Logístico</div>
@@ -343,7 +291,7 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
             className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${connectionState === "offline"
               ? (ccol ? "border-amber-300 bg-amber-50 text-amber-700" : "border-amber-400/20 bg-amber-400/10 text-amber-300")
               : (ccol ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300")}`}
-            title={connectionState === "offline" ? "Offline · exibindo último conteúdo local validado" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
+            title={connectionState === "offline" ? (Boolean(sag && rpn) || documentScenes.length > 0) ? "Sem conexão confirmada · último conteúdo local aprovado" : "Sem conexão confirmada · sem conteúdo local" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
             aria-label={connectionState === "offline" ? "Monitor offline" : "Monitor online"}
           >
             {connectionState === "offline" ? <WifiOff className="h-4 w-4" /> : <Wifi className={`h-4 w-4 ${connectionState === "syncing" ? "animate-pulse" : ""}`} />}
@@ -362,17 +310,15 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
 
       <section className="relative z-10 min-h-0 flex-1 overflow-hidden px-6 py-4">
         <div
-          className={`h-full w-full transition-[opacity,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-0 blur-[1.5px]" : "opacity-100 blur-0"}`}
+          className={`h-full w-full transition-[opacity,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-95 blur-0" : "opacity-100 blur-0"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
           <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
-              screenKey={activeItem.key}
+              documentMode={(activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
-              loopMode={effectiveLoop}
               paused={playbackState !== "playing"}
-              fitMode="contain"
-              onRequiredCycleMs={(requiredMs) => setScreenCycleMs((current) => Math.abs(current - requiredMs) > 250 ? requiredMs : current)}
+              onPageCount={onPageCount}
             >
               {screenContent}
             </MonitorViewport>
@@ -399,14 +345,10 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
         </div>
       ) : null}
 
-      <div className={`mcl-monitor-watermark pointer-events-none absolute bottom-5 right-6 z-30 flex min-w-[82px] flex-col items-center rounded-xl border px-3 py-2.5 text-center backdrop-blur-md ${ccol ? "border-slate-300/60 bg-white/50 text-slate-700 opacity-60" : "border-white/10 bg-slate-950/35 text-white opacity-52"}`}>
-        <BrandLogo className="h-11 w-11" tone={ccol ? "green" : "sky"} sizes="44px" />
-        <div className={`mt-1 text-[8px] font-black uppercase tracking-[0.16em] ${ccol ? "text-slate-600" : "text-sky-100"}`}>Continuidade</div>
-        <div className={`mt-0.5 text-[8px] font-black uppercase tracking-[0.22em] ${ccol ? "text-slate-500" : "text-sky-300"}`}>Logística</div>
-      </div>
+      <button type="button" className="mcl-monitor-footer-toggle absolute bottom-1 left-2 z-50 rounded bg-slate-800/80 p-2 text-white" aria-controls="monitor-technical-band" aria-expanded={drawerOpen} aria-label="Mostrar ou ocultar informações do monitor" onClick={() => setDrawerOpen((open) => !open)}><ChevronUp className="h-4 w-4" /></button>
+      <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50" data-open={drawerOpen} onKeyDown={(event) => { if (event.key === "Escape") setDrawerOpen(false); }}>
 
-      <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50">
-        <footer className={`mcl-monitor-footer relative flex h-10 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/92 text-slate-600" : "border-white/10 bg-slate-950/92 text-slate-400"}`}>
+        <footer id="monitor-technical-band" className={`mcl-monitor-footer relative flex h-10 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/92 text-slate-600" : "border-white/10 bg-slate-950/92 text-slate-400"}`}>
           <div className="flex min-w-0 items-center gap-4">
             <span className="flex min-w-0 items-center gap-1.5">
               <Database className="h-3.5 w-3.5 shrink-0" />
@@ -427,148 +369,13 @@ export function GrupamentoMonitorClient({ monitorId }: { monitorId: number }) {
           <div className="flex shrink-0 items-center gap-3">
             <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
             <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
-            <span>sync · 30s</span>
+            <span title={cacheIssue ?? undefined}>{cacheIssue ? "sincronização pendente" : "sync · 30s"}</span>
             <span>{connectionState === "offline" ? "cache local" : "online"}</span>
             <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
           </div>
         </footer>
       </div>
     </main>
-  );
-}
-
-function MonitorViewport({
-  children,
-  screenKey,
-  cycleSeconds,
-  loopMode,
-  paused,
-  fitMode,
-  onRequiredCycleMs,
-}: {
-  children: ReactNode;
-  screenKey: string;
-  cycleSeconds: number;
-  loopMode: boolean;
-  paused: boolean;
-  fitMode: "contain" | "scroll";
-  onRequiredCycleMs: (requiredMs: number) => void;
-}) {
-  const frameRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-  const [maxOffset, setMaxOffset] = useState(0);
-  const [offset, setOffset] = useState(0);
-
-  useEffect(() => {
-    const frame = frameRef.current;
-    const content = contentRef.current;
-    if (!frame || !content) return;
-
-    const measure = () => {
-      const frameWidth = frame.clientWidth;
-      const frameHeight = frame.clientHeight;
-      const contentWidth = content.scrollWidth;
-      const contentHeight = content.scrollHeight;
-      if (!frameWidth || !frameHeight || !contentWidth || !contentHeight) return;
-
-      const fitRatio = Math.min(frameWidth / contentWidth, frameHeight / contentHeight, 1);
-      const nextScale = fitMode === "contain" ? fitRatio : Math.max(MIN_KIOSK_SCALE, fitRatio);
-      const nextMaxOffset = fitMode === "contain" ? 0 : Math.max(0, contentHeight * nextScale - frameHeight);
-      const requiredCycleMs = fitMode === "contain"
-        ? Math.max(5, cycleSeconds) * 1000
-        : readableMonitorCycleMs(nextMaxOffset, cycleSeconds, screenKey);
-
-      setScale((current) => Math.abs(current - nextScale) > 0.005 ? nextScale : current);
-      setMaxOffset(nextMaxOffset);
-      setOffset(0);
-      onRequiredCycleMs(requiredCycleMs);
-    };
-
-    const frameId = window.requestAnimationFrame(measure);
-    const observer = new ResizeObserver(measure);
-    observer.observe(frame);
-    observer.observe(content);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      observer.disconnect();
-    };
-  }, [cycleSeconds, fitMode, onRequiredCycleMs, screenKey]);
-
-  useEffect(() => {
-    let animationFrame = 0;
-    if (fitMode === "contain") {
-      animationFrame = window.requestAnimationFrame(() => setOffset(0));
-      return () => window.cancelAnimationFrame(animationFrame);
-    }
-    if (paused) return;
-    if (maxOffset <= 2) {
-      animationFrame = window.requestAnimationFrame(() => setOffset(0));
-      return () => window.cancelAnimationFrame(animationFrame);
-    }
-
-
-    const startedAt = performance.now();
-    const pixelsPerSecond = screenKey === "pis"
-      ? CCO_PI_SCROLL_PX_PER_SECOND
-      : CCO_DEFAULT_SCROLL_PX_PER_SECOND;
-    const travelMs = Math.max(3_500, (maxOffset / pixelsPerSecond) * 1000);
-    const singleCycleMs = CCO_SCROLL_TOP_HOLD_MS + travelMs + CCO_SCROLL_BOTTOM_HOLD_MS + travelMs;
-
-    const animate = (time: number) => {
-      const elapsed = time - startedAt;
-      let nextOffset = 0;
-
-      if (loopMode) {
-        if (elapsed <= CCO_SCROLL_TOP_HOLD_MS) {
-          nextOffset = 0;
-        } else {
-          const progress = Math.min(1, (elapsed - CCO_SCROLL_TOP_HOLD_MS) / travelMs);
-          nextOffset = maxOffset * progress;
-        }
-      } else {
-        const phase = elapsed % singleCycleMs;
-        if (phase <= CCO_SCROLL_TOP_HOLD_MS) {
-          nextOffset = 0;
-        } else if (phase <= CCO_SCROLL_TOP_HOLD_MS + travelMs) {
-          nextOffset = maxOffset * ((phase - CCO_SCROLL_TOP_HOLD_MS) / travelMs);
-        } else if (phase <= CCO_SCROLL_TOP_HOLD_MS + travelMs + CCO_SCROLL_BOTTOM_HOLD_MS) {
-          nextOffset = maxOffset;
-        } else if (phase <= CCO_SCROLL_TOP_HOLD_MS + travelMs + CCO_SCROLL_BOTTOM_HOLD_MS + travelMs) {
-          const returnProgress = (phase - CCO_SCROLL_TOP_HOLD_MS - travelMs - CCO_SCROLL_BOTTOM_HOLD_MS) / travelMs;
-          nextOffset = maxOffset * (1 - returnProgress);
-        }
-      }
-
-      setOffset(nextOffset);
-      animationFrame = window.requestAnimationFrame(animate);
-    };
-
-    animationFrame = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(animationFrame);
-  }, [fitMode, maxOffset, loopMode, paused, screenKey]);
-
-  return (
-    <div ref={frameRef} className="h-full w-full overflow-hidden">
-      <div
-        className={fitMode === "contain" ? "h-full w-full will-change-transform" : "w-full will-change-transform"}
-        style={{
-          transform: `scale(${scale})`,
-          transformOrigin: "top center",
-        }}
-      >
-        <div
-          ref={contentRef}
-          className={fitMode === "contain" ? "h-full w-full will-change-transform" : "w-full will-change-transform"}
-          style={{
-            transform: `translate3d(0, -${scale > 0 ? offset / scale : 0}px, 0)`,
-          }}
-        >
-          {children}
-        </div>
-      </div>
-    </div>
   );
 }
 

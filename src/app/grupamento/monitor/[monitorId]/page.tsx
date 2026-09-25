@@ -18,5 +18,5 @@ export default async function GrupamentoMonitorPage({ params }: { params: Promis
   const monitorId = Number(monitorIdParam);
   if (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8) notFound();
 
-  return <GrupamentoMonitorClient monitorId={monitorId} />;
+  return <GrupamentoMonitorClient monitorId={monitorId} organizationId={session.user.organizationId ?? ""} />;
 }

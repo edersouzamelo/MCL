@@ -1,0 +1,39 @@
+name: monitor-display
+on:
+  push:
+    branches: [fix/monitor-resilient-display-20260925]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      AUTH_SECRET: local-monitor-regression-test-secret-20260925
+      NEXTAUTH_URL: http://127.0.0.1:3010
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Browser, viewport, cache and offline reload
+        run: |
+          mkdir -p test-results/monitor
+          pnpm start --hostname 127.0.0.1 -p 3010 > test-results/monitor/server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:3010/entrar > /dev/null; then break; fi
+            sleep 1
+          done
+          node --import tsx tests/monitor-browser/verify.ts | tee test-results/monitor/verification.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: monitor-browser-evidence
+          path: test-results/monitor

@@ -62,8 +62,9 @@ export function AnimatedPercent({
 }) {
   const display = useAnimatedValue(value, { duration, delay });
   return (
-    <span className={`mcl-animated-value tabular-nums ${className}`}>
-      {display.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+    <span className={`mcl-animated-value relative inline-grid tabular-nums ${className}`}>
+      <span className="invisible col-start-1 row-start-1" aria-hidden>{value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span>
+      <span className="col-start-1 row-start-1">{display.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</span>
     </span>
   );
 }
@@ -82,13 +83,11 @@ export function AnimatedCurrency({
   maximumFractionDigits?: number;
 }) {
   const display = useAnimatedValue(value, { duration, delay });
+  const format = (number: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits }).format(number);
   return (
-    <span className={`mcl-animated-value tabular-nums ${className}`}>
-      {new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-        maximumFractionDigits,
-      }).format(display)}
+    <span className={`mcl-animated-value relative inline-grid tabular-nums ${className}`}>
+      <span className="invisible col-start-1 row-start-1" aria-hidden>{format(value)}</span>
+      <span className="col-start-1 row-start-1">{format(display)}</span>
     </span>
   );
 }
