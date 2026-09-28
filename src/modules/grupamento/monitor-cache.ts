@@ -1,4 +1,5 @@
 import type { CcoMonitorConfig } from "./monitor";
+import { parseCcoMonitorConfig } from "./monitor";
 import type { SagImportResult } from "./sag";
 import type { RpnImportResult } from "./rpn";
 import type { MonitorDocumentSceneDto } from "./monitor-content/types";
@@ -58,11 +59,15 @@ export async function readMonitorSnapshot(organizationId: string, monitorId: num
 }
 
 export async function synchronizeMonitor(organizationId: string, monitor: CcoMonitorConfig, previous: MonitorSnapshot | null = null) {
-  const [financialResult, playlistResult] = await Promise.allSettled([
+  const [financialResult, playlistResult, configResult] = await Promise.allSettled([
     networkJson("/api/grupamento/sag/latest"),
     networkJson(`/api/grupamento/monitor-content/playlist?monitorId=${monitor.id}`),
+    networkJson("/api/grupamento/monitors"),
   ]);
   if (playlistResult.status === "rejected") throw playlistResult.reason;
+  if (configResult.status === "rejected") throw configResult.reason;
+  const sharedMonitor = parseCcoMonitorConfig(configResult.value?.monitors?.[monitor.id - 1], monitor.id);
+  if (!sharedMonitor) throw new Error("Configuração compartilhada do monitor inválida.");
   const playlist = playlistResult.value;
   if (financialResult.status === "rejected" && !previous) throw financialResult.reason;
   const financial = financialResult.status === "fulfilled" ? financialResult.value : { current: previous?.sag, rpn: previous?.rpn };
@@ -92,7 +97,7 @@ export async function synchronizeMonitor(organizationId: string, monitor: CcoMon
     scenes = scenes.filter((scene) => cachedIds.has(scene.id));
     assets = sceneAssetUrls(scenes);
   }
-  const data = { organizationId, monitorId: monitor.id, monitor, sag: financial.current, rpn: financial.rpn, scenes, assets };
+  const data = { organizationId, monitorId: monitor.id, monitor: sharedMonitor, sag: financial.current, rpn: financial.rpn, scenes, assets };
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(data)));
   const version = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
   const snapshot: MonitorSnapshot = { ...data, schemaVersion: 4, version, savedAt: new Date().toISOString() };

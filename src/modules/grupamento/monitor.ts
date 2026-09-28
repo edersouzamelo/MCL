@@ -4,7 +4,6 @@ export const GROUP_STORAGE_KEYS = {
   sag: "mcl:grupamento:sag:v1",
   rpn: "mcl:grupamento:rpn:v1",
   rules: "mcl:grupamento:rules:v1",
-  monitors: "mcl:grupamento:monitors:v2",
 } as const;
 
 export const CCO_DEFAULT_LOOP_DELAY_SECONDS = 10;
@@ -79,4 +78,21 @@ export function defaultCcoMonitorConfig(): CcoMonitorConfig[] {
     delaySeconds: CCO_DEFAULT_LOOP_DELAY_SECONDS,
     layout: layout ?? "mcl",
   }));
+}
+
+export function parseCcoMonitorConfig(value: unknown, monitorId: number): CcoMonitorConfig | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const item = value as Record<string, unknown>;
+  const validScreens = new Set<string>(CCO_SCREEN_CATALOG.map((screen) => screen.id));
+  if (item.id !== monitorId || typeof item.label !== "string" || !item.label.trim() || item.label.length > 100 ||
+      typeof item.enabled !== "boolean" || (item.mode !== "single" && item.mode !== "loop") ||
+      !Array.isArray(item.screens) || !item.screens.length || item.screens.length > validScreens.size ||
+      item.screens.some((screen) => typeof screen !== "string" || !validScreens.has(screen)) ||
+      new Set(item.screens).size !== item.screens.length ||
+      !Number.isInteger(item.delaySeconds) || (item.delaySeconds as number) < 5 || (item.delaySeconds as number) > 300 ||
+      (item.layout !== "mcl" && item.layout !== "ccol")) return null;
+  return {
+    id: monitorId, label: item.label.trim(), enabled: item.enabled, mode: item.mode,
+    screens: item.screens as CcoScreenId[], delaySeconds: item.delaySeconds as number, layout: item.layout,
+  };
 }

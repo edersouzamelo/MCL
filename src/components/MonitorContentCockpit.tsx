@@ -45,16 +45,23 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const response = await fetch(`/api/grupamento/monitor-content?monitorId=${monitorId}`, { cache: "no-store" });
-    if (!response.ok) return;
-    const payload = await response.json();
-    setImports(payload.imports ?? []);
+    try {
+      const response = await fetch(`/api/grupamento/monitor-content?monitorId=${monitorId}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao consultar os documentos.");
+      setImports(payload.imports ?? []);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Falha ao consultar os documentos.");
+    }
   }, [monitorId]);
 
   useEffect(() => {
     if (!open) return;
     const frame = window.requestAnimationFrame(() => { void refresh(); });
-    return () => window.cancelAnimationFrame(frame);
+    const poll = window.setInterval(() => { void refresh(); }, 10_000);
+    const focus = () => { void refresh(); };
+    window.addEventListener("focus", focus);
+    return () => { window.cancelAnimationFrame(frame); window.clearInterval(poll); window.removeEventListener("focus", focus); };
   }, [open, refresh]);
 
   async function upload(file: File) {

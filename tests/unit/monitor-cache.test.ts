@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readMonitorSnapshot, sceneAssetUrls, synchronizeMonitor, validatePlaylist } from "@/modules/grupamento/monitor-cache";
-import { defaultCcoMonitorConfig } from "@/modules/grupamento/monitor";
+import { defaultCcoMonitorConfig, parseCcoMonitorConfig } from "@/modules/grupamento/monitor";
 import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 
 const scene: MonitorDocumentSceneDto = { id: "test-scene", monitorId: 1, importId: "test-import", sceneOrder: 0, sceneType: "FIGURE", title: "FIXTURE DE TESTE", payload: { assetIds: ["test-image"] }, sourcePage: 1, sourceFileName: "fixture.pptx", sourceImportedAt: "2026-09-25", approvedAt: "2026-09-25" };
@@ -21,12 +21,18 @@ beforeEach(() => {
     if (url.includes("/assets/")) return new Response("test image bytes", { status: failAsset ? 503 : 200, headers: { "Content-Type": "image/png" } });
     if (failApi) return new Response("unavailable", { status: 503 });
     if (failSag && url.includes("sag/latest")) return new Response("unavailable", { status: 503 });
-    return Response.json(url.includes("playlist") ? { scenes } : { current: null, rpn: null });
+    return Response.json(url.includes("playlist") ? { scenes } : url.includes("/monitors") ? { monitors: defaultCcoMonitorConfig() } : { current: null, rpn: null });
   }));
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe("atomic monitor cache", () => {
+  it("validates shared monitor identity and selected screens", () => {
+    const config = { ...defaultCcoMonitorConfig()[5], screens: ["pis", "rpn"], delaySeconds: 15 };
+    expect(parseCcoMonitorConfig(config, 6)).toEqual(config);
+    expect(parseCcoMonitorConfig(config, 7)).toBeNull();
+    expect(parseCcoMonitorConfig({ ...config, screens: ["pis", "pis"] }, 6)).toBeNull();
+  });
   it("stores versioned approved payloads and isolates organizations", async () => {
     const snapshot = await synchronizeMonitor("org-a", monitor);
     expect(snapshot.version).toHaveLength(64);
@@ -54,6 +60,11 @@ describe("atomic monitor cache", () => {
     const updated = await synchronizeMonitor("org-a", monitor, old);
     expect(updated.scenes).toEqual([]);
     expect((await readMonitorSnapshot("org-a", 1))?.scenes).toEqual([]);
+  });
+  it("uses the shared server monitor configuration instead of the local argument", async () => {
+    const local = { ...monitor, screens: ["overview"] as typeof monitor.screens };
+    const updated = await synchronizeMonitor("org-a", local);
+    expect(updated.monitor.screens).toEqual(monitor.screens);
   });
   it("commits revocation when an unrelated new scene asset fails", async () => {
     const old = await synchronizeMonitor("org-a", monitor);
