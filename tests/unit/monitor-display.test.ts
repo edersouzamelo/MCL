@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { storedZip } from "../../src/modules/grupamento/monitor-content/extract.test";
 import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
 import { paginateMonitor } from "@/modules/grupamento/monitor-pagination";
-import { barSegments, chartDomain, chartTicks, chartValueLabel } from "@/modules/grupamento/monitor-content/chart-geometry";
+import { barSegments, chartDomain, chartTicks, chartValueLabel, isDateFormat } from "@/modules/grupamento/monitor-content/chart-geometry";
 import type { MonitorDocumentChart } from "@/modules/grupamento/monitor-content/types";
 
 const chart: MonitorDocumentChart = { type: "bar", grouping: "stacked", series: [
@@ -68,5 +68,25 @@ describe("PPTX semantic payload v3", () => {
     if (graph?.kind !== "chart") return;
     expect(graph.chart).toMatchObject({ semanticVersion: 3, orientation: "horizontal", grouping: "stacked", xAxisTitle: "Período", majorUnit: 20, showGridlines: true, gridlineColor: "#888888", legendPosition: "bottom", categoryReverse: true });
     expect(graph.chart.series[0]).toMatchObject({ values: [10, 0, 30], categories: ["Jan", "Fev", "Mar"], missingValueIndices: [1], pointColors: [null, null, "#FF0000"], color: "#008000" });
+  });
+});
+
+
+describe("axis format regression: Reserva Regional", () => {
+  const format = String.raw`"R$"\ #,##0.00_);[Red]\("R$"\ #,##0.00\)`;
+  it("does not interpret an Excel color as a date or compress currency ticks near the origin", () => {
+    expect(isDateFormat(format)).toBe(false);
+    expect(chartTicks({ ...chart, valueFormat: format }, 50000, 310000)).toEqual([50000, 102000, 154000, 206000, 258000, 310000]);
+    expect(chartValueLabel(306805.06, format)).toBe("R$ 306.805,06");
+    expect(chartValueLabel(-106000, format)).toBe("(R$ 106.000,00)");
+  });
+  it("preserves units, decimal precision, percentages and literal date-like letters", () => {
+    expect(chartValueLabel(1500.5, '0.00 "kg"')).toBe("1500,50 kg");
+    expect(chartValueLabel(.125, "0.00%")).toBe("12,50%");
+    expect(isDateFormat('0 "days"')).toBe(false);
+    expect(isDateFormat(String.raw`0\d`)).toBe(false);
+    expect(isDateFormat("[Red]0.00")).toBe(false);
+    expect(isDateFormat("dd/mm/yyyy")).toBe(true);
+    expect(chartValueLabel(46200, "dd/mm/yyyy")).toBe("27/06/2026");
   });
 });

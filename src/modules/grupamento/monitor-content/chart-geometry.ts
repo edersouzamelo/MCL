@@ -30,13 +30,46 @@ export function chartDomain(chart: MonitorDocumentChart) {
   const max = chart.axisMax ?? Math.max(chart.grouping === "percentStacked" ? 1 : 0, ...points.map((p) => p.end), 0);
   return { min, max: max > min ? max : min + 1 };
 }
+// Excel colors, conditions, locale tags and literal units are not date tokens.
+export function isDateFormat(format?: string) {
+  const tokens = (format ?? "").replace(/"[^"]*"|\\.|\[[^\]]*\]|[_*]./g, "");
+  return /[dy]|m{2,}/i.test(tokens);
+}
 export function chartValueLabel(value: number, format?: string, percent = false) {
-  if (format && /[dy]/i.test(format.replace(/"[^"]*"/g, "")) && value > 20000) {
+  if (isDateFormat(format)) {
     const date = new Date(Date.UTC(1899, 11, 30) + value * 86400000);
-    return new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit", timeZone: "UTC" }).format(date).replace(".", "");
+    const pattern = (format ?? "").split(";")[0].replace(/\[[^\]]*\]/g, "");
+    return pattern.replace(/"([^"]*)"|\\(.)|yyyy|yy|mmmm|mmm|mm|m|dd|d/gi, (token, literal, escaped) => {
+      if (literal !== undefined || escaped !== undefined) return literal ?? escaped;
+      switch (token.toLowerCase()) {
+        case "yyyy": return String(date.getUTCFullYear());
+        case "yy": return String(date.getUTCFullYear()).slice(-2);
+        case "mmmm": case "mmm": return new Intl.DateTimeFormat("pt-BR", { month: token.length === 4 ? "long" : "short", timeZone: "UTC" }).format(date).replace(".", "");
+        case "mm": return String(date.getUTCMonth() + 1).padStart(2, "0");
+        case "m": return String(date.getUTCMonth() + 1);
+        case "dd": return String(date.getUTCDate()).padStart(2, "0");
+        default: return String(date.getUTCDate());
+      }
+    });
   }
-  if (percent || format?.includes("%")) return (value * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
-  return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  const sections = (format ?? "").match(/(?:"[^"]*"|\\.|[^;])+/g) ?? [];
+  const section = sections[value < 0 && sections[1] ? 1 : value === 0 && sections[2] ? 2 : 0] ?? "";
+  const cleaned = section.replace(/\[\$([^\]-]*)[^\]]*\]/g, '$1').replace(/\[[^\]]*\]|[_*]./g, "");
+  const tokens: string[] = cleaned.match(/"[^"]*"|\\.|[0#?]+(?:,[0#?]+)*(?:\.[0#?]+)?(?:[eE][+-]0+)?,*|./g) ?? [];
+  const numericIndex = tokens.findIndex((t) => /^[0#?]/.test(t));
+  const numeric = tokens[numericIndex] ?? "";
+  const activePercent = percent || tokens.includes("%");
+  const decimals = numeric.match(/\.([0#?]+)/)?.[1];
+  const scale = 1000 ** (numeric.match(/,+$/)?.[0].length ?? 0);
+  const amount = (value < 0 && sections[1] ? -value : value) * (activePercent ? 100 : 1) / scale;
+  const number = amount.toLocaleString("pt-BR", {
+    minimumFractionDigits: decimals?.replace(/[^0]/g, "").length ?? 0,
+    maximumFractionDigits: decimals?.length ?? (numeric ? 0 : 2),
+    useGrouping: numeric ? numeric.replace(/,+$/, "").includes(",") : true,
+    notation: /[eE][+-]/.test(numeric) ? "scientific" : "standard",
+  });
+  if (numericIndex < 0) return number + (activePercent ? "%" : "");
+  return tokens.map((token, index) => index === numericIndex ? number : token.startsWith('"') ? token.slice(1, -1) : token.startsWith("\\") ? token.slice(1) : token).join("").trim() + (percent && !tokens.includes("%") ? "%" : "");
 }
 export function chartTicks(chart: MonitorDocumentChart, min: number, max: number) {
   if (chart.valueAxisTicks?.length) return chart.valueAxisTicks.filter((v) => Number.isFinite(v) && v >= min && v <= max);
@@ -45,7 +78,7 @@ export function chartTicks(chart: MonitorDocumentChart, min: number, max: number
     for (let n = 0; n <= 60 && min + n * chart.majorUnit <= max; n++) ticks.push(min + n * chart.majorUnit);
     return ticks;
   }
-  if (chart.valueFormat && /[dy]/i.test(chart.valueFormat) && min > 20000) {
+  if (isDateFormat(chart.valueFormat) && min > 20000) {
     const epoch = Date.UTC(1899, 11, 30);
     const start = new Date(epoch + min * 86400000);
     const ticks: number[] = [];
