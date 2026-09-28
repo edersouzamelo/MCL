@@ -7,6 +7,7 @@ export type MonitorDocumentSeries = {
   color?: string;
   pointColors?: Array<string | null>;
   missingValueIndices?: number[];
+  dataLabels?: Array<string | null>;
 };
 
 export type MonitorDocumentChart = {

@@ -90,3 +90,22 @@ describe("axis format regression: Reserva Regional", () => {
     expect(chartValueLabel(46200, "dd/mm/yyyy")).toBe("27/06/2026");
   });
 });
+
+
+describe("PPTX data labels", () => {
+  it("extracts explicit labels by point and inherits automatic labels without inventing hidden labels", () => {
+    const xml = `<c:chart><c:plotArea><c:barChart><c:barDir val="bar"/><c:ser>
+      <c:cat><c:strCache><c:pt idx="0"><c:v>A</c:v></c:pt><c:pt idx="1"><c:v>B</c:v></c:pt><c:pt idx="2"><c:v>C</c:v></c:pt></c:strCache></c:cat>
+      <c:val><c:numCache><c:formatCode>0.0</c:formatCode><c:pt idx="0"><c:v>7.1</c:v></c:pt><c:pt idx="1"><c:v>306805.06</c:v></c:pt><c:pt idx="2"><c:v>34.6</c:v></c:pt></c:numCache></c:val>
+      <c:dLbls><c:dLbl><c:idx val="1"/><c:tx><c:rich><a:p><a:r><a:t>R$ 306.805,06 - 39%</a:t></a:r></a:p></c:rich></c:tx></c:dLbl>
+      <c:dLbl><c:idx val="2"/><c:delete val="1"/></c:dLbl><c:showVal val="1"/></c:dLbls>
+      </c:ser><c:dLbls><c:showVal val="0"/></c:dLbls></c:barChart></c:plotArea></c:chart>`;
+    const result = extractPptxLayout(storedZip([
+      { name: "ppt/slides/slide1.xml", data: Buffer.from('<p:sld><p:graphicFrame><p:xfrm><a:off x="0" y="0"/><a:ext cx="12192000" cy="6858000"/></p:xfrm><c:chart r:id="rId1"/></p:graphicFrame></p:sld>') },
+      { name: "ppt/slides/_rels/slide1.xml.rels", data: Buffer.from('<Relationships><Relationship Id="rId1" Type="chart" Target="../charts/chart1.xml"/></Relationships>') },
+      { name: "ppt/charts/chart1.xml", data: Buffer.from(xml) },
+    ]));
+    const graph = result.scenes[0].payload.layout!.elements.find(e => e.kind === 'chart');
+    expect(graph?.kind === 'chart' && graph.chart.series[0].dataLabels).toEqual(['7,1', 'R$ 306.805,06 - 39%', null]);
+  });
+});
