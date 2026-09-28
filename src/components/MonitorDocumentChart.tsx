@@ -26,8 +26,33 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   const label = (value: number) => chartValueLabel(value, chart.valueFormat, chart.grouping === "percentStacked");
   const xTitle = chart.xAxisTitle;
   const yTitle = chart.yAxisTitle;
-  const margin = { left: (horizontal ? Math.min(size.width * .23, 180) : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: 12, right: 24, bottom: font * (xTitle ? 5 : 3.2) };
+  const categoryLabels = Array.from({ length: count }, (_, i) => chart.categoryFormat && categories[i]?.trim() && Number.isFinite(Number(categories[i])) ? chartValueLabel(Number(categories[i]), chart.categoryFormat) : categories[i] ?? "");
+  const categoryWidth = Math.min(size.width * .38, Math.max(80, ...categoryLabels.map((text) => text.length * font * .58)));
+  const margin = { left: (horizontal ? categoryWidth + 16 : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
   const width = Math.max(1, size.width - margin.left - margin.right);
+  const wrap = (text: string, available: number) => {
+    const limit = Math.max(1, Math.floor(available / (font * .58)));
+    const lines: string[] = [];
+    for (const word of text.split(/\s+/)) {
+      if (lines.length && lines[lines.length - 1].length + word.length + 1 <= limit) lines[lines.length - 1] += " " + word;
+      else {
+        for (let start = 0; start < word.length; start += limit) lines.push(word.slice(start, start + limit));
+      }
+    }
+    return lines.length ? lines : [""];
+  };
+  const categoryLines = categoryLabels.map((text) => wrap(text, horizontal ? categoryWidth : width / count - 12));
+  // Keep every tick at its true coordinate; stagger labels when space is scarce.
+  const tickLanes: number[] = [];
+  const laneEnds: number[] = [];
+  ticks.map((tick, index) => ({ index, center: (chart.valueReverse ? 1 - (tick - min) / (max - min) : (tick - min) / (max - min)) * width, half: label(tick).length * font * .29 }))
+    .sort((a, b) => a.center - b.center).forEach(({ index, center, half }) => {
+      let lane = laneEnds.findIndex((end) => end + 12 <= center - half);
+      if (lane < 0) lane = laneEnds.length;
+      laneEnds[lane] = center + half;
+      tickLanes[index] = lane;
+    });
+  margin.bottom = font * (2 + (horizontal ? Math.max(1, laneEnds.length) : Math.max(1, ...categoryLines.map((lines) => lines.length))) * 1.3) + (xTitle ? font * 2 : 0);
   const height = Math.max(1, size.height - margin.top - margin.bottom);
   const ratio = (value: number) => chart.valueReverse ? 1 - (value - min) / (max - min) : (value - min) / (max - min);
   const val = (value: number) => horizontal ? margin.left + ratio(value) * width : margin.top + (1 - ratio(value)) * height;
@@ -48,9 +73,9 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
         <defs><clipPath id={clipId}><rect x={margin.left} y={margin.top} width={width} height={height} /></clipPath></defs>
         {ticks.map((tick, i) => <g key={i} data-value-tick={tick}>
           {chart.showGridlines !== false && <line x1={horizontal ? val(tick) : margin.left} x2={horizontal ? val(tick) : margin.left + width} y1={horizontal ? margin.top : val(tick)} y2={horizontal ? margin.top + height : val(tick)} stroke={grid} strokeWidth="1" />}
-          <text fill="currentColor" x={horizontal ? val(tick) : margin.left - 8} y={horizontal ? margin.top + height + font * 1.4 : val(tick) + font * .3} textAnchor={horizontal ? "middle" : "end"} fontSize={font * .85}>{label(tick)}</text>
+          <text fill="currentColor" x={horizontal ? val(tick) : margin.left - 8} y={horizontal ? margin.top + height + font * (1.4 + tickLanes[i] * 1.3) : val(tick) + font * .3} textAnchor={horizontal ? "middle" : "end"} fontSize={font * .85}>{label(tick)}</text>
         </g>)}
-        {Array.from({ length: count }, (_, i) => <text key={i} fill="currentColor" x={horizontal ? margin.left - 8 : cat(i)} y={horizontal ? cat(i) + font * .3 : margin.top + height + font * 1.4} textAnchor={horizontal ? "end" : "middle"} fontSize={font * .9} data-category-label>{chart.categoryFormat && Number.isFinite(Number(categories[i])) ? chartValueLabel(Number(categories[i]), chart.categoryFormat) : categories[i] ?? ""}</text>)}
+        {Array.from({ length: count }, (_, i) => <text key={i} fill="currentColor" x={horizontal ? margin.left - 8 : cat(i)} y={horizontal ? cat(i) + font * .3 : margin.top + height + font * 1.4} textAnchor={horizontal ? "end" : "middle"} fontSize={font * .9} data-category-label>{categoryLines[i].map((line, lineIndex) => <tspan key={lineIndex} x={horizontal ? margin.left - 8 : cat(i)} dy={lineIndex === 0 ? horizontal ? -(categoryLines[i].length - 1) * font * .6 : 0 : font * 1.2}>{line}</tspan>)}</text>)}
         <g clipPath={`url(#${clipId})`}>
           {chart.type === "bar" ? Array.from({ length: count }, (_, index) => {
             const overlap = !isStacked(chart) && (chart.overlap ?? 0) >= 90;
