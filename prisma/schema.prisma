@@ -130,6 +130,7 @@ model Organization {
   procurementInstruments ProcurementInstrument[]
   financialSourceImports FinancialSourceImport[]
   monitorContentImports  MonitorContentImport[]
+  ccoMonitorConfigurations CcoMonitorConfiguration[]
   pcaItems               PcaItem[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -245,6 +246,17 @@ model MonitorContentImport {
 
   @@unique([organizationId, monitorId, checksum])
   @@index([organizationId, monitorId, status, importedAt])
+}
+
+model CcoMonitorConfiguration {
+  organizationId String
+  monitorId      Int
+  configuration  Json
+  updatedBy      String
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, monitorId])
 }
 
 model MonitorContentScene {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   BookOpen,
@@ -25,6 +25,7 @@ import {
   CCO_SCREEN_CATALOG,
   GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
+  parseCcoMonitorConfig,
   type CcoMonitorConfig,
   type CcoScreenId,
 } from "@/modules/grupamento/monitor";
@@ -85,6 +86,11 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
   const [currentFiles, setCurrentFiles] = useState<Record<SagPiFamily, File | null>>(() => emptyFamilyFiles());
   const [rpnFiles, setRpnFiles] = useState<Record<SagPiFamily, File | null>>(() => emptyFamilyFiles());
   const [monitors, setMonitors] = useState<CcoMonitorConfig[]>(defaultCcoMonitorConfig());
+  const [monitorsReady, setMonitorsReady] = useState(false);
+  const [monitorError, setMonitorError] = useState("");
+  const monitorsRef = useRef(monitors);
+  const writeQueue = useRef<Record<number, Promise<void>>>({});
+  const pendingWrites = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [recovering, setRecovering] = useState(false);
@@ -95,14 +101,6 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
   useEffect(() => {
     let cancelled = false;
     const frame = window.requestAnimationFrame(async () => {
-      const storedMonitors = readStored<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors);
-      if (storedMonitors?.length === 8) {
-        setMonitors(storedMonitors.map((item) => ({
-          ...item,
-          layout: item.layout ?? "mcl",
-          delaySeconds: item.delaySeconds === 15 ? CCO_DEFAULT_LOOP_DELAY_SECONDS : item.delaySeconds,
-        })));
-      }
       try {
         const response = await fetch("/api/grupamento/sag/latest", { cache: "no-store" });
         const payload = await response.json();
@@ -121,10 +119,33 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
     };
   }, []);
 
+  const refreshMonitors = useCallback(async () => {
+    if (pendingWrites.current) return;
+    try {
+      const response = await fetch("/api/grupamento/monitors", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao sincronizar os monitores.");
+      const next = payload.monitors as unknown[];
+      if (!Array.isArray(next) || next.length !== 8) throw new Error("Configuração dos monitores incompleta.");
+      const parsed = next.map((item, index) => parseCcoMonitorConfig(item, index + 1));
+      if (parsed.some((item) => !item)) throw new Error("Configuração dos monitores inválida.");
+      if (pendingWrites.current) return;
+      monitorsRef.current = parsed as CcoMonitorConfig[];
+      setMonitors(monitorsRef.current);
+      setMonitorsReady(true);
+      setMonitorError("");
+    } catch (cause) {
+      setMonitorError(cause instanceof Error ? cause.message : "Falha ao sincronizar os monitores.");
+    }
+  }, []);
+
   useEffect(() => {
-    window.localStorage.setItem(GROUP_STORAGE_KEYS.monitors, JSON.stringify(monitors));
-    window.dispatchEvent(new CustomEvent("mcl-grupamento-monitors-updated"));
-  }, [monitors]);
+    const frame = window.requestAnimationFrame(() => { void refreshMonitors(); });
+    const poll = window.setInterval(() => { void refreshMonitors(); }, 10_000);
+    const onFocus = () => { void refreshMonitors(); };
+    window.addEventListener("focus", onFocus);
+    return () => { window.cancelAnimationFrame(frame); window.clearInterval(poll); window.removeEventListener("focus", onFocus); };
+  }, [refreshMonitors]);
 
   const sourceCount = Number(Boolean(sag)) + Number(Boolean(rpn));
   const validRows = (sag?.rows.length ?? 0) + (rpn?.rows.length ?? 0);
@@ -260,12 +281,31 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
     }
   }
 
+  function commitMonitor(id: number, next: CcoMonitorConfig[]) {
+    monitorsRef.current = next;
+    setMonitors(next);
+    const config = next[id - 1];
+    pendingWrites.current += 1;
+    const task = (writeQueue.current[id] ?? Promise.resolve()).catch(() => undefined).then(async () => {
+      const response = await fetch(`/api/grupamento/monitors/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao salvar a configuração.");
+      window.dispatchEvent(new CustomEvent("mcl-grupamento-monitors-updated"));
+    }).catch((cause) => {
+      setMonitorError(cause instanceof Error ? cause.message : "Falha ao salvar a configuração.");
+      void refreshMonitors();
+    }).finally(() => { pendingWrites.current -= 1; if (!pendingWrites.current) void refreshMonitors(); });
+    writeQueue.current[id] = task;
+  }
+
   function updateMonitor(id: number, patch: Partial<CcoMonitorConfig>) {
-    setMonitors((current) => current.map((monitor) => (monitor.id === id ? { ...monitor, ...patch } : monitor)));
+    commitMonitor(id, monitorsRef.current.map((monitor) => monitor.id === id ? { ...monitor, ...patch } : monitor));
   }
 
   function toggleScreen(id: number, screen: CcoScreenId) {
-    setMonitors((current) => current.map((monitor) => {
+    commitMonitor(id, monitorsRef.current.map((monitor) => {
       if (monitor.id !== id) return monitor;
       const exists = monitor.screens.includes(screen);
       const screens = exists ? monitor.screens.filter((item) => item !== screen) : [...monitor.screens, screen];
@@ -273,9 +313,20 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
     }));
   }
 
-  function resetMonitors() {
-    setMonitors(defaultCcoMonitorConfig());
-    setNotice("Configuração dos 8 monitores restaurada para o padrão do CCOL.");
+  async function resetMonitors() {
+    await Promise.all(Object.values(writeQueue.current));
+    try {
+      const response = await fetch("/api/grupamento/monitors", { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao restaurar monitores.");
+      monitorsRef.current = payload.monitors;
+      setMonitors(payload.monitors);
+      setNotice("Configuração dos 8 monitores restaurada para o padrão do CCOL.");
+      setMonitorError("");
+      window.dispatchEvent(new CustomEvent("mcl-grupamento-monitors-updated"));
+    } catch (cause) {
+      setMonitorError(cause instanceof Error ? cause.message : "Falha ao restaurar monitores.");
+    }
   }
 
   return (
@@ -442,10 +493,12 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><div className="flex items-center gap-2 text-sm font-bold"><MonitorCog className="h-4 w-4" /> Matriz de distribuição — 8 monitores</div><p className="mt-1 text-xs text-zinc-500">Cada saída escolhe telas, loop, intervalo e layout MCL ou padrão CCOL.</p></div>
-          <button type="button" onClick={resetMonitors} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900">Restaurar padrão</button>
+          <button type="button" disabled={!monitorsReady} onClick={() => void resetMonitors()} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-900">Restaurar padrão</button>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+        {!monitorsReady ? <p className="mt-3 text-xs text-zinc-500">Sincronizando a configuração compartilhada dos monitores…</p> : null}
+        {monitorError ? <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300">{monitorError}</p> : null}
+        <div className={`mt-5 grid gap-4 xl:grid-cols-2 ${!monitorsReady ? "pointer-events-none opacity-50" : ""}`}>
           {monitors.map((monitor) => (
             <article key={monitor.id} className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
               <div className="flex items-start justify-between gap-4">

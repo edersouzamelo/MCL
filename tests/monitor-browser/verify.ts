@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { mkdir } from "node:fs/promises";
 import { parseSagWorkbook } from "../../src/modules/grupamento/sag";
 import { parseRpnWorkbook } from "../../src/modules/grupamento/rpn";
-import { defaultCcoMonitorConfig, GROUP_STORAGE_KEYS, CCO_SCREEN_CATALOG } from "../../src/modules/grupamento/monitor";
+import { defaultCcoMonitorConfig, CCO_SCREEN_CATALOG } from "../../src/modules/grupamento/monitor";
 
 const origin = "http://127.0.0.1:3010";
 const secret = "local-monitor-regression-test-secret-20260925";
@@ -18,6 +18,7 @@ const sag = parseSagWorkbook(workbook(["UG", "NOME_UG", "PI", "NOME_PI", "DISPON
 const rpn = parseRpnWorkbook(workbook(["UG", "NOME_UG", "PI", "NOME_PI", "TOTAL_A_LIQUIDAR", "TOTAL_LIQUIDADO", "CANC"], rows.map((r) => r.slice(0, 7))), "FIXTURE_RPN_TESTE.xlsx");
 let revision = 1;
 let failAsset = false;
+let sharedConfigs = defaultCcoMonitorConfig().map((c) => c.id === 1 ? { ...c, label: "MONITOR · DADOS DE TESTE", screens: CCO_SCREEN_CATALOG.map((s) => s.id), delaySeconds: 5 } : c);
 const chart = { type: "bar", orientation: "vertical", grouping: "stacked", semanticVersion: 3, legendPosition: "bottom", xAxisTitle: "Período", yAxisTitle: "Quantidade", showGridlines: true, majorUnit: 20,
   series: [ { name: "Estoque OP", categories: ["Jan/26", "Fev/26", "Mar/26"], values: [10, 20, 30], color: "#008000" }, { name: "Estoque OM", categories: ["Jan/26", "Fev/26", "Mar/26"], values: [20, 40, 30], color: "#4f81bd" }, { name: "A receber", categories: ["Jan/26", "Fev/26", "Mar/26"], values: [30, 60, 10], color: "#eab308" } ] };
 function scenes() { return [{ id: "test-scene", monitorId: 1, importId: "fixture", sceneOrder: 0, sceneType: "TEXT", title: "TESTE · Duração dos Estoques de QS", sourceFileName: "FIXTURE_QS.pptx", sourcePage: 1, sourceImportedAt: "2026-09-25", approvedAt: "2026-09-25", payload: { layoutVersion: 2, layout: { version: 2, width: 12192000, height: 6858000, elements: [
@@ -35,13 +36,17 @@ const errors: string[] = [];
 page.on("pageerror", (error) => errors.push(error.message));
 await context.route("**/api/grupamento/sag/latest", (route) => route.fulfill({ json: { current: sag, rpn } }));
 await context.route("**/api/grupamento/monitor-content/playlist?*", (route) => route.fulfill({ json: { scenes: scenes() } }));
+await context.route("**/api/grupamento/monitors", (route) => route.fulfill({ json: { monitors: sharedConfigs } }));
 await context.route("**/api/grupamento/monitor-content/assets/fixture-*", (route) => route.fulfill({ status: failAsset ? 503 : 200, contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4xkAAAAASUVORK5CYII=", "base64") }));
-await page.addInitScript(({ key, configs }) => localStorage.setItem(key, JSON.stringify(configs)), { key: GROUP_STORAGE_KEYS.monitors, configs: defaultCcoMonitorConfig().map((c) => c.id === 1 ? { ...c, label: "MONITOR · DADOS DE TESTE", screens: CCO_SCREEN_CATALOG.map((s) => s.id), delaySeconds: 5 } : c) });
 await mkdir("test-results/monitor", { recursive: true });
 await page.goto(origin + "/grupamento/monitor/1");
 await expect(page.locator(".mcl-monitor-shell")).toBeVisible();
 await page.waitForFunction(async () => (await caches.keys()).includes("mcl-monitor-navigation-v4") && (await (await caches.open("mcl-monitor-navigation-v4")).keys()).length > 0);
 await expect(page.locator("header")).toContainText("DADOS DE TESTE");
+sharedConfigs = sharedConfigs.map((config) => config.id === 1 ? { ...config, delaySeconds: 7 } : config);
+await page.evaluate(() => dispatchEvent(new Event("mcl-grupamento-monitors-updated")));
+await expect.poll(async () => (await page.evaluate(async () => (await (await (await caches.open("mcl-monitor-snapshots-v4")).match("/grupamento/monitor/1/local-snapshot?organization=fixture-org"))!.json()).monitor.delaySeconds))).toBe(7);
+console.log("PASS: shared server configuration reaches an already open monitor");
 console.log("PASS: production-built route, hydration, snapshot and navigation cache");
 await page.getByLabel("Pausar apresentação").click();
 for (const resolution of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {

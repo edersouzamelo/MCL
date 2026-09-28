@@ -17,7 +17,6 @@ import {
   CCO_PI_ROWS_PER_PAGE,
   CCO_SCREEN_CATALOG,
   CCO_UNIT_ROWS_PER_PAGE,
-  GROUP_STORAGE_KEYS,
   defaultCcoMonitorConfig,
   type CcoMonitorConfig,
   type CcoScreenId,
@@ -25,15 +24,6 @@ import {
 
 const SCREEN_FADE_MS = 320;
 const DATA_REFRESH_MS = 30_000;
-
-function load<T>(key: string): T | null {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
 
 function pageSizeForScreen(screen: CcoScreenId) {
   if (screen === "pis") return CCO_PI_ROWS_PER_PAGE;
@@ -45,7 +35,6 @@ function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
   return {
     ...item,
     layout: item.layout ?? "mcl",
-    delaySeconds: item.delaySeconds === 15 ? CCO_DEFAULT_LOOP_DELAY_SECONDS : item.delaySeconds,
   };
 }
 
@@ -95,7 +84,6 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
           if (cached) { selected = cached.monitor; applySnapshot(cached); }
           hydrated = true;
         }
-        selected = normalizeMonitor(load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors)?.find((item) => item.id === monitorId) ?? selected);
         if (!navigator.onLine) { setConnectionState("offline"); return; }
         // A revoked scene must disappear even when playback is paused.
         const snapshot = await synchronizeMonitor(organizationId, selected, lastSnapshot.current);
@@ -104,7 +92,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
         setConnectionState("online");
         const approvedIds = new Set(snapshot.scenes.map((scene) => scene.id));
         const revoked = activeSceneIds.current.some((id) => !approvedIds.has(id));
-        if (!hasSnapshot.current || revoked) {
+        const configurationChanged = lastSnapshot.current && JSON.stringify(lastSnapshot.current.monitor) !== JSON.stringify(snapshot.monitor);
+        if (!hasSnapshot.current || revoked || configurationChanged) {
           pendingSnapshot.current = null;
           applySnapshot(snapshot);
         } else pendingSnapshot.current = snapshot.version !== activeVersion.current ? snapshot : null;
