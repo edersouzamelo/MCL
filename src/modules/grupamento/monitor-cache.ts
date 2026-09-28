@@ -58,15 +58,19 @@ export async function readMonitorSnapshot(organizationId: string, monitorId: num
   }
 }
 
+export async function forgetMonitorSnapshot(organizationId: string, monitorId: number) {
+  await (await caches.open(SNAPSHOT_CACHE)).delete(snapshotKey(organizationId, monitorId));
+}
+
 export async function synchronizeMonitor(organizationId: string, monitor: CcoMonitorConfig, previous: MonitorSnapshot | null = null) {
   const [financialResult, playlistResult, configResult] = await Promise.allSettled([
-    networkJson("/api/grupamento/sag/latest"),
+    networkJson(`/api/grupamento/sag/latest?monitorId=${monitor.id}`),
     networkJson(`/api/grupamento/monitor-content/playlist?monitorId=${monitor.id}`),
-    networkJson("/api/grupamento/monitors"),
+    networkJson(`/api/grupamento/monitors?monitorId=${monitor.id}`),
   ]);
   if (playlistResult.status === "rejected") throw playlistResult.reason;
   if (configResult.status === "rejected") throw configResult.reason;
-  const sharedMonitor = parseCcoMonitorConfig(configResult.value?.monitors?.[monitor.id - 1], monitor.id);
+  const sharedMonitor = parseCcoMonitorConfig(configResult.value?.monitors?.find?.((item: CcoMonitorConfig) => item.id === monitor.id), monitor.id);
   if (!sharedMonitor) throw new Error("Configuração compartilhada do monitor inválida.");
   const playlist = playlistResult.value;
   if (financialResult.status === "rejected" && !previous) throw financialResult.reason;

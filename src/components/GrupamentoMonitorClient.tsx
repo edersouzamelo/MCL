@@ -6,7 +6,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
 import { MonitorViewport } from "@/components/MonitorViewport";
-import { prepareMonitorNavigation, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
+import { forgetMonitorSnapshot, prepareMonitorNavigation, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
 import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 import { CCO_RULE_SOURCE } from "@/modules/grupamento/cco";
@@ -38,7 +38,7 @@ function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
   };
 }
 
-export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitorId: number; organizationId: string }) {
+export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll = false, buildVersion = "local" }: { monitorId: number; organizationId: string; canEnroll?: boolean; buildVersion?: string }) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [documentScenes, setDocumentScenes] = useState<MonitorDocumentSceneDto[]>([]);
@@ -50,6 +50,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
   const [connectionState, setConnectionState] = useState<"online" | "offline" | "syncing">("syncing");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
+  const [deviceMessage, setDeviceMessage] = useState("");
+  const [deviceEnrolled, setDeviceEnrolled] = useState(false);
   const activeVersion = useRef<string | null>(null);
   const activeSceneIds = useRef<string[]>([]);
   const pendingSnapshot = useRef<MonitorSnapshot | null>(null);
@@ -90,16 +92,28 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
         if (cancelled) return;
         setCacheIssue(null);
         setConnectionState("online");
-        const approvedIds = new Set(snapshot.scenes.map((scene) => scene.id));
-        const revoked = activeSceneIds.current.some((id) => !approvedIds.has(id));
+        const sceneIds = snapshot.scenes.map((scene) => scene.id);
+        const playlistChanged = JSON.stringify(activeSceneIds.current) !== JSON.stringify(sceneIds);
         const configurationChanged = lastSnapshot.current && JSON.stringify(lastSnapshot.current.monitor) !== JSON.stringify(snapshot.monitor);
-        if (!hasSnapshot.current || revoked || configurationChanged) {
+        if (!hasSnapshot.current || playlistChanged || configurationChanged) {
           pendingSnapshot.current = null;
           applySnapshot(snapshot);
+          if (playlistChanged || configurationChanged) setPlaybackState("playing");
         } else pendingSnapshot.current = snapshot.version !== activeVersion.current ? snapshot : null;
         if (!navigationReady) { await prepareMonitorNavigation(monitorId); navigationReady = true; }
       } catch (error) {
         if (!cancelled) {
+          if (error instanceof Error && /HTTP (401|403)\b/.test(error.message)) {
+            activeVersion.current = null;
+            activeSceneIds.current = [];
+            pendingSnapshot.current = null;
+            lastSnapshot.current = null;
+            hasSnapshot.current = false;
+            setSag(null);
+            setRpn(null);
+            setDocumentScenes([]);
+            void forgetMonitorSnapshot(organizationId, monitorId);
+          }
           setConnectionState("offline");
           setCacheIssue(error instanceof Error ? error.message : "Falha de sincronização/cache");
           console.warn("MCL monitor: última versão preservada", error);
@@ -120,6 +134,21 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
       window.removeEventListener("offline", offline);
     };
   }, [monitorId, organizationId, applySnapshot]);
+
+  useEffect(() => {
+    if (buildVersion === "local") return;
+    const check = async () => {
+      if (!navigator.onLine) return;
+      try {
+        const response = await fetch(`/api/grupamento/monitor-version?monitorId=${monitorId}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (payload.version && payload.version !== buildVersion) window.location.reload();
+      } catch { /* A próxima verificação ocorre com a rede restabelecida. */ }
+    };
+    const timer = window.setInterval(() => { void check(); }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [buildVersion, monitorId]);
 
   const commitPending = useCallback(() => {
     if (!pendingSnapshot.current) return;
@@ -228,6 +257,21 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
     setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
     setScreenIndex(0);
   };
+
+  async function enrollNotebook() {
+    try {
+      const response = await fetch("/api/grupamento/monitor-devices", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monitorId, label: `Notebook HDMI · Monitor ${monitorId}` }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao vincular notebook.");
+      setDeviceEnrolled(true);
+      setDeviceMessage("Notebook vinculado. Use o perfil normal do navegador na inicialização automática.");
+    } catch (error) {
+      setDeviceMessage(error instanceof Error ? error.message : "Falha ao vincular notebook.");
+    }
+  }
 
   const ccol = monitor.layout === "ccol";
   const isRuleScreen = activeScreen ? activeScreen === "briefing" || activeScreen.startsWith("class-") : false;
@@ -359,6 +403,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
             )}
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            {canEnroll && !deviceEnrolled ? <button type="button" onClick={() => void enrollNotebook()} className="rounded border border-sky-500 px-1.5 py-0.5 font-bold text-sky-400" title="Permitir que este navegador reabra o monitor sem novo login">Vincular notebook</button> : null}
+            {deviceMessage ? <span className="max-w-64 truncate" title={deviceMessage}>{deviceMessage}</span> : null}
             <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
             <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
             <span title={cacheIssue ?? undefined}>{cacheIssue ? "sincronização pendente" : "sync · 30s"}</span>

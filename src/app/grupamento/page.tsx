@@ -20,7 +20,7 @@ export default async function GrupamentoPage() {
     <AppShell>
       <GrupamentoStorageBridge />
       <div className="space-y-6">
-        <GrupamentoCommandCenterClient organizationId={session.user.organizationId} />
+        <GrupamentoCommandCenterClient organizationId={session.user.organizationId} canManageDevices={roles.some((role) => role === "ADMIN" || role === "LOGISTICS_MANAGER")} />
       </div>
     </AppShell>
   );

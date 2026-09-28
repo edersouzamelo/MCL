@@ -426,9 +426,9 @@ export async function getApprovedMonitorScenes(organizationId: string, monitorId
     .filter((scene) => scene.payload.layoutVersion === 2);
 }
 
-export async function getMonitorContentAsset(id: string, organizationId: string) {
+export async function getMonitorContentAsset(id: string, organizationId: string, monitorId?: number) {
   return prisma.monitorContentAsset.findFirst({
-    where: { id, import: { organizationId } },
+    where: { id, import: { organizationId, ...(monitorId === undefined ? {} : { monitorId, status: "APPROVED" }) } },
     select: { id: true, fileName: true, mimeType: true, data: true },
   });
 }
