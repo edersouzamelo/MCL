@@ -238,7 +238,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
   const screenContent = !monitor.enabled ? (
     <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
   ) : activeItem.kind === "document" ? (
-    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} />
+    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={playbackState !== "playing"} onPageCount={onPageCount} />
   ) : !sag || !rpn ? (
     <MonitorBootScreen ccol={ccol} connectionState={connectionState} />
   ) : isRuleScreen ? (
@@ -310,7 +310,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
               documentMode={(activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               paused={playbackState !== "playing"}
-              onPageCount={onPageCount}
+              onPageCount={activeItem.kind === "document" ? undefined : onPageCount}
             >
               {screenContent}
             </MonitorViewport>

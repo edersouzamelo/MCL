@@ -8,7 +8,7 @@ export function MonitorViewport({ children, documentMode, cycleSeconds, paused, 
   documentMode: boolean;
   cycleSeconds: number;
   paused: boolean;
-  onPageCount: (count: number) => void;
+  onPageCount?: (count: number) => void;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -58,7 +58,7 @@ export function MonitorViewport({ children, documentMode, cycleSeconds, paused, 
     return () => { disposed = true; observer.disconnect(); cancelAnimationFrame(raf); };
   }, [documentMode]);
 
-  useEffect(() => { onPageCount(fit.pages.length); }, [fit.pages.length, onPageCount]);
+  useEffect(() => { onPageCount?.(fit.pages.length); }, [fit.pages.length, onPageCount]);
   useEffect(() => {
     if (paused || fit.pages.length < 2) return;
     const timer = window.setInterval(() => setPage((current) => (current + 1) % fit.pages.length), cycleSeconds * 1000);
