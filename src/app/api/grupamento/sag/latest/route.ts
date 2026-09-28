@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/modules/auth/options";
+import { getMonitorReader } from "@/modules/grupamento/monitor-device";
 import { getLatestFinancialSnapshotPair } from "@/modules/financial-snapshots/repository";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Autenticação obrigatória." }, { status: 401 });
-  if (!session.user.organizationId) return NextResponse.json({ error: "Sessão sem organização." }, { status: 422 });
+export async function GET(request: Request) {
+  const monitorIdParam = new URL(request.url).searchParams.get("monitorId");
+  const monitorId = monitorIdParam ? Number(monitorIdParam) : undefined;
+  if (monitorId !== undefined && (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8)) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
+  const reader = await getMonitorReader(monitorId);
+  if (!reader || (reader.device && monitorId === undefined)) return NextResponse.json({ error: "Autenticação obrigatória." }, { status: 401 });
 
-  const snapshot = await getLatestFinancialSnapshotPair(session.user.organizationId);
+  const snapshot = await getLatestFinancialSnapshotPair(reader.organizationId);
   return NextResponse.json({
     ...snapshot,
     complete: Boolean(snapshot.current && snapshot.rpn),

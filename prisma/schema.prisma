@@ -131,6 +131,7 @@ model Organization {
   financialSourceImports FinancialSourceImport[]
   monitorContentImports  MonitorContentImport[]
   ccoMonitorConfigurations CcoMonitorConfiguration[]
+  monitorDisplayDevices MonitorDisplayDevice[]
   pcaItems               PcaItem[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -257,6 +258,21 @@ model CcoMonitorConfiguration {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@id([organizationId, monitorId])
+}
+
+model MonitorDisplayDevice {
+  id             String       @id @default(uuid())
+  organizationId String
+  monitorId      Int
+  tokenHash      String       @unique
+  label          String
+  enrolledBy     String
+  enrolledAt     DateTime     @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, monitorId, revokedAt])
 }
 
 model MonitorContentScene {

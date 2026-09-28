@@ -76,7 +76,7 @@ function readStored<T>(key: string): T | null {
   }
 }
 
-export function GrupamentoCommandCenterClient({ organizationId }: { organizationId?: string }) {
+export function GrupamentoCommandCenterClient({ organizationId, canManageDevices = false }: { organizationId?: string; canManageDevices?: boolean }) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [currentMode, setCurrentMode] = useState<SagUploadMode>("family");
@@ -520,12 +520,47 @@ export function GrupamentoCommandCenterClient({ organizationId }: { organization
                 })}
               </div>
               <MonitorContentCockpit monitorId={monitor.id} />
+              {canManageDevices ? <MonitorDeviceControls monitorId={monitor.id} /> : null}
             </article>
           ))}
         </div>
       </section>
     </div>
   );
+}
+
+function MonitorDeviceControls({ monitorId }: { monitorId: number }) {
+  const [open, setOpen] = useState(false);
+  const [devices, setDevices] = useState<Array<{ id: string; label: string; expiresAt: string }>>([]);
+  const [error, setError] = useState("");
+  const refresh = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/grupamento/monitor-devices?monitorId=${monitorId}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao consultar dispositivos.");
+      setDevices(payload.devices ?? []);
+      setError("");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Falha ao consultar dispositivos."); }
+  }, [monitorId]);
+  useEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => { void refresh(); });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, refresh]);
+  async function revoke(id: string) {
+    if (!window.confirm("Revogar o acesso deste notebook ao monitor?")) return;
+    const response = await fetch(`/api/grupamento/monitor-devices/${id}`, { method: "DELETE" });
+    if (!response.ok) { setError("Falha ao revogar notebook."); return; }
+    await refresh();
+  }
+  return <div className="mt-3 border-t border-zinc-200 pt-3 text-xs dark:border-zinc-800">
+    <button type="button" onClick={() => setOpen((value) => !value)} className="font-semibold text-sky-700 dark:text-sky-300">Notebooks HDMI vinculados {open ? "▴" : "▾"}</button>
+    {open ? <div className="mt-2 space-y-2">
+      {error ? <p className="text-red-600">{error}</p> : null}
+      {!devices.length ? <p className="text-zinc-500">Nenhum notebook vinculado. Abra o monitor uma vez no notebook HDMI e use “Vincular notebook” no rodapé.</p> : null}
+      {devices.map((device) => <div key={device.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 p-2 dark:border-zinc-800"><span>{device.label} · válido até {new Date(device.expiresAt).toLocaleDateString("pt-BR")}</span><button type="button" onClick={() => void revoke(device.id)} className="font-bold text-red-600">Revogar</button></div>)}
+    </div> : null}
+  </div>;
 }
 
 function HybridSourceGroup({
