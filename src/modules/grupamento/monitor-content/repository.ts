@@ -151,7 +151,7 @@ export async function persistMonitorContentImport(input: {
     include: { scenes: { orderBy: { sceneOrder: "asc" } } },
   });
   if (existing) {
-    if (existing.status === "ARCHIVED") {
+    if (existing.status === "ARCHIVED" || existing.status === "REJECTED") {
       const reactivated = await prisma.monitorContentImport.update({
         where: { id: existing.id },
         data: {
@@ -291,9 +291,8 @@ export async function getMonitorContentForReprocess(id: string, organizationId: 
 
 export async function listMonitorContentImports(organizationId: string, monitorId: number) {
   return prisma.monitorContentImport.findMany({
-    where: { organizationId, monitorId },
+    where: { organizationId, monitorId, status: { in: ["PREVIEW", "APPROVED", "REJECTED"] } },
     orderBy: { importedAt: "desc" },
-    take: 12,
     select: {
       id: true,
       monitorId: true,
@@ -328,33 +327,51 @@ export async function setMonitorContentStatus(input: {
   id: string;
   organizationId: string;
   actorId: string;
-  status: "APPROVED" | "ARCHIVED";
+  status: "APPROVED" | "ARCHIVED" | "REJECTED";
 }) {
   const existing = await prisma.monitorContentImport.findFirst({
     where: { id: input.id, organizationId: input.organizationId },
   });
   if (!existing) throw new Error("Importação documental não encontrada.");
+  if (input.status === "APPROVED" && existing.status !== "PREVIEW") throw new Error("Somente uma prévia pendente pode ser aprovada.");
+  if (input.status === "REJECTED" && existing.status !== "PREVIEW") throw new Error("Somente uma prévia pendente pode ser rejeitada.");
+  if (input.status === "ARCHIVED" && existing.status !== "APPROVED") throw new Error("Somente conteúdo publicado pode ser retirado.");
 
-  if (input.status === "APPROVED") {
-    return prisma.monitorContentImport.update({
-      where: { id: input.id },
+  const changed = await prisma.monitorContentImport.updateMany({
+    where: { id: input.id, organizationId: input.organizationId, status: existing.status },
+    data: input.status === "APPROVED" ? {
+      status: "APPROVED", approvedBy: input.actorId, approvedAt: new Date(), archivedBy: null, archivedAt: null,
+    } : {
+      status: input.status, approvedBy: input.status === "REJECTED" ? null : existing.approvedBy,
+      approvedAt: input.status === "REJECTED" ? null : existing.approvedAt,
+      archivedBy: input.actorId, archivedAt: new Date(),
+    },
+  });
+  if (changed.count !== 1) throw new Error("O arquivo mudou de estado. Atualize a lista.");
+  return prisma.monitorContentImport.findUniqueOrThrow({ where: { id: input.id } });
+}
+
+export async function deletePendingMonitorContentImport(input: { id: string; organizationId: string; actorId: string; userAgent: string }) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.monitorContentImport.findFirst({
+      where: { id: input.id, organizationId: input.organizationId, status: { in: ["PREVIEW", "REJECTED"] } },
+      select: { monitorId: true, fileName: true },
+    });
+    if (!existing) throw new Error("Somente arquivos pendentes ou rejeitados podem ser excluídos.");
+    const deleted = await tx.monitorContentImport.deleteMany({
+      where: { id: input.id, organizationId: input.organizationId, status: { in: ["PREVIEW", "REJECTED"] } },
+    });
+    if (deleted.count !== 1) throw new Error("O arquivo mudou de estado. Atualize a lista.");
+    await tx.auditLog.create({
       data: {
-        status: "APPROVED",
-        approvedBy: input.actorId,
-        approvedAt: new Date(),
-        archivedBy: null,
-        archivedAt: null,
+        id: randomUUID(), occurredAt: new Date(), actorId: input.actorId,
+        action: "MONITOR_CONTENT_DELETE", resourceType: "MONITOR_CONTENT", resourceId: input.id,
+        organizationId: input.organizationId, requestId: randomUUID(), userAgent: input.userAgent,
+        outcome: "SUCESSO", reason: "Arquivo para avaliação excluído por operador humano.",
+        metadata: { monitorId: existing.monitorId, fileName: existing.fileName },
       },
     });
-  }
-
-  return prisma.monitorContentImport.update({
-    where: { id: input.id },
-    data: {
-      status: "ARCHIVED",
-      archivedBy: input.actorId,
-      archivedAt: new Date(),
-    },
+    return existing;
   });
 }
 

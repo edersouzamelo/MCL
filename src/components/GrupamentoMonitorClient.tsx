@@ -62,12 +62,16 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
   const activeVersion = useRef<string | null>(null);
+  const activeSceneIds = useRef<string[]>([]);
   const pendingSnapshot = useRef<MonitorSnapshot | null>(null);
+  const lastSnapshot = useRef<MonitorSnapshot | null>(null);
   const hasSnapshot = useRef(false);
 
   const applySnapshot = useCallback((snapshot: MonitorSnapshot) => {
     if (snapshot.version === activeVersion.current) return;
     activeVersion.current = snapshot.version;
+    lastSnapshot.current = snapshot;
+    activeSceneIds.current = snapshot.scenes.map((scene) => scene.id);
     hasSnapshot.current = true;
     setSag(snapshot.sag);
     setRpn(snapshot.rpn);
@@ -93,13 +97,17 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
         }
         selected = normalizeMonitor(load<CcoMonitorConfig[]>(GROUP_STORAGE_KEYS.monitors)?.find((item) => item.id === monitorId) ?? selected);
         if (!navigator.onLine) { setConnectionState("offline"); return; }
-        // Background synchronization never replaces the scene while it is being read.
-        const snapshot = await synchronizeMonitor(organizationId, selected);
+        // A revoked scene must disappear even when playback is paused.
+        const snapshot = await synchronizeMonitor(organizationId, selected, lastSnapshot.current);
         if (cancelled) return;
         setCacheIssue(null);
         setConnectionState("online");
-        if (!hasSnapshot.current) applySnapshot(snapshot);
-        else pendingSnapshot.current = snapshot.version !== activeVersion.current ? snapshot : null;
+        const approvedIds = new Set(snapshot.scenes.map((scene) => scene.id));
+        const revoked = activeSceneIds.current.some((id) => !approvedIds.has(id));
+        if (!hasSnapshot.current || revoked) {
+          pendingSnapshot.current = null;
+          applySnapshot(snapshot);
+        } else pendingSnapshot.current = snapshot.version !== activeVersion.current ? snapshot : null;
         if (!navigationReady) { await prepareMonitorNavigation(monitorId); navigationReady = true; }
       } catch (error) {
         if (!cancelled) {

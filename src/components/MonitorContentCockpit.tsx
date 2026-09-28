@@ -1,8 +1,7 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, FileText, Loader2, Presentation, Upload, X } from "lucide-react";
+import { Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, FileText, Loader2, Presentation, Trash2, Upload, X } from "lucide-react";
 import { MonitorContentSceneThumbnail } from "@/components/MonitorContentSceneThumbnail";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
 import type { MonitorDocumentSceneDto, MonitorDocumentScenePayload } from "@/modules/grupamento/monitor-content/types";
@@ -20,7 +19,7 @@ type ImportRecord = {
   id: string;
   fileName: string;
   fileSize: number;
-  status: "PREVIEW" | "APPROVED" | "ARCHIVED";
+  status: "PREVIEW" | "APPROVED" | "ARCHIVED" | "REJECTED";
   sceneCount: number;
   warnings: string[];
   importedAt: string;
@@ -43,6 +42,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const response = await fetch(`/api/grupamento/monitor-content?monitorId=${monitorId}`, { cache: "no-store" });
@@ -128,7 +128,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
     }
   }
 
-  async function setStatus(importId: string, status: "APPROVED" | "ARCHIVED") {
+  async function setStatus(importId: string, status: "APPROVED" | "ARCHIVED" | "REJECTED") {
     setBusy(true);
     setError("");
     setNotice("");
@@ -140,7 +140,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Falha ao atualizar publicação.");
-      setNotice(status === "APPROVED" ? "Conteúdo aprovado e inserido no loop do monitor." : "Conteúdo retirado do loop.");
+      setNotice(status === "APPROVED" ? "Conteúdo aprovado e inserido no loop do monitor." : status === "REJECTED" ? "Arquivo rejeitado. Ele não será exibido." : "Conteúdo retirado do loop.");
       window.dispatchEvent(new CustomEvent("mcl-grupamento-document-content-updated"));
       await refresh();
     } catch (cause) {
@@ -150,7 +150,29 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
     }
   }
 
-  const preview = imports.find((item) => item.status === "PREVIEW");
+  async function deleteImport(importId: string, fileName: string) {
+    if (!window.confirm(`Excluir definitivamente o arquivo “${fileName}” e suas cenas?`)) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`/api/grupamento/monitor-content/${importId}`, { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao excluir o arquivo.");
+      setSelectedSceneId(null);
+      setSelectedImportId(null);
+      setNotice("Arquivo e cenas excluídos.");
+      window.dispatchEvent(new CustomEvent("mcl-grupamento-document-content-updated"));
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Falha ao excluir o arquivo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const previews = imports.filter((item) => item.status === "PREVIEW");
+  const preview = previews.find((item) => item.id === selectedImportId) ?? previews[0];
   const selectedScene = preview?.scenes.find((scene) => scene.id === selectedSceneId) ?? null;
   const selectedIndex = selectedScene && preview ? preview.scenes.findIndex((scene) => scene.id === selectedScene.id) : -1;
 
@@ -200,6 +222,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
           {error ? <div className="mt-3 rounded-lg bg-red-50 p-2.5 text-[11px] font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</div> : null}
           {notice ? <div className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{notice}</div> : null}
 
+          {previews.length > 1 ? <div className="mt-4 flex flex-wrap gap-2" aria-label="Arquivos aguardando avaliação">{previews.map((item) => <button key={item.id} type="button" onClick={() => { setSelectedImportId(item.id); setSelectedSceneId(null); }} className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold ${preview?.id === item.id ? "border-amber-600 bg-amber-100 dark:bg-amber-950" : "border-zinc-300 dark:border-zinc-700"}`}>{item.fileName}</button>)}</div> : null}
           {preview ? (
             <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/15">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -211,6 +234,8 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
                 <div className="flex gap-2">
                   <a href={`/api/grupamento/monitor-content/${preview.id}/source`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-[10px] font-bold dark:border-zinc-700 dark:bg-zinc-950"><Download className="h-3.5 w-3.5" /> Original</a>
                   <button type="button" disabled={busy} onClick={() => void setStatus(preview.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-2 text-[10px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" /> Aprovar para exibição</button>
+                  <button type="button" disabled={busy} onClick={() => void setStatus(preview.id, "REJECTED")} className="rounded-lg border border-amber-500 px-2.5 py-2 text-[10px] font-bold text-amber-800 disabled:opacity-50 dark:text-amber-300">Rejeitar</button>
+                  <button type="button" disabled={busy} onClick={() => void deleteImport(preview.id, preview.fileName)} className="inline-flex items-center gap-1 rounded-lg border border-red-400 px-2.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50 dark:text-red-300"><Trash2 className="h-3.5 w-3.5" /> Excluir</button>
                 </div>
               </div>
 
@@ -238,6 +263,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
           ) : null}
 
           <div className="mt-4 space-y-2">
+            {imports.filter((item) => item.status === "REJECTED").map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-2.5 dark:border-zinc-800 dark:bg-zinc-950"><div><div className="text-[10px] font-black uppercase text-zinc-500">Rejeitado · fora do ar</div><div className="text-[11px] font-semibold">{item.fileName}</div></div><button type="button" disabled={busy} onClick={() => void deleteImport(item.id, item.fileName)} className="inline-flex items-center gap-1 rounded-lg border border-red-400 px-2.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50 dark:text-red-300"><Trash2 className="h-3.5 w-3.5" /> Excluir</button></div>)}
             {imports.filter((item) => item.status === "APPROVED").map((item) => {
               const chartLegacy = item.scenes.some((scene) => scene.payload?.layout?.elements.some((element) => element.kind === "chart" && element.chart.semanticVersion !== 3));
               const legacy = item.scenes.some((scene) => scene.payload?.layoutVersion !== 2);
