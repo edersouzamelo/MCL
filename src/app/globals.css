@@ -1768,6 +1768,45 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
   .mcl-monitor-footer-drawer:hover { transform: translateY(100%); }
   .mcl-monitor-footer-drawer[data-open="true"] { transform: translateY(0); }
 }
+/* Low-cost monitor playback: a single opacity transition owns scene entry.
+   Avoid repainting blurred full-screen layers and every card on each frame. */
+.mcl-monitor-shell .mcl-monitor-scene {
+  animation: none;
+  will-change: auto;
+}
+.mcl-monitor-shell .mcl-monitor-ambient,
+.mcl-monitor-shell .mcl-monitor-icon,
+.mcl-monitor-shell .mcl-monitor-live,
+.mcl-monitor-shell .mcl-monitor-watermark,
+.mcl-monitor-shell .mcl-broadcast-card::before {
+  animation: none;
+  will-change: auto;
+}
+.mcl-monitor-shell .mcl-monitor-broadcast-sweep,
+.mcl-monitor-shell .mcl-monitor-scanline,
+.mcl-monitor-shell .mcl-monitor-stripes,
+.mcl-monitor-shell .mcl-monitor-horizon,
+.mcl-monitor-shell .mcl-monitor-header-glint {
+  display: none;
+}
+.mcl-monitor-shell .mcl-broadcast-card {
+  backdrop-filter: none;
+  will-change: auto;
+}
+.mcl-monitor-shell .mcl-animated-value,
+.mcl-monitor-shell .mcl-document-element {
+  animation: none;
+  filter: none;
+  will-change: auto;
+}
+.mcl-monitor-shell .mcl-broadcast-bar {
+  animation-name: mclMonitorBarReveal;
+  will-change: auto;
+}
+@keyframes mclMonitorBarReveal {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   .mcl-monitor-shell *, .mcl-monitor-shell *::before, .mcl-monitor-shell *::after {
     animation: none !important;
