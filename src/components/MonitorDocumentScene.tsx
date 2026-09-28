@@ -1,6 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { useEffect } from "react";
+import { MonitorDocumentTable } from "@/components/MonitorDocumentTable";
+import { monitorTableSlide } from "@/modules/grupamento/monitor-content/table-layout";
 import { BarChart3, FileText, Image as ImageIcon, Table2 } from "lucide-react";
 import type {
   MonitorDocumentSceneDto,
@@ -103,7 +106,7 @@ function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: bo
           return <div key={"table-" + String(index)} className="absolute overflow-hidden rounded-lg border border-white/10 bg-slate-950/20" style={boxStyle(item)}>
             <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
               <thead className="bg-white/[0.08]"><tr>{item.columns.map((cell,cellIndex)=><th key={cellIndex} className="px-2 py-1 text-left font-black">{cell}</th>)}</tr></thead>
-              <tbody>{item.rows.map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.map((cell,cellIndex)=><td key={cellIndex} className="truncate px-2 py-1">{cell}</td>)}</tr>)}</tbody>
+              <tbody>{item.rows.map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.map((cell,cellIndex)=><td key={cellIndex} className="whitespace-normal break-words px-2 py-1 align-top">{cell}</td>)}</tr>)}</tbody>
             </table>
           </div>;
         })}
@@ -130,8 +133,21 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
   );
 }
 
-export function MonitorDocumentScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: boolean }) {
+export function MonitorDocumentScene({ scene, ccol, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
+  const tableSlide = payload.layout ? monitorTableSlide(prepareMonitorElements(payload.layout.elements).elements) : null;
+  useEffect(() => { if (!tableSlide) onPageCount?.(1); }, [Boolean(tableSlide), onPageCount]);
+  if (tableSlide) {
+    const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
+    const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
+    const text = (items: typeof before) => items.map((item, i) => <div key={i} className="whitespace-pre-line break-words" style={{ fontSize: item.role === 'title' || i === 0 && items === before ? 'clamp(24px, 2.4vw, 40px)' : 'clamp(16px, 1.3vw, 24px)', fontWeight: item.bold ? 800 : 600 }}>{item.text}</div>);
+    return <section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
+      <header className="shrink-0 space-y-2">{before.length ? text(before) : <h1 className="text-3xl font-bold">{scene.title}</h1>}</header>
+      <MonitorDocumentTable columns={tableSlide.table.columns} rows={tableSlide.table.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
+      {after.length > 0 && <div className="shrink-0 space-y-1">{text(after)}</div>}
+      <footer className="shrink-0 text-xs opacity-65">{scene.sourceFileName} · slide/página {scene.sourcePage ?? 'não informada'}</footer>
+    </section>;
+  }
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
       <section className="relative h-full min-h-0 overflow-hidden">
