@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ imp
   const { importId } = await params;
   const body = await request.json().catch(() => null) as { status?: string } | null;
   const status = String(body?.status ?? "").toUpperCase();
-  if (status !== "APPROVED" && status !== "ARCHIVED") return NextResponse.json({ error: "Status inválido." }, { status: 400 });
+  if (status !== "APPROVED" && status !== "ARCHIVED" && status !== "REJECTED") return NextResponse.json({ error: "Status inválido." }, { status: 400 });
 
   try {
     const updated = await setMonitorContentStatus({
@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ imp
         id: randomUUID(),
         occurredAt: new Date(),
         actorId: session.user.id,
-        action: status === "APPROVED" ? "MONITOR_CONTENT_APPROVE" : "MONITOR_CONTENT_ARCHIVE",
+        action: status === "APPROVED" ? "MONITOR_CONTENT_APPROVE" : status === "REJECTED" ? "MONITOR_CONTENT_REJECT" : "MONITOR_CONTENT_ARCHIVE",
         resourceType: "MONITOR_CONTENT",
         resourceId: importId,
         organizationId: session.user.organizationId,
@@ -43,6 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ imp
         outcome: "SUCESSO",
         reason: status === "APPROVED"
           ? "Conteúdo documental aprovado por operador humano para entrar no loop do monitor."
+          : status === "REJECTED" ? "Prévia documental rejeitada por operador humano."
           : "Conteúdo documental retirado do loop do monitor por operador humano.",
         metadata: { monitorId: updated.monitorId, fileName: updated.fileName, status },
       },

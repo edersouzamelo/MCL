@@ -57,27 +57,40 @@ export async function readMonitorSnapshot(organizationId: string, monitorId: num
   }
 }
 
-export async function synchronizeMonitor(organizationId: string, monitor: CcoMonitorConfig) {
-  const [financial, playlist] = await Promise.all([
+export async function synchronizeMonitor(organizationId: string, monitor: CcoMonitorConfig, previous: MonitorSnapshot | null = null) {
+  const [financialResult, playlistResult] = await Promise.allSettled([
     networkJson("/api/grupamento/sag/latest"),
     networkJson(`/api/grupamento/monitor-content/playlist?monitorId=${monitor.id}`),
   ]);
-  const scenes = validatePlaylist(playlist, monitor.id);
+  if (playlistResult.status === "rejected") throw playlistResult.reason;
+  const playlist = playlistResult.value;
+  if (financialResult.status === "rejected" && !previous) throw financialResult.reason;
+  const financial = financialResult.status === "fulfilled" ? financialResult.value : { current: previous?.sag, rpn: previous?.rpn };
+  let scenes = validatePlaylist(playlist, monitor.id);
   // Null means no published source; malformed responses must never replace a snapshot.
   if (!("current" in financial) || !("rpn" in financial)) throw new Error("Resposta SAG incompleta.");
   for (const result of [financial.current, financial.rpn]) {
     if (result !== null && (!result || !result.totals || !Array.isArray(result.byUg) || !Array.isArray(result.byPi) || !Array.isArray(result.rows))) throw new Error("Snapshot SAG inválido.");
   }
-  const assets = sceneAssetUrls(scenes);
+  let assets = sceneAssetUrls(scenes);
   const assetCache = await caches.open(MONITOR_ASSET_CACHE);
   // All assets finish before the single snapshot pointer is committed.
-  for (let start = 0; start < assets.length; start += 4) {
-    await Promise.all(assets.slice(start, start + 4).map(async (url) => {
-      if (await assetCache.match(url)) return;
-      const response = await fetch(url, { cache: "no-store", headers: { "X-MCL-Revalidate": "1" }, signal: AbortSignal.timeout(12000) });
-      if (!response.ok || response.redirected || !response.headers.get("content-type")?.startsWith("image/")) throw new Error(`Asset indisponível: ${url}`);
-      await assetCache.put(url, response);
-    }));
+  try {
+    for (let start = 0; start < assets.length; start += 4) {
+      await Promise.all(assets.slice(start, start + 4).map(async (url) => {
+        if (await assetCache.match(url)) return;
+        const response = await fetch(url, { cache: "no-store", headers: { "X-MCL-Revalidate": "1" }, signal: AbortSignal.timeout(12000) });
+        if (!response.ok || response.redirected || !response.headers.get("content-type")?.startsWith("image/")) throw new Error(`Asset indisponível: ${url}`);
+        await assetCache.put(url, response);
+      }));
+    }
+  } catch (error) {
+    const approvedIds = new Set(scenes.map((scene) => scene.id));
+    if (!previous?.scenes.some((scene) => !approvedIds.has(scene.id))) throw error;
+    // A failed new asset cannot keep a revoked document on the screen.
+    const cachedIds = new Set(previous.scenes.map((scene) => scene.id));
+    scenes = scenes.filter((scene) => cachedIds.has(scene.id));
+    assets = sceneAssetUrls(scenes);
   }
   const data = { organizationId, monitorId: monitor.id, monitor, sag: financial.current, rpn: financial.rpn, scenes, assets };
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(data)));

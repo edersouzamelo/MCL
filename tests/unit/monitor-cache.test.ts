@@ -7,9 +7,10 @@ const scene: MonitorDocumentSceneDto = { id: "test-scene", monitorId: 1, importI
 const monitor = defaultCcoMonitorConfig()[0];
 let failAsset = false;
 let failApi = false;
+let failSag = false;
 let scenes = [scene];
 beforeEach(() => {
-  failAsset = false; failApi = false; scenes = [scene];
+  failAsset = false; failApi = false; failSag = false; scenes = [scene];
   const stores = new Map<string, Map<string, Response>>();
   vi.stubGlobal("caches", { open: async (name: string) => {
     if (!stores.has(name)) stores.set(name, new Map());
@@ -19,6 +20,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     if (url.includes("/assets/")) return new Response("test image bytes", { status: failAsset ? 503 : 200, headers: { "Content-Type": "image/png" } });
     if (failApi) return new Response("unavailable", { status: 503 });
+    if (failSag && url.includes("sag/latest")) return new Response("unavailable", { status: 503 });
     return Response.json(url.includes("playlist") ? { scenes } : { current: null, rpn: null });
   }));
 });
@@ -45,6 +47,20 @@ describe("atomic monitor cache", () => {
     expect((await readMonitorSnapshot("org-a", 1))?.version).toBe(old.version);
     failApi = false; scenes = [];
     expect((await synchronizeMonitor("org-a", monitor)).scenes).toEqual([]);
+  });
+  it("removes a revoked scene even if financial refresh fails", async () => {
+    const old = await synchronizeMonitor("org-a", monitor);
+    failSag = true; scenes = [];
+    const updated = await synchronizeMonitor("org-a", monitor, old);
+    expect(updated.scenes).toEqual([]);
+    expect((await readMonitorSnapshot("org-a", 1))?.scenes).toEqual([]);
+  });
+  it("commits revocation when an unrelated new scene asset fails", async () => {
+    const old = await synchronizeMonitor("org-a", monitor);
+    scenes = [{ ...scene, id: "next", payload: { assetIds: ["next-image"] } }]; failAsset = true;
+    const updated = await synchronizeMonitor("org-a", monitor, old);
+    expect(updated.scenes).toEqual([]);
+    expect((await readMonitorSnapshot("org-a", 1))?.scenes).toEqual([]);
   });
   it("rejects malformed and unapproved playlists instead of silently replacing them", () => {
     expect(() => validatePlaylist({}, 1)).toThrow();
