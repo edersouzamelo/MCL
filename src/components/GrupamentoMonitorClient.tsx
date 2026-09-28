@@ -23,7 +23,7 @@ import {
   type CcoScreenId,
 } from "@/modules/grupamento/monitor";
 
-const SCREEN_FADE_MS = 720;
+const SCREEN_FADE_MS = 320;
 const DATA_REFRESH_MS = 30_000;
 
 function load<T>(key: string): T | null {
@@ -64,7 +64,6 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
   const activeVersion = useRef<string | null>(null);
   const pendingSnapshot = useRef<MonitorSnapshot | null>(null);
   const hasSnapshot = useRef(false);
-  const [now, setNow] = useState(new Date());
 
   const applySnapshot = useCallback((snapshot: MonitorSnapshot) => {
     if (snapshot.version === activeVersion.current) return;
@@ -134,10 +133,6 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
     setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000 * count);
   }, [monitor.delaySeconds]);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
   type PlaylistItem =
     | { kind: "system"; key: string; screen: CcoScreenId; label: string; page: number; pageSize: number }
     | { kind: "document"; key: string; scene: MonitorDocumentSceneDto; label: string };
@@ -283,10 +278,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-5 text-right">
-          <div>
-            <div className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
-            <div className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
-          </div>
+          <MonitorClock ccol={ccol} />
           <div
             className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${connectionState === "offline"
               ? (ccol ? "border-amber-300 bg-amber-50 text-amber-700" : "border-amber-400/20 bg-amber-400/10 text-amber-300")
@@ -310,7 +302,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
 
       <section className="relative z-10 min-h-0 flex-1 overflow-hidden px-6 py-4">
         <div
-          className={`h-full w-full transition-[opacity,filter] ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-95 blur-0" : "opacity-100 blur-0"}`}
+          className={`h-full w-full transition-opacity ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-0" : "opacity-100"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
           <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
@@ -332,7 +324,10 @@ export function GrupamentoMonitorClient({ monitorId, organizationId }: { monitor
             <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
             <button
               type="button"
-              onClick={() => setPlaybackState((state) => state === "playing" ? "paused" : "playing")}
+              onClick={() => {
+                setTransitioning(false);
+                setPlaybackState((state) => state === "playing" ? "paused" : "playing");
+              }}
               className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300"
               aria-label={playbackState === "playing" ? "Pausar apresentação" : "Retomar apresentação"}
               title={playbackState === "playing" ? "Pausar" : "Retomar"}
@@ -403,6 +398,21 @@ function Empty({ ccol, title, description }: { ccol: boolean; title: string; des
         <h1 className="mt-4 text-3xl font-black">{title}</h1>
         <p className={`mt-3 leading-6 ${ccol ? "text-slate-600" : "text-slate-400"}`}>{description}</p>
       </div>
+    </div>
+  );
+}
+
+// Keep one-second clock updates outside the scene and its charts.
+function MonitorClock({ ccol }: { ccol: boolean }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return (
+    <div>
+      <div className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
+      <div className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
     </div>
   );
 }
