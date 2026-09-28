@@ -1,5 +1,6 @@
 import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
+import { chartValueLabel } from "./chart-geometry";
 import { prepareMonitorElements } from "./presentation-layout";
 import type {
   MonitorDocumentAssetDraft,
@@ -189,6 +190,7 @@ function cachedPoints(xml: string) {
 
 function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
   const result: MonitorDocumentSeries[] = [];
+  const chartLabels = xml.replace(/<c:ser\b[^>]*>[\s\S]*?<\/c:ser>/g, "").match(/<c:dLbls\b[^>]*>([\s\S]*?)<\/c:dLbls>/)?.[1] ?? "";
   for (const match of xml.matchAll(/<c:ser\b[^>]*>([\s\S]*?)<\/c:ser>/g)) {
     const block = match[1];
     const name = clean(block.match(/<c:tx\b[^>]*>[\s\S]*?<c:v>([\s\S]*?)<\/c:v>/)?.[1] ?? "Série " + (result.length + 1));
@@ -211,7 +213,35 @@ function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
       if (index >= 0 && index < count) pointColors[index] = fill(point[1], theme) ?? null;
     }
     const seriesStyle = block.replace(/<c:dPt\b[^>]*>[\s\S]*?<\/c:dPt>/g, "").match(/<c:spPr\b[^>]*>([\s\S]*?)<\/c:spPr>/)?.[1] ?? "";
-    if (vals.size) result.push({ name, categories, values, missingValueIndices, pointColors, color: fill(seriesStyle, theme) ?? theme["accent" + ((result.length % 6) + 1)] });
+    const ownLabels = block.match(/<c:dLbls\b[^>]*>([\s\S]*?)<\/c:dLbls>/)?.[1] ?? "";
+    const defaults = ownLabels.replace(/<c:dLbl\b[^>]*>[\s\S]*?<\/c:dLbl>/g, "") + chartLabels.replace(/<c:dLbl\b[^>]*>[\s\S]*?<\/c:dLbl>/g, "");
+    const overrides = new Map<number, string>();
+    for (const item of (chartLabels + ownLabels).matchAll(/<c:dLbl\b[^>]*>([\s\S]*?)<\/c:dLbl>/g)) {
+      const index = Number(item[1].match(/<c:idx\b[^>]*val="(\d+)"/)?.[1]);
+      if (Number.isInteger(index)) overrides.set(index, item[1]);
+    }
+    const dataLabels = values.map((value, index) => {
+      if (missingValueIndices.includes(index)) return null;
+      const own = overrides.get(index) ?? "";
+      const settings = own + defaults;
+      const flag = (key: string) => new RegExp('<c:' + key + '\\b[^>]*val="([^" ]+)"').exec(settings)?.[1] === "1";
+      if (flag("delete")) return null;
+      const tx = own.match(/<c:tx\b[^>]*>([\s\S]*?)<\/c:tx>/)?.[1] ?? "";
+      const custom = paragraphs(tx).join("\n") || [...cachedPoints(tx).values()].join(" ");
+      if (custom) return custom.trim();
+      const format = decode(settings.match(/<c:numFmt\b[^>]*formatCode="([^"]+)"/)?.[1] ?? val.match(/<c:formatCode>([\s\S]*?)<\/c:formatCode>/)?.[1] ?? "");
+      const separator = decode(settings.match(/<c:separator>([\s\S]*?)<\/c:separator>/)?.[1] ?? " · ");
+      const parts: string[] = [];
+      if (flag("showSerName")) parts.push(name);
+      if (flag("showCatName")) parts.push(categories[index]);
+      if (flag("showVal")) parts.push(chartValueLabel(value, format));
+      if (flag("showPercent")) {
+        const total = values.reduce((sum, item, i) => sum + (missingValueIndices.includes(i) ? 0 : item), 0);
+        if (total) parts.push(chartValueLabel(value / total, "0%"));
+      }
+      return parts.length ? parts.join(separator) : null;
+    });
+    if (vals.size) result.push({ name, categories, values, dataLabels, missingValueIndices, pointColors, color: fill(seriesStyle, theme) ?? theme["accent" + ((result.length % 6) + 1)] });
   }
   return result;
 }

@@ -28,7 +28,7 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   const yTitle = chart.yAxisTitle;
   const categoryLabels = Array.from({ length: count }, (_, i) => chart.categoryFormat && categories[i]?.trim() && Number.isFinite(Number(categories[i])) ? chartValueLabel(Number(categories[i]), chart.categoryFormat) : categories[i] ?? "");
   const categoryWidth = Math.min(size.width * .38, Math.max(80, ...categoryLabels.map((text) => text.length * font * .58)));
-  const margin = { left: (horizontal ? categoryWidth + 16 : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
+  const margin = { left: (horizontal ? categoryWidth + 16 : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: chart.series.some(series => series.dataLabels?.some(Boolean)) && !horizontal ? font * 4 : font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
   const width = Math.max(1, size.width - margin.left - margin.right);
   const wrap = (text: string, available: number) => {
     const limit = Math.max(1, Math.floor(available / (font * .58)));
@@ -98,6 +98,24 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
             return <path key={seriesIndex} d={path} fill="none" stroke={seriesColor(series, seriesIndex)} strokeWidth="2.5" />;
           })}
         </g>
+        {chart.series.flatMap((series, seriesIndex) => (series.dataLabels ?? []).map((text, index) => {
+          if (!text || !hasPoint(series, index)) return null;
+          const segment = barSegments(chart, index).find(item => item.seriesIndex === seriesIndex);
+          if (!segment) return null;
+          const overlap = !isStacked(chart) && (chart.overlap ?? 0) >= 90;
+          const band = (horizontal ? height : width) / count * .7;
+          const thickness = isStacked(chart) || overlap ? band : band / Math.max(1, chart.series.length);
+          const cross = chart.type === "bar" ? cat(index) - band / 2 + (isStacked(chart) || overlap ? band / 2 : thickness * (seriesIndex + .5)) : cat(index);
+          const end = val(segment.end);
+          const lines = wrap(text, horizontal ? Math.max(100, width * .55) : Math.max(40, width / count - 8));
+          const textWidth = Math.max(...lines.map(line => line.length)) * font * .58;
+          const outsideFits = horizontal && end + textWidth + 12 < margin.left + width;
+          const x = horizontal ? outsideFits ? end + 8 : Math.max(margin.left + textWidth + 4, end - 8) : cross;
+          const y = horizontal ? cross - (lines.length - 1) * font * .55 + font * .3 : Math.max(font, end - 8 - (lines.length - 1) * font * 1.1);
+          return <text key={`${seriesIndex}:${index}`} data-point-label={`${seriesIndex}:${index}`} x={x} y={y} textAnchor={horizontal ? outsideFits ? "start" : "end" : "middle"} fill={foreground} stroke={ccol ? "#ffffff" : "#071421"} strokeWidth="3" paintOrder="stroke" strokeLinejoin="round" fontSize={font * .9} fontWeight="700">
+            {lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex ? font * 1.1 : 0}>{line}</tspan>)}
+          </text>;
+        }))}
         {xTitle && <text x={margin.left + width / 2} y={size.height - 4} textAnchor="middle" fill="currentColor" fontWeight="700">{xTitle}</text>}
         {yTitle && <text transform={`translate(${font},${margin.top + height / 2}) rotate(-90)`} textAnchor="middle" fill="currentColor" fontWeight="700">{yTitle}</text>}
       </svg>}
