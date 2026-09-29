@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 
-type ExportMode = "html" | "webm" | "both";
-
 type CapturedHtmlFrame = {
   html: string;
   label: string;
@@ -279,121 +277,6 @@ schedule();
 </html>`;
 }
 
-function supportedWebmMime() {
-  if (typeof MediaRecorder === "undefined") return null;
-  return [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
-  ].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
-}
-
-function mountLiveRecorderFrame(monitorId: number) {
-  const root = document.createElement("div");
-  Object.assign(root.style, {
-    position: "fixed",
-    inset: "0",
-    zIndex: "2147483647",
-    overflow: "hidden",
-    background: "#020617",
-  });
-
-  const iframe = document.createElement("iframe");
-  iframe.src = `/grupamento/monitor-capture/${monitorId}?record=${Date.now()}`;
-  iframe.setAttribute("aria-label", `Monitor ${monitorId} em gravação WebM`);
-  Object.assign(iframe.style, {
-    position: "absolute",
-    inset: "0",
-    width: "100%",
-    height: "100%",
-    border: "0",
-    background: "#020617",
-    opacity: "1",
-    transition: "opacity 320ms cubic-bezier(.22,1,.36,1)",
-  });
-
-  root.appendChild(iframe);
-  document.body.appendChild(root);
-
-  return {
-    root,
-    iframe,
-    destroy() {
-      root.remove();
-    },
-  };
-}
-
-async function waitForIframeLoad(iframe: HTMLIFrameElement, timeoutMs = 25_000) {
-  await new Promise<void>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("Tempo esgotado abrindo o monitor para gravação.")), timeoutMs);
-    iframe.onload = () => {
-      window.clearTimeout(timer);
-      resolve();
-    };
-  });
-}
-
-async function recordWebmFromLiveMonitor(
-  monitorId: number,
-  delaySeconds: number,
-  stream: MediaStream,
-  mimeType: string,
-  onProgress: (message: string) => void,
-) {
-  const displaySurface = stream.getVideoTracks()[0]?.getSettings().displaySurface;
-  if (displaySurface && displaySurface !== "browser") {
-    throw new Error('Para gerar o vídeo, selecione "Esta guia" na janela de compartilhamento do Chrome.');
-  }
-
-  const overlay = mountLiveRecorderFrame(monitorId);
-  const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
-  const stopped = new Promise<Blob>((resolve, reject) => {
-    recorder.ondataavailable = (event) => {
-      if (event.data.size) chunks.push(event.data);
-    };
-    recorder.onerror = () => reject(new Error("Falha durante a gravação WebM."));
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
-  });
-
-  const fadeMs = 320;
-  const frameMs = Math.max(5, delaySeconds) * 1000;
-
-  try {
-    await waitForIframeLoad(overlay.iframe);
-    const firstRoot = await waitForCaptureFrame(overlay.iframe, 0);
-    const frameCount = Number(firstRoot.dataset.mclPlaylistCount ?? "0");
-    if (!Number.isInteger(frameCount) || frameCount < 1) {
-      throw new Error("Este monitor não possui conteúdo ativo para gravar.");
-    }
-
-    const track = stream.getVideoTracks()[0];
-    if (track) track.contentHint = "detail";
-
-    recorder.start();
-
-    for (let index = 0; index < frameCount; index += 1) {
-      onProgress(`Gravando WebM ${index + 1}/${frameCount}... mantenha esta guia visível.`);
-      if (index > 0) {
-        overlay.iframe.style.opacity = "0";
-        await wait(fadeMs);
-        overlay.iframe.contentWindow?.postMessage({ type: "MCL_CAPTURE_FRAME", frameIndex: index }, window.location.origin);
-        await waitForCaptureFrame(overlay.iframe, index);
-        overlay.iframe.style.opacity = "1";
-      }
-      await wait(Math.max(500, frameMs - (index > 0 ? fadeMs : 0)));
-    }
-
-    recorder.stop();
-    return await stopped;
-  } finally {
-    if (recorder.state !== "inactive") recorder.stop();
-    overlay.destroy();
-    stream.getTracks().forEach((track) => track.stop());
-  }
-}
-
 export function OfflineExportControls({
   monitorId,
   delaySeconds,
@@ -405,57 +288,22 @@ export function OfflineExportControls({
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
-  async function exportOffline(mode: ExportMode) {
+  async function exportOffline() {
     if (running) return;
     setRunning(true);
     setError("");
     setProgress("Preparando exibição offline...");
-
-    let displayStream: MediaStream | null = null;
     try {
-      const wantsVideo = mode === "webm" || mode === "both";
-      let videoMime: string | null = null;
-
-      if (wantsVideo) {
-        videoMime = supportedWebmMime();
-        if (!videoMime) {
-          throw new Error("Este navegador não oferece gravação WebM nativa. Use Chrome ou Edge atual.");
-        }
-        if (!navigator.mediaDevices?.getDisplayMedia) {
-          throw new Error("Este navegador não oferece captura de guia para gravação WebM.");
-        }
-
-        setProgress('Selecione "Esta guia" na janela de compartilhamento do navegador.');
-        displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 30 },
-          audio: false,
-          preferCurrentTab: true,
-          selfBrowserSurface: "include",
-        } as DisplayMediaStreamOptions);
-      }
-
       const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
-
-      if (mode === "html" || mode === "both") {
-        const frames = await captureMonitorFrames(monitorId, setProgress);
-        setProgress("Gerando HTML offline...");
-        const html = buildOfflineHtml(monitorId, frames, delaySeconds);
-        downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
-      }
-
-      if (wantsVideo && displayStream && videoMime) {
-        setProgress("Preparando gravação WebM do monitor ao vivo...");
-        const webm = await recordWebmFromLiveMonitor(monitorId, delaySeconds, displayStream, videoMime, setProgress);
-        displayStream = null;
-        downloadBlob(webm, `${baseName}-offline.webm`);
-      }
-
-      setProgress("Exportação concluída.");
+      const htmlFrames = await captureMonitorFrames(monitorId, setProgress);
+      setProgress("Gerando HTML portátil...");
+      const html = buildOfflineHtml(monitorId, htmlFrames, delaySeconds);
+      downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
+      setProgress("HTML portátil gerado.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha ao exportar monitor.");
       setProgress("");
     } finally {
-      displayStream?.getTracks().forEach((track) => track.stop());
       setRunning(false);
     }
   }
@@ -466,18 +314,12 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            HTML funciona offline. A exportação de vídeo usa WebM nativo do Chrome, gravando a própria guia sem canvas: selecione &quot;Esta guia&quot; quando o navegador pedir o compartilhamento.
+            Gera um HTML portátil do conteúdo publicado neste monitor, com ajuste automático de tela, fade e controles de reprodução. Funciona localmente em Chrome, Edge ou Firefox sem internet.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" disabled={running} onClick={() => void exportOffline("html")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} HTML
-          </button>
-          <button type="button" disabled={running} onClick={() => void exportOffline("webm")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
-            <Download className="h-3 w-3" /> Vídeo WebM
-          </button>
-          <button type="button" disabled={running} onClick={() => void exportOffline("both")} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-2.5 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
-            <Download className="h-3 w-3" /> Ambos
+          <button type="button" disabled={running} onClick={() => void exportOffline()} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
+            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} Exportar HTML portátil
           </button>
         </div>
       </div>
