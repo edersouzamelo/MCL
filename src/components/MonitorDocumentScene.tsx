@@ -12,7 +12,8 @@ import type {
 } from "@/modules/grupamento/monitor-content/types";
 
 import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
-import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";\nimport { presentationTextColor } from "@/modules/grupamento/monitor-content/presentation-intelligence";
+import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
+import { presentationTextColor } from "@/modules/grupamento/monitor-content/presentation-intelligence";
 
 function SceneIcon({ type }: { type: MonitorDocumentSceneDto["sceneType"] }) {
   if (type === "CHART") return <BarChart3 className="h-4 w-4" />;
