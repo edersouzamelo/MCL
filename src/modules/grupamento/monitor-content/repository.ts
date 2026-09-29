@@ -137,6 +137,7 @@ export async function persistMonitorContentImport(input: {
   mimeType: string;
   buffer: Buffer;
   importedBy: string;
+  importedByName?: string | null;
   extraction: MonitorDocumentExtraction;
 }) {
   const checksum = monitorContentChecksum(input.buffer);
@@ -161,6 +162,7 @@ export async function persistMonitorContentImport(input: {
           archivedBy: null,
           archivedAt: null,
           importedBy: input.importedBy,
+          importedByName: input.importedByName ?? existing.importedByName,
           importedAt: new Date(),
         },
         include: { scenes: { orderBy: { sceneOrder: "asc" } } },
@@ -203,6 +205,7 @@ export async function persistMonitorContentImport(input: {
         warnings: json(input.extraction.warnings),
         rawFile: bytes(input.buffer),
         importedBy: input.importedBy,
+        importedByName: input.importedByName ?? null,
       },
     });
     if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });
@@ -263,8 +266,6 @@ export async function replaceMonitorContentExtraction(input: {
         status: "PREVIEW",
         sceneCount: sceneRows.length,
         warnings: json(input.extraction.warnings),
-        importedBy: input.actorId,
-        importedAt: new Date(),
         approvedBy: null,
         approvedAt: null,
         archivedBy: null,
@@ -304,6 +305,7 @@ export async function listMonitorContentImports(organizationId: string, monitorI
       sceneCount: true,
       warnings: true,
       importedBy: true,
+      importedByName: true,
       importedAt: true,
       approvedBy: true,
       approvedAt: true,
@@ -403,6 +405,7 @@ export async function getApprovedMonitorScenes(organizationId: string, monitorId
           monitorId: true,
           fileName: true,
           importedAt: true,
+          importedByName: true,
           approvedAt: true,
         },
       },
@@ -421,6 +424,7 @@ export async function getApprovedMonitorScenes(organizationId: string, monitorId
       sourcePage: row.sourcePage,
       sourceFileName: row.import.fileName,
       sourceImportedAt: row.import.importedAt.toISOString(),
+      sourceImportedByName: row.import.importedByName,
       approvedAt: row.import.approvedAt?.toISOString() ?? null,
     }))
     .filter((scene) => scene.payload.layoutVersion === 2);
