@@ -27,6 +27,24 @@ describe("institutional slide preparation", () => {
     ];
     expect(prepareMonitorElements(items).elements).toEqual(items);
   });
+  it("expands a simple dominant chart into unused slide space without covering title or footer", () => {
+    const items: MonitorSlideElement[] = [
+      { kind: "text", text: "Índice de disponibilidade", x: .1, y: .04, w: .8, h: .08, z: 1, role: "title" },
+      { kind: "chart", x: .22, y: .26, w: .56, h: .42, z: 2, chart: { type: "bar", orientation: "horizontal", series: [{ name: "Atual", categories: ["OM A"], values: [80] }] } },
+      { kind: "text", text: "Fonte: relatório validado", x: .1, y: .9, w: .8, h: .04, z: 3, role: "label" },
+    ];
+    const result = prepareMonitorElements(items);
+    const chart = result.elements.find((item) => item.kind === "chart");
+    expect(chart?.kind).toBe("chart");
+    if (chart?.kind === "chart") {
+      expect(chart.x).toBe(.04);
+      expect(chart.w).toBe(.92);
+      expect(chart.y).toBeGreaterThanOrEqual(.135);
+      expect(chart.y + chart.h).toBeLessThanOrEqual(.885);
+    }
+    expect(result.adjustments).toHaveLength(1);
+    expect(prepareMonitorElements(result.elements).elements).toEqual(result.elements);
+  });
   it("does not filter small images in a figure-only slide", () => {
     const items: MonitorSlideElement[] = [{ kind: "image", x: .01, y: .01, w: .05, h: .05, z: 1, assetId: "figure" }];
     expect(prepareMonitorElements(items).elements).toEqual(items);
