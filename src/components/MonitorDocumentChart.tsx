@@ -3,7 +3,7 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { MonitorDocumentChart as Chart } from "@/modules/grupamento/monitor-content/types";
 import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStacked, seriesColor } from "@/modules/grupamento/monitor-content/chart-geometry";
-import { estimatedChartLabelWidth, fitHorizontalCategoryLabel } from "@/modules/grupamento/monitor-content/chart-label-layout";
+import { estimatedChartLabelWidth, fitHorizontalCategoryLabel, fitVerticalCategoryAxis } from "@/modules/grupamento/monitor-content/chart-label-layout";
 import { pieArcPath, pieLabelPositions, pieSliceGeometry } from "@/modules/grupamento/monitor-content/pie-layout";
 
 export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; ccol?: boolean }) {
@@ -48,7 +48,8 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
     }
     return lines.length ? lines : [""];
   };
-  const categoryLines = categoryLabels.map((text) => horizontal ? [text] : wrap(text, width / count - 12));
+  const categoryLines = categoryLabels.map((text) => [text]);
+  const verticalAxisLayout = horizontal ? null : fitVerticalCategoryAxis(categoryLabels, width / count, size.height, preferredCategoryFont);
   // Keep every tick at its true coordinate; stagger labels when space is scarce.
   const tickLanes: number[] = [];
   const laneEnds: number[] = [];
@@ -59,11 +60,13 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
       laneEnds[lane] = center + half;
       tickLanes[index] = lane;
     });
-  margin.bottom = font * (2 + (horizontal ? Math.max(1, laneEnds.length) : Math.max(1, ...categoryLines.map((lines) => lines.length))) * 1.3) + (xTitle ? font * 2 : 0);
+  margin.bottom = horizontal
+    ? font * (2 + Math.max(1, laneEnds.length) * 1.3) + (xTitle ? font * 2 : 0)
+    : Math.max(font * 3.2, (verticalAxisLayout?.bottomExtent ?? font * 1.5) + font * 1.6) + (xTitle ? font * 2 : 0);
   const height = Math.max(1, size.height - margin.top - margin.bottom);
   const categoryLayouts = categoryLabels.map((text, index) => horizontal
     ? fitHorizontalCategoryLabel(text, Math.max(40, categoryWidth - 6), height / count, preferredCategoryFont)
-    : { lines: categoryLines[index], fontSize: preferredCategoryFont, lineHeight: font * 1.2 });
+    : { lines: categoryLines[index], fontSize: verticalAxisLayout?.fontSize ?? preferredCategoryFont, lineHeight: font * 1.2 });
   const ratio = (value: number) => chart.valueReverse ? 1 - (value - min) / (max - min) : (value - min) / (max - min);
   const val = (value: number) => horizontal ? margin.left + ratio(value) * width : margin.top + (1 - ratio(value)) * height;
   const cat = (index: number) => {
@@ -98,8 +101,20 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
             const x = horizontal ? margin.left - 8 : cat(i);
             const y = horizontal
               ? cat(i) + layout.fontSize * .32 - (layout.lines.length - 1) * layout.lineHeight / 2
-              : margin.top + height + font * 1.4;
-            return <text key={i} fill="currentColor" x={x} y={y} textAnchor={horizontal ? "end" : "middle"} fontSize={layout.fontSize} data-category-label data-category-lines={layout.lines.length}>
+              : margin.top + height + font * 1.25;
+            const angle = horizontal ? 0 : verticalAxisLayout?.angle ?? 0;
+            return <text
+              key={i}
+              fill="currentColor"
+              x={x}
+              y={y}
+              transform={angle ? `rotate(${angle} ${x} ${y})` : undefined}
+              textAnchor={horizontal || angle ? "end" : "middle"}
+              fontSize={layout.fontSize}
+              data-category-label
+              data-category-lines={layout.lines.length}
+              data-category-angle={angle}
+            >
               {layout.lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex === 0 ? 0 : layout.lineHeight}>{line}</tspan>)}
             </text>;
           })}
