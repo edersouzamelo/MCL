@@ -3,6 +3,7 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { MonitorDocumentChart as Chart } from "@/modules/grupamento/monitor-content/types";
 import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStacked, seriesColor } from "@/modules/grupamento/monitor-content/chart-geometry";
+import { estimatedChartLabelWidth, fitHorizontalCategoryLabel } from "@/modules/grupamento/monitor-content/chart-label-layout";
 
 export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; ccol?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -11,7 +12,11 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    const observer = new ResizeObserver(() => setSize((current) => node.clientWidth === current.width && node.clientHeight === current.height ? current : { width: node.clientWidth, height: node.clientHeight }));
+    const observer = new ResizeObserver(() => setSize((current) => {
+      const width = node.clientWidth;
+      const height = node.clientHeight;
+      return Math.abs(width - current.width) <= 1 && Math.abs(height - current.height) <= 1 ? current : { width, height };
+    }));
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -27,7 +32,8 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   const xTitle = chart.xAxisTitle;
   const yTitle = chart.yAxisTitle;
   const categoryLabels = Array.from({ length: count }, (_, i) => chart.categoryFormat && categories[i]?.trim() && Number.isFinite(Number(categories[i])) ? chartValueLabel(Number(categories[i]), chart.categoryFormat) : categories[i] ?? "");
-  const categoryWidth = Math.min(size.width * .38, Math.max(80, ...categoryLabels.map((text) => text.length * font * .58)));
+  const preferredCategoryFont = font * .9;
+  const categoryWidth = Math.min(size.width * .48, Math.max(88, ...categoryLabels.map((text) => estimatedChartLabelWidth(text, preferredCategoryFont) + 8)));
   const margin = { left: (horizontal ? categoryWidth + 16 : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: chart.series.some(series => series.dataLabels?.some(Boolean)) && !horizontal ? font * 4 : font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
   const width = Math.max(1, size.width - margin.left - margin.right);
   const wrap = (text: string, available: number) => {
@@ -41,7 +47,7 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
     }
     return lines.length ? lines : [""];
   };
-  const categoryLines = categoryLabels.map((text) => wrap(text, horizontal ? categoryWidth : width / count - 12));
+  const categoryLines = categoryLabels.map((text) => horizontal ? [text] : wrap(text, width / count - 12));
   // Keep every tick at its true coordinate; stagger labels when space is scarce.
   const tickLanes: number[] = [];
   const laneEnds: number[] = [];
@@ -54,6 +60,9 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
     });
   margin.bottom = font * (2 + (horizontal ? Math.max(1, laneEnds.length) : Math.max(1, ...categoryLines.map((lines) => lines.length))) * 1.3) + (xTitle ? font * 2 : 0);
   const height = Math.max(1, size.height - margin.top - margin.bottom);
+  const categoryLayouts = categoryLabels.map((text, index) => horizontal
+    ? fitHorizontalCategoryLabel(text, Math.max(40, categoryWidth - 6), height / count, preferredCategoryFont)
+    : { lines: categoryLines[index], fontSize: preferredCategoryFont, lineHeight: font * 1.2 });
   const ratio = (value: number) => chart.valueReverse ? 1 - (value - min) / (max - min) : (value - min) / (max - min);
   const val = (value: number) => horizontal ? margin.left + ratio(value) * width : margin.top + (1 - ratio(value)) * height;
   const cat = (index: number) => {
@@ -75,7 +84,16 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
           {chart.showGridlines !== false && <line x1={horizontal ? val(tick) : margin.left} x2={horizontal ? val(tick) : margin.left + width} y1={horizontal ? margin.top : val(tick)} y2={horizontal ? margin.top + height : val(tick)} stroke={grid} strokeWidth="1" />}
           <text fill="currentColor" x={horizontal ? val(tick) : margin.left - 8} y={horizontal ? margin.top + height + font * (1.4 + tickLanes[i] * 1.3) : val(tick) + font * .3} textAnchor={horizontal ? "middle" : "end"} fontSize={font * .85}>{label(tick)}</text>
         </g>)}
-        {Array.from({ length: count }, (_, i) => <text key={i} fill="currentColor" x={horizontal ? margin.left - 8 : cat(i)} y={horizontal ? cat(i) + font * .3 : margin.top + height + font * 1.4} textAnchor={horizontal ? "end" : "middle"} fontSize={font * .9} data-category-label>{categoryLines[i].map((line, lineIndex) => <tspan key={lineIndex} x={horizontal ? margin.left - 8 : cat(i)} dy={lineIndex === 0 ? horizontal ? -(categoryLines[i].length - 1) * font * .6 : 0 : font * 1.2}>{line}</tspan>)}</text>)}
+        {Array.from({ length: count }, (_, i) => {
+          const layout = categoryLayouts[i];
+          const x = horizontal ? margin.left - 8 : cat(i);
+          const y = horizontal
+            ? cat(i) + layout.fontSize * .32 - (layout.lines.length - 1) * layout.lineHeight / 2
+            : margin.top + height + font * 1.4;
+          return <text key={i} fill="currentColor" x={x} y={y} textAnchor={horizontal ? "end" : "middle"} fontSize={layout.fontSize} data-category-label data-category-lines={layout.lines.length}>
+            {layout.lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex === 0 ? 0 : layout.lineHeight}>{line}</tspan>)}
+          </text>;
+        })}
         <g clipPath={`url(#${clipId})`}>
           {chart.type === "bar" ? Array.from({ length: count }, (_, index) => {
             const overlap = !isStacked(chart) && (chart.overlap ?? 0) >= 90;
