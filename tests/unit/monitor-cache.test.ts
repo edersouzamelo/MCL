@@ -3,7 +3,7 @@ import { readMonitorSnapshot, sceneAssetUrls, synchronizeMonitor, validatePlayli
 import { defaultCcoMonitorConfig, parseCcoMonitorConfig } from "@/modules/grupamento/monitor";
 import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 
-const scene: MonitorDocumentSceneDto = { id: "test-scene", monitorId: 1, importId: "test-import", sceneOrder: 0, sceneType: "FIGURE", title: "FIXTURE DE TESTE", payload: { assetIds: ["test-image"] }, sourcePage: 1, sourceFileName: "fixture.pptx", sourceImportedAt: "2026-09-25", approvedAt: "2026-09-25" };
+const scene: MonitorDocumentSceneDto = { id: "test-scene", monitorId: 1, importId: "test-import", sceneOrder: 0, sceneType: "FIGURE", title: "FIXTURE DE TESTE", payload: { assetIds: ["test-image"] }, sourcePage: 1, sourceFileName: "fixture.pptx", sourceImportedAt: "2026-09-25", sourceImportedByName: "Operador Teste", approvedAt: "2026-09-25" };
 const monitor = defaultCcoMonitorConfig()[0];
 let failAsset = false;
 let failApi = false;
