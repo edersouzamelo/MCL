@@ -45,7 +45,7 @@ function normalizeMonitor(item: CcoMonitorConfig): CcoMonitorConfig {
   };
 }
 
-export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll = false, buildVersion = "local" }: { monitorId: number; organizationId: string; canEnroll?: boolean; buildVersion?: string }) {
+export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll = false, buildVersion = "local", captureMode = false, initialCaptureFrame = 0 }: { monitorId: number; organizationId: string; canEnroll?: boolean; buildVersion?: string; captureMode?: boolean; initialCaptureFrame?: number }) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [documentScenes, setDocumentScenes] = useState<MonitorDocumentSceneDto[]>([]);
@@ -59,12 +59,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
   const [deviceMessage, setDeviceMessage] = useState("");
   const [deviceEnrolled, setDeviceEnrolled] = useState(false);
-  const [captureMode] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("capture") === "1");
-  const [captureFrame, setCaptureFrame] = useState(() => {
-    if (typeof window === "undefined") return 0;
-    const value = Number(new URLSearchParams(window.location.search).get("frame") ?? "0");
-    return Number.isInteger(value) && value >= 0 ? value : 0;
-  });
+  const [captureFrame, setCaptureFrame] = useState(initialCaptureFrame);
   const activeVersion = useRef<string | null>(null);
   const activeSceneIds = useRef<string[]>([]);
   const pendingSnapshot = useRef<MonitorSnapshot | null>(null);
