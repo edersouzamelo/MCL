@@ -10,11 +10,6 @@ type CapturedHtmlFrame = {
   label: string;
 };
 
-type CapturedVideoFrame = {
-  dataUrl: string;
-  label: string;
-};
-
 const WIDTH = 1920;
 const HEIGHT = 1080;
 
@@ -122,33 +117,6 @@ async function captureRootAsHtml(root: HTMLElement, sourceWindow: Window) {
   return new XMLSerializer().serializeToString(clone);
 }
 
-async function captureRootAsJpeg(root: HTMLElement, sourceWindow: Window) {
-  const clone = await cloneCaptureRoot(root, sourceWindow);
-  const serialized = new XMLSerializer().serializeToString(clone);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
-    <foreignObject width="100%" height="100%">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="width:${WIDTH}px;height:${HEIGHT}px;overflow:hidden;margin:0;">${serialized}</div>
-    </foreignObject>
-  </svg>`;
-
-  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-  try {
-    const image = new Image();
-    image.decoding = "async";
-    image.src = url;
-    await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Canvas indisponível neste navegador.");
-    context.drawImage(image, 0, 0, WIDTH, HEIGHT);
-    return canvas.toDataURL("image/jpeg", 0.9);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -167,7 +135,6 @@ async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number
 async function captureMonitorFrames(
   monitorId: number,
   onProgress: (message: string) => void,
-  format: "html" | "video",
 ) {
   const iframe = document.createElement("iframe");
   iframe.width = String(WIDTH);
@@ -203,7 +170,6 @@ async function captureMonitorFrames(
     }
 
     const htmlFrames: CapturedHtmlFrame[] = [];
-    const videoFrames: CapturedVideoFrame[] = [];
     for (let index = 0; index < frameCount; index += 1) {
       onProgress(`Capturando quadro ${index + 1}/${frameCount}...`);
       if (index > 0) {
@@ -211,19 +177,12 @@ async function captureMonitorFrames(
       }
       const root = await waitForCaptureFrame(iframe, index);
       const label = root.dataset.mclFrameLabel ?? `Quadro ${index + 1}`;
-      if (format === "html") {
-        htmlFrames.push({
-          html: await captureRootAsHtml(root, iframe.contentWindow!),
-          label,
-        });
-      } else {
-        videoFrames.push({
-          dataUrl: await captureRootAsJpeg(root, iframe.contentWindow!),
-          label,
-        });
-      }
+      htmlFrames.push({
+        html: await captureRootAsHtml(root, iframe.contentWindow!),
+        label,
+      });
     }
-    return { htmlFrames, videoFrames };
+    return htmlFrames;
   } finally {
     iframe.remove();
   }
@@ -329,56 +288,108 @@ function supportedMp4Mime() {
   ].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
 }
 
-async function renderMp4(
-  frames: CapturedVideoFrame[],
+function mountRecorderOverlay(frames: CapturedHtmlFrame[]) {
+  const root = document.createElement("div");
+  Object.assign(root.style, {
+    position: "fixed",
+    inset: "0",
+    zIndex: "2147483647",
+    overflow: "hidden",
+    background: "#020617",
+  });
+
+  const surface = document.createElement("div");
+  Object.assign(surface.style, {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: `${WIDTH}px`,
+    height: `${HEIGHT}px`,
+    transformOrigin: "center center",
+    opacity: "1",
+    transition: "opacity 320ms cubic-bezier(.22,1,.36,1)",
+    willChange: "transform,opacity",
+  });
+
+  root.appendChild(surface);
+  document.body.appendChild(root);
+
+  const fit = () => {
+    const scale = Math.min(window.innerWidth / WIDTH, window.innerHeight / HEIGHT);
+    surface.style.transform = `translate(-50%,-50%) scale(${scale})`;
+  };
+  const mount = (index: number) => {
+    const frame = frames[index];
+    surface.innerHTML = frame.html;
+    root.setAttribute("aria-label", frame.label || "MCL");
+  };
+
+  fit();
+  window.addEventListener("resize", fit);
+  return {
+    root,
+    surface,
+    mount,
+    destroy() {
+      window.removeEventListener("resize", fit);
+      root.remove();
+    },
+  };
+}
+
+async function recordMp4FromCurrentTab(
+  frames: CapturedHtmlFrame[],
   delaySeconds: number,
+  stream: MediaStream,
+  mimeType: string,
   onProgress: (message: string) => void,
 ) {
-  const mimeType = supportedMp4Mime();
-  if (!mimeType) {
-    throw new Error("Este navegador não oferece gravação MP4 pelo MediaRecorder. Faça a exportação MP4 em um Chrome/Edge atual ou use o HTML offline.");
+  if (!frames.length) throw new Error("Não há quadros para gravar.");
+
+  const displaySurface = stream.getVideoTracks()[0]?.getSettings().displaySurface;
+  if (displaySurface && displaySurface !== "browser") {
+    throw new Error('Para gerar o MP4, selecione "Esta guia" na janela de compartilhamento do Chrome.');
   }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = WIDTH;
-  canvas.height = HEIGHT;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas indisponível neste navegador.");
-
-  const images = await Promise.all(frames.map(async (frame) => {
-    const image = new Image();
-    image.src = frame.dataUrl;
-    await image.decode();
-    return image;
-  }));
-
-  const stream = canvas.captureStream(30);
+  const overlay = mountRecorderOverlay(frames);
   const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
   recorder.ondataavailable = (event) => {
     if (event.data.size) chunks.push(event.data);
   };
   const stopped = new Promise<void>((resolve, reject) => {
     recorder.onstop = () => resolve();
-    recorder.onerror = () => reject(new Error("Falha durante a codificação MP4."));
+    recorder.onerror = () => reject(new Error("Falha durante a gravação MP4."));
   });
 
-  recorder.start(1000);
-  const frameDuration = Math.max(5, delaySeconds) * 1000;
+  const fadeMs = 320;
+  const frameMs = Math.max(5, delaySeconds) * 1000;
+
   try {
-    for (let index = 0; index < images.length; index += 1) {
-      onProgress(`Codificando MP4 ${index + 1}/${images.length}. Mantenha esta aba aberta...`);
-      context.fillStyle = "#020617";
-      context.fillRect(0, 0, WIDTH, HEIGHT);
-      context.drawImage(images[index], 0, 0, WIDTH, HEIGHT);
-      await wait(frameDuration);
+    overlay.mount(0);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    recorder.start(1000);
+
+    for (let index = 0; index < frames.length; index += 1) {
+      onProgress(`Gravando MP4 ${index + 1}/${frames.length}... mantenha esta guia visível.`);
+      if (index > 0) {
+        overlay.surface.style.opacity = "0";
+        await wait(fadeMs);
+        overlay.mount(index);
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        overlay.surface.style.opacity = "1";
+      }
+      await wait(Math.max(500, frameMs - (index > 0 ? fadeMs : 0)));
     }
-  } finally {
+
     recorder.stop();
+    await stopped;
+    return new Blob(chunks, { type: mimeType });
+  } finally {
+    if (recorder.state !== "inactive") recorder.stop();
+    overlay.destroy();
     stream.getTracks().forEach((track) => track.stop());
   }
-  await stopped;
-  return new Blob(chunks, { type: mimeType });
 }
 
 export function OfflineExportControls({
@@ -397,32 +408,44 @@ export function OfflineExportControls({
     setRunning(true);
     setError("");
     setProgress("Preparando exibição offline...");
-    try {
-      const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
-      let htmlCreated = false;
 
-      if (mode === "html" || mode === "both") {
-        const { htmlFrames } = await captureMonitorFrames(monitorId, setProgress, "html");
-        setProgress("Gerando HTML offline...");
-        const html = buildOfflineHtml(monitorId, htmlFrames, delaySeconds);
-        downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
-        htmlCreated = true;
+    let displayStream: MediaStream | null = null;
+    try {
+      const wantsMp4 = mode === "mp4" || mode === "both";
+      let mp4Mime: string | null = null;
+
+      if (wantsMp4) {
+        mp4Mime = supportedMp4Mime();
+        if (!mp4Mime) {
+          throw new Error("Este navegador não oferece gravação MP4 nativa. Use Chrome ou Edge atual para o teste MP4.");
+        }
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+          throw new Error("Este navegador não oferece captura de guia para gravação MP4.");
+        }
+
+        setProgress('Selecione "Esta guia" na janela de compartilhamento do navegador.');
+        displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 30 },
+          audio: false,
+          preferCurrentTab: true,
+          selfBrowserSurface: "include",
+        } as DisplayMediaStreamOptions);
       }
 
-      if (mode === "mp4" || mode === "both") {
-        try {
-          const { videoFrames } = await captureMonitorFrames(monitorId, setProgress, "video");
-          setProgress("Iniciando codificação MP4...");
-          const mp4 = await renderMp4(videoFrames, delaySeconds, setProgress);
-          downloadBlob(mp4, `${baseName}-offline.mp4`);
-        } catch (mp4Error) {
-          if (htmlCreated) {
-            setError(`HTML gerado com sucesso. MP4 não pôde ser gerado: ${mp4Error instanceof Error ? mp4Error.message : "falha de captura de vídeo"}`);
-            setProgress("");
-            return;
-          }
-          throw mp4Error;
-        }
+      const frames = await captureMonitorFrames(monitorId, setProgress);
+      const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
+
+      if (mode === "html" || mode === "both") {
+        setProgress("Gerando HTML offline...");
+        const html = buildOfflineHtml(monitorId, frames, delaySeconds);
+        downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
+      }
+
+      if (wantsMp4 && displayStream && mp4Mime) {
+        setProgress("Preparando gravação MP4 da própria guia...");
+        const mp4 = await recordMp4FromCurrentTab(frames, delaySeconds, displayStream, mp4Mime, setProgress);
+        displayStream = null;
+        downloadBlob(mp4, `${baseName}-offline.mp4`);
       }
 
       setProgress("Exportação concluída.");
@@ -430,6 +453,7 @@ export function OfflineExportControls({
       setError(cause instanceof Error ? cause.message : "Falha ao exportar monitor.");
       setProgress("");
     } finally {
+      displayStream?.getTracks().forEach((track) => track.stop());
       setRunning(false);
     }
   }
@@ -440,7 +464,7 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            Gera uma cópia visual do conteúdo atualmente publicado neste monitor. O HTML é serializado sem canvas, preserva o enquadramento 16:9 e aplica fade entre quadros. O MP4 permanece experimental e tenta incorporar todos os recursos antes da codificação.
+            HTML funciona offline. O MP4 usa gravação direta da própria guia do navegador, sem canvas: ao clicar, selecione "Esta guia" quando o Chrome pedir o compartilhamento.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
