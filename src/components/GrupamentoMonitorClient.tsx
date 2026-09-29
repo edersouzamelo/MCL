@@ -360,13 +360,13 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
           </div>
           <MonitorClock ccol={ccol} />
           <div
-            className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${connectionState === "offline"
+            className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${captureMode || connectionState === "offline"
               ? (ccol ? "border-amber-300 bg-amber-50 text-amber-700" : "border-amber-400/20 bg-amber-400/10 text-amber-300")
               : (ccol ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300")}`}
-            title={connectionState === "offline" ? (Boolean(sag && rpn) || documentScenes.length > 0) ? "Sem conexão confirmada · último conteúdo local aprovado" : "Sem conexão confirmada · sem conteúdo local" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
-            aria-label={connectionState === "offline" ? "Monitor offline" : "Monitor online"}
+            title={captureMode ? "Artefato de exportação offline" : connectionState === "offline" ? (Boolean(sag && rpn) || documentScenes.length > 0) ? "Sem conexão confirmada · último conteúdo local aprovado" : "Sem conexão confirmada · sem conteúdo local" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
+            aria-label={captureMode ? "Exportação offline" : connectionState === "offline" ? "Monitor offline" : "Monitor online"}
           >
-            {connectionState === "offline" ? <WifiOff className="h-4 w-4" /> : <Wifi className={`h-4 w-4 ${connectionState === "syncing" ? "animate-pulse" : ""}`} />}
+            {captureMode || connectionState === "offline" ? <WifiOff className="h-4 w-4" /> : <Wifi className={`h-4 w-4 ${connectionState === "syncing" ? "animate-pulse" : ""}`} />}
           </div>
           <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${monitor.enabled ? "mcl-monitor-live " : ""}${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
             {monitor.enabled ? "Saída ativa" : "Saída desativada"}
