@@ -6,6 +6,22 @@ function item(str: string, x: number, y: number) {
 }
 
 describe("SAG PDF coordinate reconstruction", () => {
+  it("captures the SAG reference date from the PDF header", () => {
+    const page: PositionedPage = [
+      item("Data de emissão: 29/09/2026", 10, 840),
+      item("UG", 10, 800), item("SIGLA", 70, 800), item("PI", 150, 800),
+      item("DISPONIVEL", 400, 800), item("A_LIQUIDAR", 480, 800), item("EM_LIQUIDACAO", 560, 800),
+      item("LIQUIDADO", 640, 800), item("PAGO", 720, 800),
+      item("160001", 10, 760), item("OM A", 70, 760), item("E6TESTE001", 150, 760),
+      item("20,00", 400, 760), item("30,00", 480, 760), item("10,00", 560, 760),
+      item("15,00", 640, 760), item("25,00", 720, 760),
+    ];
+
+    const result = parseCurrentSagPositionedPages([page], "corrente.pdf");
+
+    expect(result.source.referenceDate).toBe("2026-09-29");
+  });
+
   it("uses the PI column position instead of mistaking NOME UG codes such as CMD018 for PI", () => {
     const page: PositionedPage = [
       item("UASG", 10, 800), item("NOME_UG", 70, 800), item("PI", 150, 800),
