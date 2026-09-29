@@ -38,7 +38,7 @@ async function inlineComputedStyles(source: Element, clone: Element, sourceWindo
     }
   }
 
-  if (sourceElement instanceof sourceWindow.HTMLImageElement && cloneElement instanceof HTMLElement) {
+  if (sourceElement.tagName === "IMG" && cloneElement.tagName === "IMG") {
     const image = sourceElement as HTMLImageElement;
     const target = cloneElement as HTMLImageElement;
     const src = image.currentSrc || image.src;
