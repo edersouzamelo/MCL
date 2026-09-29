@@ -2,7 +2,8 @@
 
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { MonitorDocumentChart as Chart } from "@/modules/grupamento/monitor-content/types";
-import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStacked, seriesColor } from "@/modules/grupamento/monitor-content/chart-geometry";\nimport { estimatedChartLabelWidth, fitHorizontalCategoryLabel } from "@/modules/grupamento/monitor-content/chart-label-layout";
+import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStacked, seriesColor } from "@/modules/grupamento/monitor-content/chart-geometry";
+import { estimatedChartLabelWidth, fitHorizontalCategoryLabel } from "@/modules/grupamento/monitor-content/chart-label-layout";
 
 export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; ccol?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -11,7 +12,11 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    const observer = new ResizeObserver(() => setSize((current) => {\n      const width = node.clientWidth;\n      const height = node.clientHeight;\n      return Math.abs(width - current.width) <= 1 && Math.abs(height - current.height) <= 1 ? current : { width, height };\n    }));
+    const observer = new ResizeObserver(() => setSize((current) => {
+      const width = node.clientWidth;
+      const height = node.clientHeight;
+      return Math.abs(width - current.width) <= 1 && Math.abs(height - current.height) <= 1 ? current : { width, height };
+    }));
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -27,7 +32,8 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   const xTitle = chart.xAxisTitle;
   const yTitle = chart.yAxisTitle;
   const categoryLabels = Array.from({ length: count }, (_, i) => chart.categoryFormat && categories[i]?.trim() && Number.isFinite(Number(categories[i])) ? chartValueLabel(Number(categories[i]), chart.categoryFormat) : categories[i] ?? "");
-  const preferredCategoryFont = font * .9;\n  const categoryWidth = Math.min(size.width * .48, Math.max(88, ...categoryLabels.map((text) => estimatedChartLabelWidth(text, preferredCategoryFont) + 8)));
+  const preferredCategoryFont = font * .9;
+  const categoryWidth = Math.min(size.width * .48, Math.max(88, ...categoryLabels.map((text) => estimatedChartLabelWidth(text, preferredCategoryFont) + 8)));
   const margin = { left: (horizontal ? categoryWidth + 16 : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: chart.series.some(series => series.dataLabels?.some(Boolean)) && !horizontal ? font * 4 : font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
   const width = Math.max(1, size.width - margin.left - margin.right);
   const wrap = (text: string, available: number) => {
@@ -53,7 +59,10 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
       tickLanes[index] = lane;
     });
   margin.bottom = font * (2 + (horizontal ? Math.max(1, laneEnds.length) : Math.max(1, ...categoryLines.map((lines) => lines.length))) * 1.3) + (xTitle ? font * 2 : 0);
-  const height = Math.max(1, size.height - margin.top - margin.bottom);\n  const categoryLayouts = categoryLabels.map((text, index) => horizontal\n    ? fitHorizontalCategoryLabel(text, Math.max(40, categoryWidth - 6), height / count, preferredCategoryFont)\n    : { lines: categoryLines[index], fontSize: preferredCategoryFont, lineHeight: font * 1.2 });
+  const height = Math.max(1, size.height - margin.top - margin.bottom);
+  const categoryLayouts = categoryLabels.map((text, index) => horizontal
+    ? fitHorizontalCategoryLabel(text, Math.max(40, categoryWidth - 6), height / count, preferredCategoryFont)
+    : { lines: categoryLines[index], fontSize: preferredCategoryFont, lineHeight: font * 1.2 });
   const ratio = (value: number) => chart.valueReverse ? 1 - (value - min) / (max - min) : (value - min) / (max - min);
   const val = (value: number) => horizontal ? margin.left + ratio(value) * width : margin.top + (1 - ratio(value)) * height;
   const cat = (index: number) => {
