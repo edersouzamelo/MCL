@@ -130,7 +130,7 @@ async function captureMonitorFrames(
     pointerEvents: "none",
     zIndex: "-1",
   });
-  iframe.src = `/grupamento/monitor/${monitorId}?capture=1&frame=0&export=${Date.now()}`;
+  iframe.src = `/grupamento/monitor-capture/${monitorId}?export=${Date.now()}`;
   document.body.appendChild(iframe);
 
   try {
