@@ -31,6 +31,7 @@ export type RpnImportResult = {
     importedAt: string;
     origin: "MANUAL_RPNP";
     nature: "DADO_IMPORTADO";
+    referenceDate?: string;
     files?: Array<{ family: string; fileName: string; rowCount: number }>;
   };
   sheets: string[];
@@ -217,6 +218,8 @@ export function mergeRpnImportResults(
   const piGroups = groupRows(rows, "pi");
   const ugGroups = groupRows(rows, "ug");
   const warnings = parts.flatMap((part) => part.warnings.map((warning) => `${part.source.fileName}: ${warning}`));
+  const referenceDates = [...new Set(parts.map((part) => part.source.referenceDate).filter((value): value is string => Boolean(value)))];
+  if (referenceDates.length > 1) warnings.push(`Datas de referência divergentes entre os PDFs RPNP: ${referenceDates.join(", ")}.`);
 
   return {
     source: {
@@ -224,6 +227,7 @@ export function mergeRpnImportResults(
       importedAt: new Date().toISOString(),
       origin: "MANUAL_RPNP",
       nature: "DADO_IMPORTADO",
+      referenceDate: referenceDates.length === 1 ? referenceDates[0] : undefined,
       files,
     },
     sheets: parts.flatMap((part) => part.sheets.map((sheet) => `${part.source.fileName} · ${sheet}`)),
@@ -249,7 +253,7 @@ export function mergeRpnImportResults(
   };
 }
 
-export function buildRpnImportResult(rows: RpnRow[], fileName: string, sheets: string[], warnings: string[]): RpnImportResult {
+export function buildRpnImportResult(rows: RpnRow[], fileName: string, sheets: string[], warnings: string[], referenceDate?: string): RpnImportResult {
   const piGroups = groupRows(rows, "pi");
   const ugGroups = groupRows(rows, "ug");
   const divergenceCount = rows.filter((row) => row.valueDivergence).length;
@@ -261,6 +265,7 @@ export function buildRpnImportResult(rows: RpnRow[], fileName: string, sheets: s
       importedAt: new Date().toISOString(),
       origin: "MANUAL_RPNP",
       nature: "DADO_IMPORTADO",
+      referenceDate,
     },
     sheets,
     rows,
