@@ -42,8 +42,11 @@ export async function POST(request: Request) {
     organizationId: user.organizationId, outcome: "SUCESSO", reason: "Notebook HDMI vinculado para exibição restrita.",
     metadata: { monitorId, label: device.label, expiresAt: device.expiresAt.toISOString() }, userAgent: request.headers.get("user-agent") ?? "mcl-monitor-device" });
   const response = NextResponse.json({ device });
+  const secureDisplayCookie =
+    process.env.MCL_COOKIE_SECURE === "true" ||
+    (process.env.MCL_COOKIE_SECURE !== "false" && process.env.NODE_ENV === "production");
   response.cookies.set(DISPLAY_COOKIE, token, {
-    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: DISPLAY_MAX_AGE_SECONDS,
+    httpOnly: true, secure: secureDisplayCookie, sameSite: "lax", path: "/", maxAge: DISPLAY_MAX_AGE_SECONDS,
   });
   return response;
 }
