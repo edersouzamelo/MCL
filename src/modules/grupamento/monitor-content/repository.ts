@@ -276,6 +276,60 @@ export async function replaceMonitorContentExtraction(input: {
   });
 }
 
+export async function replaceApprovedMonitorContentExtraction(input: {
+  id: string;
+  organizationId: string;
+  extraction: MonitorDocumentExtraction;
+}) {
+  const existing = await prisma.monitorContentImport.findFirst({
+    where: { id: input.id, organizationId: input.organizationId, status: "APPROVED" },
+    select: {
+      id: true,
+      fileName: true,
+      monitorId: true,
+      status: true,
+    },
+  });
+  if (!existing) throw new Error("Conteúdo aprovado não encontrado para atualização automática.");
+
+  const assetIds = new Map<string, string>();
+  const assetRows = input.extraction.assets.map((asset) => {
+    const id = randomUUID();
+    assetIds.set(asset.key, id);
+    return {
+      id,
+      importId: existing.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+      data: bytes(asset.data),
+    };
+  });
+  const sceneRows = sceneRowsForImport(existing.id, input.extraction, assetIds);
+
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.monitorContentImport.findFirst({
+      where: { id: existing.id, organizationId: input.organizationId, status: "APPROVED" },
+      select: { id: true },
+    });
+    if (!current) throw new Error("O conteúdo deixou de estar aprovado durante a atualização automática.");
+
+    await tx.monitorContentScene.deleteMany({ where: { importId: existing.id } });
+    await tx.monitorContentAsset.deleteMany({ where: { importId: existing.id } });
+    if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });
+    if (sceneRows.length) await tx.monitorContentScene.createMany({ data: sceneRows });
+    return tx.monitorContentImport.update({
+      where: { id: existing.id },
+      data: {
+        sceneCount: sceneRows.length,
+        warnings: json(input.extraction.warnings),
+      },
+      include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+    });
+  }, { isolationLevel: "Serializable" });
+}
+
 export async function getMonitorContentForReprocess(id: string, organizationId: string) {
   return prisma.monitorContentImport.findFirst({
     where: { id, organizationId },

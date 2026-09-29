@@ -97,6 +97,7 @@ export type MonitorSlideLayout = {
 };
 
 export type MonitorDocumentScenePayload = {
+  extractionVersion?: number;
   layoutVersion?: number;
   layout?: MonitorSlideLayout;
   bullets?: string[];

@@ -2,6 +2,7 @@ import { inflateRawSync, deflateSync } from "node:zlib";
 import { posix } from "node:path";
 import { extractImages, extractTextItems, getDocumentProxy } from "unpdf";
 import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
+import { stampMonitorExtraction } from "@/modules/grupamento/monitor-content/version";
 import type {
   MonitorDocumentAssetDraft,
   MonitorDocumentExtraction,
@@ -430,11 +431,14 @@ async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
 
 export async function extractMonitorDocument(buffer: Buffer, fileName: string): Promise<MonitorDocumentExtraction> {
   const extension = fileName.toLowerCase().split(".").pop() ?? "";
-  if (extension === "pptx") return extractPptxLayout(buffer);
-  if (extension === "docx") return extractDocx(buffer);
-  if (extension === "pdf") return extractPdf(buffer);
-  if (extension === "ppt" || extension === "doc") {
+  let extraction: MonitorDocumentExtraction;
+  if (extension === "pptx") extraction = extractPptxLayout(buffer);
+  else if (extension === "docx") extraction = extractDocx(buffer);
+  else if (extension === "pdf") extraction = await extractPdf(buffer);
+  else if (extension === "ppt" || extension === "doc") {
     throw new Error("Formato legado .ppt/.doc não suportado. Salve como .pptx/.docx ou PDF antes da importação.");
+  } else {
+    throw new Error("Formato não suportado. Use PDF, PPTX ou DOCX.");
   }
-  throw new Error("Formato não suportado. Use PDF, PPTX ou DOCX.");
+  return stampMonitorExtraction(extraction);
 }
