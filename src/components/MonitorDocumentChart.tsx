@@ -4,6 +4,7 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { MonitorDocumentChart as Chart } from "@/modules/grupamento/monitor-content/types";
 import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStacked, seriesColor } from "@/modules/grupamento/monitor-content/chart-geometry";
 import { estimatedChartLabelWidth, fitHorizontalCategoryLabel } from "@/modules/grupamento/monitor-content/chart-label-layout";
+import { pieArcPath, pieLabelPositions, pieSliceGeometry } from "@/modules/grupamento/monitor-content/pie-layout";
 
 export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; ccol?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -86,7 +87,7 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
     <div className={`flex min-h-0 min-w-0 flex-1 ${sideLegend ? "flex-row" : "flex-col"}`}>
       {(chart.legendPosition === "top" || chart.legendPosition === "left") && legend}
       <div ref={ref} className="relative min-h-0 min-w-0 flex-1">
-        {unsupported ? <div className="flex h-full items-center justify-center text-center text-xs" style={{ color: foreground }}>Gráfico {chart.type}: consulte o documento original. Renderização fiel ainda não disponível.</div> : pie ? <Pie chart={chart} colors={legendItems.map((item) => item.color)} /> : <svg width="100%" height="100%" viewBox={`0 0 ${size.width} ${size.height}`} role="img" aria-label={chartAria} style={{ color: foreground, fontFamily: "inherit", fontSize: font }}>
+        {unsupported ? <div className="flex h-full items-center justify-center text-center text-xs" style={{ color: foreground }}>Gráfico {chart.type}: consulte o documento original. Renderização fiel ainda não disponível.</div> : pie ? <Pie chart={chart} colors={legendItems.map((item) => item.color)} size={size} foreground={foreground} ccol={ccol} /> : <svg width="100%" height="100%" viewBox={`0 0 ${size.width} ${size.height}`} role="img" aria-label={chartAria} style={{ color: foreground, fontFamily: "inherit", fontSize: font }}>
           <defs><clipPath id={clipId}><rect x={margin.left} y={margin.top} width={width} height={height} /></clipPath></defs>
           {ticks.map((tick, i) => <g key={i} data-value-tick={tick}>
             {chart.showGridlines !== false && <line x1={horizontal ? val(tick) : margin.left} x2={horizontal ? val(tick) : margin.left + width} y1={horizontal ? margin.top : val(tick)} y2={horizontal ? margin.top + height : val(tick)} stroke={grid} strokeWidth="1" />}
@@ -150,13 +151,75 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
     </div>
   </div>;
 }
-function Pie({ chart, colors }: { chart: Chart; colors: string[] }) {
-  const values = chart.series[0]?.values ?? [];
-  const total = values.reduce((sum, v) => sum + Math.max(0, v), 0);
-  let start = 0;
-  const stops = values.map((value, index) => {
-    const end = start + (total ? Math.max(0, value) / total * 100 : 0);
-    const stop = `${colors[index]} ${start}% ${end}%`; start = end; return stop;
-  });
-  return <div className="flex h-full items-center justify-center"><div role="img" aria-label={chart.series[0]?.name} className="aspect-square h-[85%] rounded-full" style={{ background: total ? `conic-gradient(${stops.join(",")})` : "transparent" }}>{chart.type === "doughnut" && <div className="m-[24%] h-[52%] rounded-full bg-slate-950" />}</div></div>;
+function Pie({ chart, colors, size, foreground, ccol }: { chart: Chart; colors: string[]; size: { width: number; height: number }; foreground: string; ccol: boolean }) {
+  const series = chart.series[0];
+  const values = series?.values ?? [];
+  const labels = series?.dataLabels ?? [];
+  const slices = pieSliceGeometry(values);
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const explicitLabelIndices = labels.flatMap((text, index) => text?.trim() ? [index] : []);
+  const hasLabels = explicitLabelIndices.length > 0;
+  const fontSize = Math.max(11, Math.min(18, size.width / 48));
+  const radius = Math.max(8, Math.min(size.height * (hasLabels ? .29 : .42), size.width * (hasLabels ? .25 : .42)));
+  const innerRadius = chart.type === "doughnut" ? radius * .52 : 0;
+  const positions = pieLabelPositions(slices, size.width, size.height, radius, explicitLabelIndices, fontSize);
+  const labelPosition = new Map(positions.map((item) => [item.index, item]));
+  const wrapLabel = (text: string) => {
+    const cleaned = text.replace(/\s+/g, " ").trim();
+    const limit = Math.max(12, Math.min(30, Math.floor(size.width / Math.max(1, fontSize * 3.2))));
+    const lines: string[] = [];
+    for (const word of cleaned.split(" ")) {
+      if (lines.length && lines[lines.length - 1].length + word.length + 1 <= limit) lines[lines.length - 1] += " " + word;
+      else lines.push(word);
+    }
+    return lines.length ? lines : [cleaned];
+  };
+
+  return <svg
+    width="100%"
+    height="100%"
+    viewBox={`0 0 ${size.width} ${size.height}`}
+    role="img"
+    aria-label={chart.title || series?.name || "Gráfico de setores"}
+    style={{ overflow: "visible", fontFamily: "inherit" }}
+    data-pie-chart
+  >
+    {total > 0 && slices.map((slice) => slice.value > 0 ? <path
+      key={slice.index}
+      d={pieArcPath(size.width / 2, size.height / 2, radius, slice.startAngle, slice.endAngle, innerRadius)}
+      fill={colors[slice.index] ?? seriesColor({ ...series, color: undefined }, slice.index)}
+      stroke={ccol ? "#ffffff" : "#0f172a"}
+      strokeWidth="1"
+      data-pie-slice={slice.index}
+    ><title>{series?.categories?.[slice.index] ?? "Categoria"}: {slice.value}</title></path> : null)}
+    {positions.map((position) => {
+      const text = labels[position.index]?.trim();
+      if (!text) return null;
+      const lines = wrapLabel(text);
+      return <g key={position.index} data-pie-label={position.index}>
+        <polyline
+          points={`${position.lineStartX},${position.lineStartY} ${position.lineBendX},${position.lineBendY} ${position.x},${position.y}`}
+          fill="none"
+          stroke={foreground}
+          strokeWidth="1.5"
+          opacity=".82"
+        />
+        <text
+          x={position.x}
+          y={position.y - (lines.length - 1) * fontSize * .55}
+          textAnchor={position.anchor}
+          fill={foreground}
+          stroke={ccol ? "#ffffff" : "#071421"}
+          strokeWidth="3"
+          paintOrder="stroke"
+          strokeLinejoin="round"
+          fontSize={fontSize}
+          fontWeight="800"
+        >
+          {lines.map((line, lineIndex) => <tspan key={lineIndex} x={position.x} dy={lineIndex ? fontSize * 1.15 : 0}>{line}</tspan>)}
+        </text>
+      </g>;
+    })}
+    {chart.type === "doughnut" && total <= 0 ? <circle cx={size.width / 2} cy={size.height / 2} r={radius} fill="none" stroke={foreground} opacity=".2" /> : null}
+  </svg>;
 }
