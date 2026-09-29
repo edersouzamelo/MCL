@@ -257,18 +257,31 @@ body{font-family:Arial,sans-serif}
 #surface>main{width:1920px!important;height:1080px!important;max-width:none!important;max-height:none!important}
 @keyframes mclMonitorBarReveal{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 #surface .mcl-broadcast-bar{animation:mclMonitorBarReveal 1.2s cubic-bezier(.16,1,.3,1) both}
+#controls{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:8px;z-index:12;padding:6px 8px;border:1px solid rgba(125,211,252,.18);border-radius:999px;background:rgba(2,6,23,.72);backdrop-filter:blur(8px)}
+#controls button{width:38px;height:32px;border:0;border-radius:999px;background:rgba(255,255,255,.06);color:#dbeafe;font:700 14px Arial,sans-serif;cursor:pointer}
+#controls button:hover{background:rgba(56,189,248,.14)}
 #badge{position:fixed;right:10px;bottom:8px;padding:4px 7px;border-radius:5px;background:rgba(2,6,23,.68);color:rgba(255,255,255,.72);font:10px Arial,sans-serif;letter-spacing:.05em;z-index:10}
 </style>
 </head>
 <body>
 <div id="stage" aria-label="Exibição offline do MCL"><div id="surface"></div></div>
+<div id="controls" aria-label="Controles da apresentação">
+  <button id="prev" type="button" title="Quadro anterior">◀</button>
+  <button id="toggle" type="button" title="Pausar apresentação">Ⅱ</button>
+  <button id="nextBtn" type="button" title="Próximo quadro">▶</button>
+</div>
 <div id="badge">MCL OFFLINE · Monitor ${String(monitorId).padStart(2, "0")} · gerado ${generatedAt}</div>
 <script>
 const frames=${safeFrames};
 const delay=${Math.max(5, delaySeconds) * 1000};
 const stage=document.getElementById("stage");
 const surface=document.getElementById("surface");
+const prevButton=document.getElementById("prev");
+const toggleButton=document.getElementById("toggle");
+const nextButton=document.getElementById("nextBtn");
 let index=0;
+let playing=true;
+let timer=null;
 function fit(){
   const scale=Math.min(window.innerWidth/1920,window.innerHeight/1080);
   surface.style.transform="translate(-50%,-50%) scale("+scale+")";
@@ -277,19 +290,31 @@ function mount(frame){
   surface.innerHTML=frame.html;
   stage.setAttribute("aria-label",frame.label||"MCL");
 }
-function next(){
-  if(frames.length<2)return;
+function show(target){
+  if(!frames.length)return;
   surface.style.opacity="0";
   setTimeout(()=>{
-    index=(index+1)%frames.length;
+    index=(target+frames.length)%frames.length;
     mount(frames[index]);
     requestAnimationFrame(()=>requestAnimationFrame(()=>{surface.style.opacity="1"}));
   },320);
 }
+function schedule(){
+  if(timer)clearInterval(timer);
+  if(playing&&frames.length>1)timer=setInterval(()=>show(index+1),delay);
+}
+prevButton.addEventListener("click",()=>{show(index-1);schedule()});
+nextButton.addEventListener("click",()=>{show(index+1);schedule()});
+toggleButton.addEventListener("click",()=>{
+  playing=!playing;
+  toggleButton.textContent=playing?"Ⅱ":"▶";
+  toggleButton.title=playing?"Pausar apresentação":"Retomar apresentação";
+  schedule();
+});
 mount(frames[0]);
 fit();
 window.addEventListener("resize",fit);
-setInterval(next,delay);
+schedule();
 </script>
 </body>
 </html>`;
