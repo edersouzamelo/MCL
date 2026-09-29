@@ -30,6 +30,35 @@ function blobToDataUrl(blob: Blob) {
     reader.readAsDataURL(blob);
   });
 }
+function transparentPixelDataUrl() {
+  return "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+}
+
+async function resourceToDataUrl(value: string, sourceWindow: Window) {
+  if (!value) return transparentPixelDataUrl();
+  if (value.startsWith("data:")) return value;
+  try {
+    const absolute = new URL(value, sourceWindow.location.href).toString();
+    const response = await fetch(absolute, { credentials: "include", cache: "no-store" });
+    if (!response.ok) return transparentPixelDataUrl();
+    return await blobToDataUrl(await response.blob());
+  } catch {
+    return transparentPixelDataUrl();
+  }
+}
+
+async function inlineCssUrls(value: string, sourceWindow: Window) {
+  const matches = [...value.matchAll(/url\((['"]?)(.*?)\1\)/g)];
+  if (!matches.length) return value;
+  let next = value;
+  for (const match of matches) {
+    const original = match[0];
+    const raw = match[2];
+    const dataUrl = await resourceToDataUrl(raw, sourceWindow);
+    next = next.replace(original, `url("${dataUrl}")`);
+  }
+  return next;
+}
 
 async function inlineComputedStyles(source: Element, clone: Element, sourceWindow: Window) {
   const sourceElement = source as HTMLElement;
@@ -37,7 +66,9 @@ async function inlineComputedStyles(source: Element, clone: Element, sourceWindo
   const computed = sourceWindow.getComputedStyle(sourceElement);
   for (const property of Array.from(computed)) {
     try {
-      cloneElement.style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+      const rawValue = computed.getPropertyValue(property);
+      const value = rawValue.includes("url(") ? await inlineCssUrls(rawValue, sourceWindow) : rawValue;
+      cloneElement.style.setProperty(property, value, computed.getPropertyPriority(property));
     } catch {
       // Algumas propriedades calculadas são somente leitura no clone. Elas podem ser ignoradas.
     }
@@ -47,17 +78,16 @@ async function inlineComputedStyles(source: Element, clone: Element, sourceWindo
     const image = sourceElement as HTMLImageElement;
     const target = cloneElement as HTMLImageElement;
     const src = image.currentSrc || image.src;
-    if (src) {
-      try {
-        const response = await fetch(src, { credentials: "include", cache: "no-store" });
-        if (response.ok) {
-          target.src = await blobToDataUrl(await response.blob());
-          target.removeAttribute("srcset");
-          target.removeAttribute("sizes");
-        }
-      } catch {
-        // A captura prossegue. O teste visual revelará qualquer asset não incorporado.
-      }
+    if (src) target.src = await resourceToDataUrl(src, sourceWindow);
+    target.removeAttribute("srcset");
+    target.removeAttribute("sizes");
+  }
+  if (sourceElement.tagName.toLowerCase() === "image" && cloneElement.tagName.toLowerCase() === "image") {
+    const href = sourceElement.getAttribute("href") ?? sourceElement.getAttribute("xlink:href");
+    if (href) {
+      const dataUrl = await resourceToDataUrl(href, sourceWindow);
+      cloneElement.setAttribute("href", dataUrl);
+      cloneElement.setAttribute("xlink:href", dataUrl);
     }
   }
 
@@ -221,28 +251,70 @@ function buildOfflineHtml(monitorId: number, frames: CapturedHtmlFrame[], delayS
 <title>MCL Monitor ${String(monitorId).padStart(2, "0")} Offline</title>
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020617}
-body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
-#stage{position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:#020617}
-#stage>main{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important}
-#badge{position:fixed;right:10px;bottom:8px;padding:4px 7px;border-radius:5px;background:rgba(2,6,23,.68);color:rgba(255,255,255,.72);font:10px Arial,sans-serif;letter-spacing:.05em}
+body{font-family:Arial,sans-serif}
+#stage{position:fixed;inset:0;overflow:hidden;background:#020617}
+#surface{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center center;opacity:1;transition:opacity 320ms cubic-bezier(.22,1,.36,1);will-change:transform,opacity}
+#surface>main{width:1920px!important;height:1080px!important;max-width:none!important;max-height:none!important}
+@keyframes mclMonitorBarReveal{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+#surface .mcl-broadcast-bar{animation:mclMonitorBarReveal 1.2s cubic-bezier(.16,1,.3,1) both}
+#controls{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:8px;z-index:12;padding:6px 8px;border:1px solid rgba(125,211,252,.18);border-radius:999px;background:rgba(2,6,23,.72);backdrop-filter:blur(8px)}
+#controls button{width:38px;height:32px;border:0;border-radius:999px;background:rgba(255,255,255,.06);color:#dbeafe;font:700 14px Arial,sans-serif;cursor:pointer}
+#controls button:hover{background:rgba(56,189,248,.14)}
+#badge{position:fixed;right:10px;bottom:8px;padding:4px 7px;border-radius:5px;background:rgba(2,6,23,.68);color:rgba(255,255,255,.72);font:10px Arial,sans-serif;letter-spacing:.05em;z-index:10}
 </style>
 </head>
 <body>
-<div id="stage" aria-label="Exibição offline do MCL"></div>
+<div id="stage" aria-label="Exibição offline do MCL"><div id="surface"></div></div>
+<div id="controls" aria-label="Controles da apresentação">
+  <button id="prev" type="button" title="Quadro anterior">◀</button>
+  <button id="toggle" type="button" title="Pausar apresentação">Ⅱ</button>
+  <button id="nextBtn" type="button" title="Próximo quadro">▶</button>
+</div>
 <div id="badge">MCL OFFLINE · Monitor ${String(monitorId).padStart(2, "0")} · gerado ${generatedAt}</div>
 <script>
 const frames=${safeFrames};
 const delay=${Math.max(5, delaySeconds) * 1000};
 const stage=document.getElementById("stage");
+const surface=document.getElementById("surface");
+const prevButton=document.getElementById("prev");
+const toggleButton=document.getElementById("toggle");
+const nextButton=document.getElementById("nextBtn");
 let index=0;
-function show(){
-  const frame=frames[index];
-  stage.innerHTML=frame.html;
-  stage.setAttribute("aria-label",frame.label||"MCL");
-  index=(index+1)%frames.length;
+let playing=true;
+let timer=null;
+function fit(){
+  const scale=Math.min(window.innerWidth/1920,window.innerHeight/1080);
+  surface.style.transform="translate(-50%,-50%) scale("+scale+")";
 }
-show();
-setInterval(show,delay);
+function mount(frame){
+  surface.innerHTML=frame.html;
+  stage.setAttribute("aria-label",frame.label||"MCL");
+}
+function show(target){
+  if(!frames.length)return;
+  surface.style.opacity="0";
+  setTimeout(()=>{
+    index=(target+frames.length)%frames.length;
+    mount(frames[index]);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{surface.style.opacity="1"}));
+  },320);
+}
+function schedule(){
+  if(timer)clearInterval(timer);
+  if(playing&&frames.length>1)timer=setInterval(()=>show(index+1),delay);
+}
+prevButton.addEventListener("click",()=>{show(index-1);schedule()});
+nextButton.addEventListener("click",()=>{show(index+1);schedule()});
+toggleButton.addEventListener("click",()=>{
+  playing=!playing;
+  toggleButton.textContent=playing?"Ⅱ":"▶";
+  toggleButton.title=playing?"Pausar apresentação":"Retomar apresentação";
+  schedule();
+});
+mount(frames[0]);
+fit();
+window.addEventListener("resize",fit);
+schedule();
 </script>
 </body>
 </html>`;
@@ -368,7 +440,7 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            Gera uma cópia visual do conteúdo atualmente publicado neste monitor. O HTML é serializado sem canvas e roda em navegador sem rede. O MP4 permanece experimental e pode ser bloqueado pelo navegador.
+            Gera uma cópia visual do conteúdo atualmente publicado neste monitor. O HTML é serializado sem canvas, preserva o enquadramento 16:9 e aplica fade entre quadros. O MP4 permanece experimental e tenta incorporar todos os recursos antes da codificação.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
