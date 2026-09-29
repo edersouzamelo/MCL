@@ -288,7 +288,7 @@ function supportedMp4Mime() {
   ].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
 }
 
-function mountRecorderOverlay(frames: CapturedHtmlFrame[]) {
+function mountLiveRecorderFrame(monitorId: number) {
   const root = document.createElement("div");
   Object.assign(root.style, {
     position: "fixed",
@@ -298,93 +298,95 @@ function mountRecorderOverlay(frames: CapturedHtmlFrame[]) {
     background: "#020617",
   });
 
-  const surface = document.createElement("div");
-  Object.assign(surface.style, {
+  const iframe = document.createElement("iframe");
+  iframe.src = `/grupamento/monitor-capture/${monitorId}?record=${Date.now()}`;
+  iframe.setAttribute("aria-label", `Monitor ${monitorId} em gravação MP4`);
+  Object.assign(iframe.style, {
     position: "absolute",
-    left: "50%",
-    top: "50%",
-    width: `${WIDTH}px`,
-    height: `${HEIGHT}px`,
-    transformOrigin: "center center",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    border: "0",
+    background: "#020617",
     opacity: "1",
     transition: "opacity 320ms cubic-bezier(.22,1,.36,1)",
-    willChange: "transform,opacity",
   });
 
-  root.appendChild(surface);
+  root.appendChild(iframe);
   document.body.appendChild(root);
 
-  const fit = () => {
-    const scale = Math.min(window.innerWidth / WIDTH, window.innerHeight / HEIGHT);
-    surface.style.transform = `translate(-50%,-50%) scale(${scale})`;
-  };
-  const mount = (index: number) => {
-    const frame = frames[index];
-    surface.innerHTML = frame.html;
-    root.setAttribute("aria-label", frame.label || "MCL");
-  };
-
-  fit();
-  window.addEventListener("resize", fit);
   return {
     root,
-    surface,
-    mount,
+    iframe,
     destroy() {
-      window.removeEventListener("resize", fit);
       root.remove();
     },
   };
 }
 
-async function recordMp4FromCurrentTab(
-  frames: CapturedHtmlFrame[],
+async function waitForIframeLoad(iframe: HTMLIFrameElement, timeoutMs = 25_000) {
+  await new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("Tempo esgotado abrindo o monitor para gravação.")), timeoutMs);
+    iframe.onload = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+  });
+}
+
+async function recordMp4FromLiveMonitor(
+  monitorId: number,
   delaySeconds: number,
   stream: MediaStream,
   mimeType: string,
   onProgress: (message: string) => void,
 ) {
-  if (!frames.length) throw new Error("Não há quadros para gravar.");
-
   const displaySurface = stream.getVideoTracks()[0]?.getSettings().displaySurface;
   if (displaySurface && displaySurface !== "browser") {
     throw new Error('Para gerar o MP4, selecione "Esta guia" na janela de compartilhamento do Chrome.');
   }
 
-  const overlay = mountRecorderOverlay(frames);
+  const overlay = mountLiveRecorderFrame(monitorId);
   const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
-  recorder.ondataavailable = (event) => {
-    if (event.data.size) chunks.push(event.data);
-  };
-  const stopped = new Promise<void>((resolve, reject) => {
-    recorder.onstop = () => resolve();
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+  const stopped = new Promise<Blob>((resolve, reject) => {
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunks.push(event.data);
+    };
     recorder.onerror = () => reject(new Error("Falha durante a gravação MP4."));
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
   const fadeMs = 320;
   const frameMs = Math.max(5, delaySeconds) * 1000;
 
   try {
-    overlay.mount(0);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    recorder.start(1000);
+    await waitForIframeLoad(overlay.iframe);
+    const firstRoot = await waitForCaptureFrame(overlay.iframe, 0);
+    const frameCount = Number(firstRoot.dataset.mclPlaylistCount ?? "0");
+    if (!Number.isInteger(frameCount) || frameCount < 1) {
+      throw new Error("Este monitor não possui conteúdo ativo para gravar.");
+    }
 
-    for (let index = 0; index < frames.length; index += 1) {
-      onProgress(`Gravando MP4 ${index + 1}/${frames.length}... mantenha esta guia visível.`);
+    const track = stream.getVideoTracks()[0];
+    if (track) track.contentHint = "detail";
+
+    recorder.start();
+
+    for (let index = 0; index < frameCount; index += 1) {
+      onProgress(`Gravando MP4 ${index + 1}/${frameCount}... mantenha esta guia visível.`);
       if (index > 0) {
-        overlay.surface.style.opacity = "0";
+        overlay.iframe.style.opacity = "0";
         await wait(fadeMs);
-        overlay.mount(index);
-        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-        overlay.surface.style.opacity = "1";
+        overlay.iframe.contentWindow?.postMessage({ type: "MCL_CAPTURE_FRAME", frameIndex: index }, window.location.origin);
+        await waitForCaptureFrame(overlay.iframe, index);
+        overlay.iframe.style.opacity = "1";
       }
       await wait(Math.max(500, frameMs - (index > 0 ? fadeMs : 0)));
     }
 
     recorder.stop();
-    await stopped;
-    return new Blob(chunks, { type: mimeType });
+    return await stopped;
   } finally {
     if (recorder.state !== "inactive") recorder.stop();
     overlay.destroy();
@@ -432,18 +434,18 @@ export function OfflineExportControls({
         } as DisplayMediaStreamOptions);
       }
 
-      const frames = await captureMonitorFrames(monitorId, setProgress);
       const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
 
       if (mode === "html" || mode === "both") {
+        const frames = await captureMonitorFrames(monitorId, setProgress);
         setProgress("Gerando HTML offline...");
         const html = buildOfflineHtml(monitorId, frames, delaySeconds);
         downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
       }
 
       if (wantsMp4 && displayStream && mp4Mime) {
-        setProgress("Preparando gravação MP4 da própria guia...");
-        const mp4 = await recordMp4FromCurrentTab(frames, delaySeconds, displayStream, mp4Mime, setProgress);
+        setProgress("Preparando gravação MP4 do monitor ao vivo...");
+        const mp4 = await recordMp4FromLiveMonitor(monitorId, delaySeconds, displayStream, mp4Mime, setProgress);
         displayStream = null;
         downloadBlob(mp4, `${baseName}-offline.mp4`);
       }
@@ -464,7 +466,7 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            HTML funciona offline. O MP4 usa gravação direta da própria guia do navegador, sem canvas: ao clicar, selecione &quot;Esta guia&quot; quando o Chrome pedir o compartilhamento.
+            HTML funciona offline. O MP4 grava o monitor ao vivo pela própria guia, sem canvas e sem guardar os 9 quadros clonados em memória: selecione &quot;Esta guia&quot; quando o Chrome pedir o compartilhamento.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
