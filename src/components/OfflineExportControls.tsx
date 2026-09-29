@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 
-type ExportMode = "html" | "mp4" | "both";
+type ExportMode = "html" | "webm" | "both";
 
 type CapturedHtmlFrame = {
   html: string;
@@ -279,12 +279,12 @@ schedule();
 </html>`;
 }
 
-function supportedMp4Mime() {
+function supportedWebmMime() {
   if (typeof MediaRecorder === "undefined") return null;
   return [
-    "video/mp4;codecs=avc1.42E01E",
-    "video/mp4;codecs=avc1",
-    "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
   ].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
 }
 
@@ -300,7 +300,7 @@ function mountLiveRecorderFrame(monitorId: number) {
 
   const iframe = document.createElement("iframe");
   iframe.src = `/grupamento/monitor-capture/${monitorId}?record=${Date.now()}`;
-  iframe.setAttribute("aria-label", `Monitor ${monitorId} em gravação MP4`);
+  iframe.setAttribute("aria-label", `Monitor ${monitorId} em gravação WebM`);
   Object.assign(iframe.style, {
     position: "absolute",
     inset: "0",
@@ -334,7 +334,7 @@ async function waitForIframeLoad(iframe: HTMLIFrameElement, timeoutMs = 25_000) 
   });
 }
 
-async function recordMp4FromLiveMonitor(
+async function recordWebmFromLiveMonitor(
   monitorId: number,
   delaySeconds: number,
   stream: MediaStream,
@@ -343,7 +343,7 @@ async function recordMp4FromLiveMonitor(
 ) {
   const displaySurface = stream.getVideoTracks()[0]?.getSettings().displaySurface;
   if (displaySurface && displaySurface !== "browser") {
-    throw new Error('Para gerar o MP4, selecione "Esta guia" na janela de compartilhamento do Chrome.');
+    throw new Error('Para gerar o vídeo, selecione "Esta guia" na janela de compartilhamento do Chrome.');
   }
 
   const overlay = mountLiveRecorderFrame(monitorId);
@@ -353,7 +353,7 @@ async function recordMp4FromLiveMonitor(
     recorder.ondataavailable = (event) => {
       if (event.data.size) chunks.push(event.data);
     };
-    recorder.onerror = () => reject(new Error("Falha durante a gravação MP4."));
+    recorder.onerror = () => reject(new Error("Falha durante a gravação WebM."));
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
@@ -374,7 +374,7 @@ async function recordMp4FromLiveMonitor(
     recorder.start();
 
     for (let index = 0; index < frameCount; index += 1) {
-      onProgress(`Gravando MP4 ${index + 1}/${frameCount}... mantenha esta guia visível.`);
+      onProgress(`Gravando WebM ${index + 1}/${frameCount}... mantenha esta guia visível.`);
       if (index > 0) {
         overlay.iframe.style.opacity = "0";
         await wait(fadeMs);
@@ -413,16 +413,16 @@ export function OfflineExportControls({
 
     let displayStream: MediaStream | null = null;
     try {
-      const wantsMp4 = mode === "mp4" || mode === "both";
-      let mp4Mime: string | null = null;
+      const wantsVideo = mode === "webm" || mode === "both";
+      let videoMime: string | null = null;
 
-      if (wantsMp4) {
-        mp4Mime = supportedMp4Mime();
-        if (!mp4Mime) {
-          throw new Error("Este navegador não oferece gravação MP4 nativa. Use Chrome ou Edge atual para o teste MP4.");
+      if (wantsVideo) {
+        videoMime = supportedWebmMime();
+        if (!videoMime) {
+          throw new Error("Este navegador não oferece gravação WebM nativa. Use Chrome ou Edge atual.");
         }
         if (!navigator.mediaDevices?.getDisplayMedia) {
-          throw new Error("Este navegador não oferece captura de guia para gravação MP4.");
+          throw new Error("Este navegador não oferece captura de guia para gravação WebM.");
         }
 
         setProgress('Selecione "Esta guia" na janela de compartilhamento do navegador.');
@@ -443,11 +443,11 @@ export function OfflineExportControls({
         downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
       }
 
-      if (wantsMp4 && displayStream && mp4Mime) {
-        setProgress("Preparando gravação MP4 do monitor ao vivo...");
-        const mp4 = await recordMp4FromLiveMonitor(monitorId, delaySeconds, displayStream, mp4Mime, setProgress);
+      if (wantsVideo && displayStream && videoMime) {
+        setProgress("Preparando gravação WebM do monitor ao vivo...");
+        const webm = await recordWebmFromLiveMonitor(monitorId, delaySeconds, displayStream, videoMime, setProgress);
         displayStream = null;
-        downloadBlob(mp4, `${baseName}-offline.mp4`);
+        downloadBlob(webm, `${baseName}-offline.webm`);
       }
 
       setProgress("Exportação concluída.");
@@ -466,15 +466,15 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            HTML funciona offline. O MP4 grava o monitor ao vivo pela própria guia, sem canvas e sem guardar os 9 quadros clonados em memória: selecione &quot;Esta guia&quot; quando o Chrome pedir o compartilhamento.
+            HTML funciona offline. A exportação de vídeo usa WebM nativo do Chrome, gravando a própria guia sem canvas: selecione &quot;Esta guia&quot; quando o navegador pedir o compartilhamento.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <button type="button" disabled={running} onClick={() => void exportOffline("html")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
             {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} HTML
           </button>
-          <button type="button" disabled={running} onClick={() => void exportOffline("mp4")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
-            <Download className="h-3 w-3" /> MP4
+          <button type="button" disabled={running} onClick={() => void exportOffline("webm")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
+            <Download className="h-3 w-3" /> Vídeo WebM
           </button>
           <button type="button" disabled={running} onClick={() => void exportOffline("both")} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-2.5 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
             <Download className="h-3 w-3" /> Ambos
