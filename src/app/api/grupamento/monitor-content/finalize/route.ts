@@ -40,9 +40,20 @@ export async function POST(request: Request) {
   if (!roles.some((role) => ALLOWED_ROLES.has(role))) return NextResponse.json({ error: "Permissão insuficiente para importar conteúdo documental." }, { status: 403 });
   if (!session.user.organizationId) return NextResponse.json({ error: "Sessão sem organização." }, { status: 422 });
 
-  const body = await request.json().catch(() => null) as { uploadId?: string } | null;
+  const body = await request.json().catch(() => null) as { uploadId?: string; operatorName?: string } | null;
   const uploadId = String(body?.uploadId ?? "");
   if (!validUploadId(uploadId)) return NextResponse.json({ error: "Identificador de carga inválido." }, { status: 400 });
+
+  const demoIdentity = Boolean(
+    session.user.email?.toLowerCase().endsWith("@mcl.invalid") || session.user.id.startsWith("usr-demo"),
+  );
+  const informedOperatorName = String(body?.operatorName ?? "").trim().replace(/\s+/g, " ").slice(0, 120);
+  if (demoIdentity && informedOperatorName.length < 3) {
+    return NextResponse.json({ error: "A conta demonstrativa exige a identificação do responsável pelo upload." }, { status: 422 });
+  }
+  const importedByName = demoIdentity
+    ? informedOperatorName
+    : (session.user.name?.trim() || session.user.email?.trim() || session.user.id);
 
   try {
     const assembled = await assembleMonitorUpload({
@@ -67,6 +78,7 @@ export async function POST(request: Request) {
       mimeType: assembled.mimeType,
       buffer: assembled.buffer,
       importedBy: session.user.id,
+      importedByName,
       extraction,
     });
 
@@ -93,6 +105,7 @@ export async function POST(request: Request) {
           assetCount: extraction.assets.length,
           warningCount: extraction.warnings.length,
           deduplicated: persisted.deduplicated,
+          importedByName,
         },
       },
     });
