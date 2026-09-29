@@ -63,3 +63,43 @@ export function fitHorizontalCategoryLabel(
 export function estimatedChartLabelWidth(text: string, fontPx: number) {
   return textWidth(text, fontPx);
 }
+
+
+export type VerticalCategoryAxisLayout = {
+  angle: number;
+  fontSize: number;
+  bottomExtent: number;
+};
+
+export function fitVerticalCategoryAxis(
+  labels: string[],
+  slotPx: number,
+  availableHeightPx: number,
+  preferredFontPx: number,
+): VerticalCategoryAxisLayout {
+  const clean = labels.map(normalized).filter(Boolean);
+  const preferred = Math.max(9, preferredFontPx);
+  if (!clean.length) return { angle: 0, fontSize: preferred, bottomExtent: preferred * 1.4 };
+
+  const maxWidthAt = (fontSize: number) => Math.max(...clean.map((text) => textWidth(text, fontSize)));
+  const directWidth = maxWidthAt(preferred);
+  if (directWidth <= Math.max(12, slotPx * .9)) {
+    return { angle: 0, fontSize: preferred, bottomExtent: preferred * 1.5 };
+  }
+
+  const maxBottom = Math.max(64, availableHeightPx * .4);
+  for (const angle of [-45, -55, -65, -75, -82, -90]) {
+    const radians = Math.abs(angle) * Math.PI / 180;
+    for (let fontSize = preferred; fontSize >= 9; fontSize -= .5) {
+      const width = maxWidthAt(fontSize);
+      const projectedHorizontal = width * Math.cos(radians) + fontSize * Math.sin(radians);
+      const projectedVertical = width * Math.sin(radians) + fontSize * Math.cos(radians);
+      if (projectedHorizontal <= Math.max(14, slotPx * .94) && projectedVertical <= maxBottom) {
+        return { angle, fontSize, bottomExtent: projectedVertical + fontSize * .9 };
+      }
+    }
+  }
+
+  const fallbackFont = Math.max(9, Math.min(preferred, maxBottom / Math.max(1, maxWidthAt(1))));
+  return { angle: -90, fontSize: fallbackFont, bottomExtent: Math.min(maxBottom, maxWidthAt(fallbackFont)) + fallbackFont };
+}
