@@ -36,6 +36,7 @@ export type SagImportResult = {
     importedAt: string;
     origin: "MANUAL_SAG";
     nature: "DADO_IMPORTADO";
+    referenceDate?: string;
     files?: Array<{ family: string; fileName: string; rowCount: number }>;
   };
   sheets: string[];
@@ -239,6 +240,8 @@ export function mergeSagImportResults(
   const piGroups = groupRows(rows, "pi");
   const ugGroups = groupRows(rows, "ug");
   const warnings = parts.flatMap((part) => part.warnings.map((warning) => `${part.source.fileName}: ${warning}`));
+  const referenceDates = [...new Set(parts.map((part) => part.source.referenceDate).filter((value): value is string => Boolean(value)))];
+  if (referenceDates.length > 1) warnings.push(`Datas de referência divergentes entre os PDFs SAG: ${referenceDates.join(", ")}.`);
 
   return {
     source: {
@@ -246,6 +249,7 @@ export function mergeSagImportResults(
       importedAt: new Date().toISOString(),
       origin: "MANUAL_SAG",
       nature: "DADO_IMPORTADO",
+      referenceDate: referenceDates.length === 1 ? referenceDates[0] : undefined,
       files,
     },
     sheets: parts.flatMap((part) => part.sheets.map((sheet) => `${part.source.fileName} · ${sheet}`)),

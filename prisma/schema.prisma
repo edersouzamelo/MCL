@@ -236,6 +236,7 @@ model MonitorContentImport {
   warnings       Json
   rawFile        Bytes
   importedBy     String
+  importedByName String?
   importedAt     DateTime     @default(now())
   approvedBy     String?
   approvedAt     DateTime?

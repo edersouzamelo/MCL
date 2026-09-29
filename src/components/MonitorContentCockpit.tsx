@@ -23,6 +23,7 @@ type ImportRecord = {
   sceneCount: number;
   warnings: string[];
   importedAt: string;
+  importedByName: string | null;
   approvedAt: string | null;
   scenes: ScenePreview[];
 };
@@ -34,7 +35,15 @@ function size(bytes: number) {
   return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
+export function MonitorContentCockpit({
+  monitorId,
+  currentUserName,
+  requiresOperatorIdentification = false,
+}: {
+  monitorId: number;
+  currentUserName?: string;
+  requiresOperatorIdentification?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [imports, setImports] = useState<ImportRecord[]>([]);
   const [busy, setBusy] = useState(false);
@@ -67,6 +76,17 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
   async function upload(file: File) {
     setError("");
     setNotice("");
+
+    let operatorName = currentUserName?.trim() || "";
+    if (requiresOperatorIdentification) {
+      const informed = window.prompt("Identifique o responsável por este upload documental:", "");
+      if (informed === null) return;
+      operatorName = informed.trim();
+      if (operatorName.length < 3) {
+        setError("Informe o nome do responsável pelo upload documental.");
+        return;
+      }
+    }
     const extension = file.name.toLowerCase().split(".").pop() ?? "";
     if (!["pdf", "pptx", "docx"].includes(extension)) {
       setError("Use PDF, PPTX ou DOCX. Arquivos .ppt/.doc antigos devem ser salvos no formato atual.");
@@ -103,7 +123,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
       const finalize = await fetch("/api/grupamento/monitor-content/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploadId }),
+        body: JSON.stringify({ uploadId, operatorName }),
       });
       const payload = await finalize.json();
       if (!finalize.ok) throw new Error(payload.error ?? "Falha ao estruturar o documento.");
@@ -196,6 +216,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
       sourcePage: scene.sourcePage,
       sourceFileName: preview.fileName,
       sourceImportedAt: preview.importedAt,
+      sourceImportedByName: preview.importedByName,
       approvedAt: null,
     };
   }
@@ -236,7 +257,7 @@ export function MonitorContentCockpit({ monitorId }: { monitorId: number }) {
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">Aguardando aprovação humana</div>
                   <div className="mt-1 text-sm font-bold">{preview.fileName}</div>
-                  <div className="text-[11px] text-zinc-500">{size(preview.fileSize)} · {preview.sceneCount} cena(s)</div>
+                  <div className="text-[11px] text-zinc-500">{size(preview.fileSize)} · {preview.sceneCount} cena(s) · input {new Date(preview.importedAt).toLocaleString("pt-BR")}{preview.importedByName ? ` · ${preview.importedByName}` : ""}</div>
                 </div>
                 <div className="flex gap-2">
                   <a href={`/api/grupamento/monitor-content/${preview.id}/source`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-[10px] font-bold dark:border-zinc-700 dark:bg-zinc-950"><Download className="h-3.5 w-3.5" /> Original</a>

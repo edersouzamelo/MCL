@@ -141,5 +141,6 @@ export type MonitorDocumentSceneDto = {
   sourcePage: number | null;
   sourceFileName: string;
   sourceImportedAt: string;
+  sourceImportedByName: string | null;
   approvedAt: string | null;
 };
