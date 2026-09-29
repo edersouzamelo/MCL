@@ -403,9 +403,9 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
           <div className="flex min-w-0 items-center gap-4">
             <span className="flex min-w-0 items-center gap-1.5">
               <Database className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Fonte: {activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "aguardando sincronização")}</span>
+              <span className="truncate">Fonte: {!activeItem ? "nenhuma" : activeItem.kind === "document" ? activeItem.scene.sourceFileName : (sag && rpn ? `${sag.source.fileName} + ${rpn.source.fileName}` : "aguardando sincronização")}</span>
             </span>
-            {activeItem.kind === "system" ? (
+            {activeItem?.kind === "system" ? (
               <span className="hidden items-center gap-1.5 xl:flex">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Matriz PI/Classe: {CCO_RULE_SOURCE.fileName} · {CCO_RULE_SOURCE.referenceDate}
