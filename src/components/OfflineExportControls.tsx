@@ -464,7 +464,7 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            HTML funciona offline. O MP4 usa gravação direta da própria guia do navegador, sem canvas: ao clicar, selecione "Esta guia" quando o Chrome pedir o compartilhamento.
+            HTML funciona offline. O MP4 usa gravação direta da própria guia do navegador, sem canvas: ao clicar, selecione &quot;Esta guia&quot; quando o Chrome pedir o compartilhamento.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
