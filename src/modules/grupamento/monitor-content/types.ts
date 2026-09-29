@@ -11,6 +11,7 @@ export type MonitorDocumentSeries = {
 };
 
 export type MonitorDocumentChart = {
+  title?: string;
   type: "bar" | "line" | "pie" | "doughnut" | "area" | "scatter" | "unknown";
   orientation?: "vertical" | "horizontal";
   grouping?: "clustered" | "stacked" | "percentStacked" | "standard";
