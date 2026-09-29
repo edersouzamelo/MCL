@@ -127,6 +127,7 @@ describe("monitor content extraction", () => {
       expect(graph.chart.xAxisTitle).toBe("Itens de suprimento");
       expect(graph.chart.yAxisTitle).toBe("Toneladas/litros");
     }
+    expect(scene.payload.searchableText).toContain("Índice de disponibilidade por OM");
   });
 
   it("preserves horizontal chart semantics, overlap and multiple colored series", async () => {
