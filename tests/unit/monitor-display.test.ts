@@ -4,6 +4,7 @@ import { storedZip } from "../../src/modules/grupamento/monitor-content/extract.
 import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
 import { paginateMonitor } from "@/modules/grupamento/monitor-pagination";
 import { barSegments, chartDomain, chartTicks, chartValueLabel, isDateFormat } from "@/modules/grupamento/monitor-content/chart-geometry";
+import { pieLabelPositions, pieSliceGeometry } from "@/modules/grupamento/monitor-content/pie-layout";
 import type { MonitorDocumentChart } from "@/modules/grupamento/monitor-content/types";
 
 const chart: MonitorDocumentChart = { type: "bar", grouping: "stacked", series: [
@@ -91,6 +92,43 @@ describe("axis format regression: Reserva Regional", () => {
   });
 });
 
+
+
+describe("PPTX pie slice labels", () => {
+  it("preserves category and percentage labels declared on each pie slice", () => {
+    const xml = `<c:chart><c:plotArea><c:pieChart>
+      <c:ser><c:tx><c:v>Total recebido</c:v></c:tx>
+      <c:cat><c:strCache><c:pt idx="0"><c:v>DIESEL</c:v></c:pt><c:pt idx="1"><c:v>GASOLINA</c:v></c:pt></c:strCache></c:cat>
+      <c:val><c:numCache><c:pt idx="0"><c:v>85</c:v></c:pt><c:pt idx="1"><c:v>15</c:v></c:pt></c:numCache></c:val>
+      </c:ser>
+      <c:dLbls><c:showCatName val="1"/><c:showPercent val="1"/><c:separator> · </c:separator></c:dLbls>
+      </c:pieChart></c:plotArea><c:legend><c:legendPos val="r"/></c:legend></c:chart>`;
+    const result = extractPptxLayout(storedZip([
+      { name: "ppt/slides/slide1.xml", data: Buffer.from(`<p:sld><p:graphicFrame><p:xfrm><a:off x="0" y="0"/><a:ext cx="12192000" cy="6858000"/></p:xfrm><c:chart r:id="rId1"/></p:graphicFrame></p:sld>`) },
+      { name: "ppt/slides/_rels/slide1.xml.rels", data: Buffer.from(`<Relationships><Relationship Id="rId1" Type="chart" Target="../charts/chart1.xml"/></Relationships>`) },
+      { name: "ppt/charts/chart1.xml", data: Buffer.from(xml) },
+    ]));
+    const graph = result.scenes[0].payload.layout!.elements.find((e) => e.kind === "chart");
+    expect(graph?.kind).toBe("chart");
+    if (graph?.kind !== "chart") return;
+    expect(graph.chart.type).toBe("pie");
+    expect(graph.chart.series[0].categories).toEqual(["DIESEL", "GASOLINA"]);
+    expect(graph.chart.series[0].dataLabels).toEqual(["DIESEL · 85%", "GASOLINA · 15%"]);
+  });
+
+  it("allocates one non-overlapping outside label position per identified slice", () => {
+    const slices = pieSliceGeometry([55, 20, 15, 10]);
+    const positions = pieLabelPositions(slices, 900, 480, 125, [0, 1, 2, 3], 14);
+    expect(positions.map((item) => item.index)).toEqual([0, 1, 2, 3]);
+    const left = positions.filter((item) => item.anchor === "end").sort((a, b) => a.y - b.y);
+    const right = positions.filter((item) => item.anchor === "start").sort((a, b) => a.y - b.y);
+    for (const side of [left, right]) {
+      for (let index = 1; index < side.length; index += 1) {
+        expect(side[index].y - side[index - 1].y).toBeGreaterThanOrEqual(18.1);
+      }
+    }
+  });
+});
 
 describe("PPTX data labels", () => {
   it("extracts explicit labels by point and inherits automatic labels without inventing hidden labels", () => {
