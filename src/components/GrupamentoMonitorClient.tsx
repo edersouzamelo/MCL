@@ -25,6 +25,13 @@ import {
 const SCREEN_FADE_MS = 320;
 const DATA_REFRESH_MS = 30_000;
 
+function formatSourceDate(value?: string | null) {
+  if (!value) return "data não identificada";
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value;
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("pt-BR");
+}
+
 function pageSizeForScreen(screen: CcoScreenId) {
   if (screen === "pis") return CCO_PI_ROWS_PER_PAGE;
   if (screen.startsWith("units-")) return CCO_UNIT_ROWS_PER_PAGE;
@@ -197,16 +204,19 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   }, [documentScenes, monitor.screens, rpn, sag]);
 
   const safeIndex = Math.min(screenIndex, Math.max(0, playlist.length - 1));
-  const activeItem = playlist[safeIndex] ?? {
-    kind: "system" as const,
-    key: "system:overview",
-    screen: "overview" as CcoScreenId,
-    label: "Visão executiva",
-    page: 0,
-    pageSize: 0,
-  };
-  const activeScreen = activeItem.kind === "system" ? activeItem.screen : null;
-  const screenLabel = activeItem.label;
+  const activeItem = playlist[safeIndex] ?? null;
+  const activeScreen = activeItem?.kind === "system" ? activeItem.screen : null;
+  const screenLabel = activeItem?.label ?? "Sem conteúdo selecionado";
+  const dataProvenance = useMemo(() => {
+    if (!activeItem) return "Sem fonte ativa";
+    if (activeItem.kind === "document") {
+      return `Input: ${formatSourceDate(activeItem.scene.sourceImportedAt)} · ${activeItem.scene.sourceImportedByName ?? "responsável não identificado"}`;
+    }
+    const currentDate = formatSourceDate(sag?.source.referenceDate);
+    const previousDate = formatSourceDate(rpn?.source.referenceDate);
+    if (currentDate === previousDate) return `Fonte: SAG · ${currentDate}`;
+    return `Fonte: SAG · EC ${currentDate} · RPNP ${previousDate}`;
+  }, [activeItem, rpn?.source.referenceDate, sag?.source.referenceDate]);
   const effectiveLoop = monitor.mode === "loop" && playlist.length > 1;
   const autoAdvance = effectiveLoop && playbackState === "playing";
 
@@ -278,6 +288,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
 
   const screenContent = !monitor.enabled ? (
     <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
+  ) : !activeItem ? (
+    <Empty ccol={ccol} title="Sem conteúdo selecionado" description="Selecione uma tela SAG ou aprove conteúdo documental para esta saída." />
   ) : activeItem.kind === "document" ? (
     <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={playbackState !== "playing"} onPageCount={onPageCount} />
   ) : !sag || !rpn ? (
@@ -318,7 +330,10 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <div className="mt-1 truncate text-lg font-black">{monitor.label} · {screenLabel}</div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-5 text-right">
+        <div className="flex shrink-0 items-center gap-4 text-right">
+          <div className={`max-w-[360px] truncate text-[10px] font-bold uppercase tracking-[0.12em] ${ccol ? "text-slate-600" : "text-slate-300"}`} title={dataProvenance}>
+            {dataProvenance}
+          </div>
           <MonitorClock ccol={ccol} />
           <div
             className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${connectionState === "offline"
@@ -346,12 +361,12 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
           className={`h-full w-full transition-opacity ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-0" : "opacity-100"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
-          <div key={activeItem.key} className="mcl-monitor-scene h-full w-full">
+          <div key={activeItem?.key ?? "empty-playlist"} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
-              documentMode={(activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn}
+              documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               paused={playbackState !== "playing"}
-              onPageCount={activeItem.kind === "document" ? undefined : onPageCount}
+              onPageCount={activeItem?.kind === "document" || !activeItem ? undefined : onPageCount}
             >
               {screenContent}
             </MonitorViewport>
