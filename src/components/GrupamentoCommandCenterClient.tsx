@@ -76,7 +76,17 @@ function readStored<T>(key: string): T | null {
   }
 }
 
-export function GrupamentoCommandCenterClient({ organizationId, canManageDevices = false }: { organizationId?: string; canManageDevices?: boolean }) {
+export function GrupamentoCommandCenterClient({
+  organizationId,
+  canManageDevices = false,
+  currentUserName,
+  requiresOperatorIdentification = false,
+}: {
+  organizationId?: string;
+  canManageDevices?: boolean;
+  currentUserName?: string;
+  requiresOperatorIdentification?: boolean;
+}) {
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [currentMode, setCurrentMode] = useState<SagUploadMode>("family");
@@ -309,7 +319,7 @@ export function GrupamentoCommandCenterClient({ organizationId, canManageDevices
       if (monitor.id !== id) return monitor;
       const exists = monitor.screens.includes(screen);
       const screens = exists ? monitor.screens.filter((item) => item !== screen) : [...monitor.screens, screen];
-      return { ...monitor, screens: screens.length ? screens : ["overview"] };
+      return { ...monitor, screens };
     }));
   }
 
@@ -492,7 +502,7 @@ export function GrupamentoCommandCenterClient({ organizationId, canManageDevices
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><div className="flex items-center gap-2 text-sm font-bold"><MonitorCog className="h-4 w-4" /> Matriz de distribuição — 8 monitores</div><p className="mt-1 text-xs text-zinc-500">Cada saída escolhe telas, loop, intervalo e layout MCL ou padrão CCOL.</p></div>
+          <div><div className="flex items-center gap-2 text-sm font-bold"><MonitorCog className="h-4 w-4" /> Matriz de distribuição — 8 monitores</div><p className="mt-1 text-xs text-zinc-500">Cada saída escolhe telas SAG, conteúdo documental, loop, intervalo e layout. É permitido deixar todas as telas SAG desmarcadas e exibir somente documentos aprovados.</p></div>
           <button type="button" disabled={!monitorsReady} onClick={() => void resetMonitors()} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-900">Restaurar padrão</button>
         </div>
 
@@ -519,7 +529,11 @@ export function GrupamentoCommandCenterClient({ organizationId, canManageDevices
                   return <button key={screen.id} type="button" onClick={() => toggleScreen(monitor.id, screen.id)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition ${selected ? "border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-300" : "border-zinc-200 text-zinc-500 dark:border-zinc-800"}`}>{selected ? <CheckCircle2 className="mr-1 inline h-3 w-3" /> : null}{screen.label}</button>;
                 })}
               </div>
-              <MonitorContentCockpit monitorId={monitor.id} />
+              <MonitorContentCockpit
+                monitorId={monitor.id}
+                currentUserName={currentUserName}
+                requiresOperatorIdentification={requiresOperatorIdentification}
+              />
               {canManageDevices ? <MonitorDeviceControls monitorId={monitor.id} /> : null}
             </article>
           ))}
