@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { MonitorContentCockpit } from "@/components/MonitorContentCockpit";
+import { OfflineExportControls } from "@/components/OfflineExportControls";
 import { CCO_CLASS_SLIDES, CCO_RULE_SOURCE, findUnmappedPis } from "@/modules/grupamento/cco";
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
@@ -534,6 +535,7 @@ export function GrupamentoCommandCenterClient({
                 currentUserName={currentUserName}
                 requiresOperatorIdentification={requiresOperatorIdentification}
               />
+              <OfflineExportControls monitorId={monitor.id} delaySeconds={monitor.delaySeconds} />
               {canManageDevices ? <MonitorDeviceControls monitorId={monitor.id} /> : null}
             </article>
           ))}
