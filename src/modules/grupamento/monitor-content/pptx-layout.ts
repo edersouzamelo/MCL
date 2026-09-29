@@ -437,6 +437,9 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     for (const reason of new Set(presentation.omitted.map((item) => item.reason))) {
       warnings.push("Slide " + page + ": " + reason + ". Omitido na exibição institucional; original preservado.");
     }
+    for (const adjustment of presentation.adjustments) {
+      warnings.push("Slide " + page + ": " + adjustment + " Original preservado.");
+    }
     if (/p:grpSp\b/.test(xml)) warnings.push("Slide " + page + ": grupo de objetos detectado; revisar prévia.");
     scenes.push({
       sceneType:"TEXT",
