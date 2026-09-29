@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 
-type ExportMode = "html" | "mp4" | "both";
-
 type CapturedHtmlFrame = {
   html: string;
   label: string;
@@ -279,119 +277,6 @@ schedule();
 </html>`;
 }
 
-function supportedMp4Mime() {
-  if (typeof MediaRecorder === "undefined") return null;
-  return [
-    "video/mp4;codecs=avc1.42E01E",
-    "video/mp4;codecs=avc1",
-    "video/mp4",
-  ].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
-}
-
-function mountRecorderOverlay(frames: CapturedHtmlFrame[]) {
-  const root = document.createElement("div");
-  Object.assign(root.style, {
-    position: "fixed",
-    inset: "0",
-    zIndex: "2147483647",
-    overflow: "hidden",
-    background: "#020617",
-  });
-
-  const surface = document.createElement("div");
-  Object.assign(surface.style, {
-    position: "absolute",
-    left: "50%",
-    top: "50%",
-    width: `${WIDTH}px`,
-    height: `${HEIGHT}px`,
-    transformOrigin: "center center",
-    opacity: "1",
-    transition: "opacity 320ms cubic-bezier(.22,1,.36,1)",
-    willChange: "transform,opacity",
-  });
-
-  root.appendChild(surface);
-  document.body.appendChild(root);
-
-  const fit = () => {
-    const scale = Math.min(window.innerWidth / WIDTH, window.innerHeight / HEIGHT);
-    surface.style.transform = `translate(-50%,-50%) scale(${scale})`;
-  };
-  const mount = (index: number) => {
-    const frame = frames[index];
-    surface.innerHTML = frame.html;
-    root.setAttribute("aria-label", frame.label || "MCL");
-  };
-
-  fit();
-  window.addEventListener("resize", fit);
-  return {
-    root,
-    surface,
-    mount,
-    destroy() {
-      window.removeEventListener("resize", fit);
-      root.remove();
-    },
-  };
-}
-
-async function recordMp4FromCurrentTab(
-  frames: CapturedHtmlFrame[],
-  delaySeconds: number,
-  stream: MediaStream,
-  mimeType: string,
-  onProgress: (message: string) => void,
-) {
-  if (!frames.length) throw new Error("Não há quadros para gravar.");
-
-  const displaySurface = stream.getVideoTracks()[0]?.getSettings().displaySurface;
-  if (displaySurface && displaySurface !== "browser") {
-    throw new Error('Para gerar o MP4, selecione "Esta guia" na janela de compartilhamento do Chrome.');
-  }
-
-  const overlay = mountRecorderOverlay(frames);
-  const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
-  recorder.ondataavailable = (event) => {
-    if (event.data.size) chunks.push(event.data);
-  };
-  const stopped = new Promise<void>((resolve, reject) => {
-    recorder.onstop = () => resolve();
-    recorder.onerror = () => reject(new Error("Falha durante a gravação MP4."));
-  });
-
-  const fadeMs = 320;
-  const frameMs = Math.max(5, delaySeconds) * 1000;
-
-  try {
-    overlay.mount(0);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    recorder.start(1000);
-
-    for (let index = 0; index < frames.length; index += 1) {
-      onProgress(`Gravando MP4 ${index + 1}/${frames.length}... mantenha esta guia visível.`);
-      if (index > 0) {
-        overlay.surface.style.opacity = "0";
-        await wait(fadeMs);
-        overlay.mount(index);
-        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-        overlay.surface.style.opacity = "1";
-      }
-      await wait(Math.max(500, frameMs - (index > 0 ? fadeMs : 0)));
-    }
-
-    recorder.stop();
-    await stopped;
-    return new Blob(chunks, { type: mimeType });
-  } finally {
-    if (recorder.state !== "inactive") recorder.stop();
-    overlay.destroy();
-    stream.getTracks().forEach((track) => track.stop());
-  }
-}
-
 export function OfflineExportControls({
   monitorId,
   delaySeconds,
@@ -403,57 +288,22 @@ export function OfflineExportControls({
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
-  async function exportOffline(mode: ExportMode) {
+  async function exportOffline() {
     if (running) return;
     setRunning(true);
     setError("");
     setProgress("Preparando exibição offline...");
-
-    let displayStream: MediaStream | null = null;
     try {
-      const wantsMp4 = mode === "mp4" || mode === "both";
-      let mp4Mime: string | null = null;
-
-      if (wantsMp4) {
-        mp4Mime = supportedMp4Mime();
-        if (!mp4Mime) {
-          throw new Error("Este navegador não oferece gravação MP4 nativa. Use Chrome ou Edge atual para o teste MP4.");
-        }
-        if (!navigator.mediaDevices?.getDisplayMedia) {
-          throw new Error("Este navegador não oferece captura de guia para gravação MP4.");
-        }
-
-        setProgress('Selecione "Esta guia" na janela de compartilhamento do navegador.');
-        displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 30 },
-          audio: false,
-          preferCurrentTab: true,
-          selfBrowserSurface: "include",
-        } as DisplayMediaStreamOptions);
-      }
-
-      const frames = await captureMonitorFrames(monitorId, setProgress);
       const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
-
-      if (mode === "html" || mode === "both") {
-        setProgress("Gerando HTML offline...");
-        const html = buildOfflineHtml(monitorId, frames, delaySeconds);
-        downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
-      }
-
-      if (wantsMp4 && displayStream && mp4Mime) {
-        setProgress("Preparando gravação MP4 da própria guia...");
-        const mp4 = await recordMp4FromCurrentTab(frames, delaySeconds, displayStream, mp4Mime, setProgress);
-        displayStream = null;
-        downloadBlob(mp4, `${baseName}-offline.mp4`);
-      }
-
-      setProgress("Exportação concluída.");
+      const htmlFrames = await captureMonitorFrames(monitorId, setProgress);
+      setProgress("Gerando HTML portátil...");
+      const html = buildOfflineHtml(monitorId, htmlFrames, delaySeconds);
+      downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
+      setProgress("HTML portátil gerado.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha ao exportar monitor.");
       setProgress("");
     } finally {
-      displayStream?.getTracks().forEach((track) => track.stop());
       setRunning(false);
     }
   }
@@ -464,18 +314,12 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            HTML funciona offline. O MP4 usa gravação direta da própria guia do navegador, sem canvas: ao clicar, selecione &quot;Esta guia&quot; quando o Chrome pedir o compartilhamento.
+            Gera um HTML portátil do conteúdo publicado neste monitor, com ajuste automático de tela, fade e controles de reprodução. Funciona localmente em Chrome, Edge ou Firefox sem internet.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" disabled={running} onClick={() => void exportOffline("html")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} HTML
-          </button>
-          <button type="button" disabled={running} onClick={() => void exportOffline("mp4")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
-            <Download className="h-3 w-3" /> MP4
-          </button>
-          <button type="button" disabled={running} onClick={() => void exportOffline("both")} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-2.5 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
-            <Download className="h-3 w-3" /> Ambos
+          <button type="button" disabled={running} onClick={() => void exportOffline()} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
+            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} Exportar HTML portátil
           </button>
         </div>
       </div>
