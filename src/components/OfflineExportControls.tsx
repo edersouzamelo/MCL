@@ -3,15 +3,8 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 
-type ExportMode = "html" | "mp4" | "both";
-
 type CapturedHtmlFrame = {
   html: string;
-  label: string;
-};
-
-type CapturedVideoFrame = {
-  dataUrl: string;
   label: string;
 };
 
@@ -122,33 +115,6 @@ async function captureRootAsHtml(root: HTMLElement, sourceWindow: Window) {
   return new XMLSerializer().serializeToString(clone);
 }
 
-async function captureRootAsJpeg(root: HTMLElement, sourceWindow: Window) {
-  const clone = await cloneCaptureRoot(root, sourceWindow);
-  const serialized = new XMLSerializer().serializeToString(clone);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
-    <foreignObject width="100%" height="100%">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="width:${WIDTH}px;height:${HEIGHT}px;overflow:hidden;margin:0;">${serialized}</div>
-    </foreignObject>
-  </svg>`;
-
-  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-  try {
-    const image = new Image();
-    image.decoding = "async";
-    image.src = url;
-    await image.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Canvas indisponível neste navegador.");
-    context.drawImage(image, 0, 0, WIDTH, HEIGHT);
-    return canvas.toDataURL("image/jpeg", 0.9);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -167,7 +133,6 @@ async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number
 async function captureMonitorFrames(
   monitorId: number,
   onProgress: (message: string) => void,
-  format: "html" | "video",
 ) {
   const iframe = document.createElement("iframe");
   iframe.width = String(WIDTH);
@@ -203,7 +168,6 @@ async function captureMonitorFrames(
     }
 
     const htmlFrames: CapturedHtmlFrame[] = [];
-    const videoFrames: CapturedVideoFrame[] = [];
     for (let index = 0; index < frameCount; index += 1) {
       onProgress(`Capturando quadro ${index + 1}/${frameCount}...`);
       if (index > 0) {
@@ -211,19 +175,12 @@ async function captureMonitorFrames(
       }
       const root = await waitForCaptureFrame(iframe, index);
       const label = root.dataset.mclFrameLabel ?? `Quadro ${index + 1}`;
-      if (format === "html") {
-        htmlFrames.push({
-          html: await captureRootAsHtml(root, iframe.contentWindow!),
-          label,
-        });
-      } else {
-        videoFrames.push({
-          dataUrl: await captureRootAsJpeg(root, iframe.contentWindow!),
-          label,
-        });
-      }
+      htmlFrames.push({
+        html: await captureRootAsHtml(root, iframe.contentWindow!),
+        label,
+      });
     }
-    return { htmlFrames, videoFrames };
+    return htmlFrames;
   } finally {
     iframe.remove();
   }
@@ -320,67 +277,6 @@ schedule();
 </html>`;
 }
 
-function supportedMp4Mime() {
-  if (typeof MediaRecorder === "undefined") return null;
-  return [
-    "video/mp4;codecs=avc1.42E01E",
-    "video/mp4;codecs=avc1",
-    "video/mp4",
-  ].find((mime) => MediaRecorder.isTypeSupported(mime)) ?? null;
-}
-
-async function renderMp4(
-  frames: CapturedVideoFrame[],
-  delaySeconds: number,
-  onProgress: (message: string) => void,
-) {
-  const mimeType = supportedMp4Mime();
-  if (!mimeType) {
-    throw new Error("Este navegador não oferece gravação MP4 pelo MediaRecorder. Faça a exportação MP4 em um Chrome/Edge atual ou use o HTML offline.");
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = WIDTH;
-  canvas.height = HEIGHT;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas indisponível neste navegador.");
-
-  const images = await Promise.all(frames.map(async (frame) => {
-    const image = new Image();
-    image.src = frame.dataUrl;
-    await image.decode();
-    return image;
-  }));
-
-  const stream = canvas.captureStream(30);
-  const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
-  recorder.ondataavailable = (event) => {
-    if (event.data.size) chunks.push(event.data);
-  };
-  const stopped = new Promise<void>((resolve, reject) => {
-    recorder.onstop = () => resolve();
-    recorder.onerror = () => reject(new Error("Falha durante a codificação MP4."));
-  });
-
-  recorder.start(1000);
-  const frameDuration = Math.max(5, delaySeconds) * 1000;
-  try {
-    for (let index = 0; index < images.length; index += 1) {
-      onProgress(`Codificando MP4 ${index + 1}/${images.length}. Mantenha esta aba aberta...`);
-      context.fillStyle = "#020617";
-      context.fillRect(0, 0, WIDTH, HEIGHT);
-      context.drawImage(images[index], 0, 0, WIDTH, HEIGHT);
-      await wait(frameDuration);
-    }
-  } finally {
-    recorder.stop();
-    stream.getTracks().forEach((track) => track.stop());
-  }
-  await stopped;
-  return new Blob(chunks, { type: mimeType });
-}
-
 export function OfflineExportControls({
   monitorId,
   delaySeconds,
@@ -392,40 +288,18 @@ export function OfflineExportControls({
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
-  async function exportOffline(mode: ExportMode) {
+  async function exportOffline() {
     if (running) return;
     setRunning(true);
     setError("");
     setProgress("Preparando exibição offline...");
     try {
       const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
-      let htmlCreated = false;
-
-      if (mode === "html" || mode === "both") {
-        const { htmlFrames } = await captureMonitorFrames(monitorId, setProgress, "html");
-        setProgress("Gerando HTML offline...");
-        const html = buildOfflineHtml(monitorId, htmlFrames, delaySeconds);
-        downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
-        htmlCreated = true;
-      }
-
-      if (mode === "mp4" || mode === "both") {
-        try {
-          const { videoFrames } = await captureMonitorFrames(monitorId, setProgress, "video");
-          setProgress("Iniciando codificação MP4...");
-          const mp4 = await renderMp4(videoFrames, delaySeconds, setProgress);
-          downloadBlob(mp4, `${baseName}-offline.mp4`);
-        } catch (mp4Error) {
-          if (htmlCreated) {
-            setError(`HTML gerado com sucesso. MP4 não pôde ser gerado: ${mp4Error instanceof Error ? mp4Error.message : "falha de captura de vídeo"}`);
-            setProgress("");
-            return;
-          }
-          throw mp4Error;
-        }
-      }
-
-      setProgress("Exportação concluída.");
+      const htmlFrames = await captureMonitorFrames(monitorId, setProgress);
+      setProgress("Gerando HTML portátil...");
+      const html = buildOfflineHtml(monitorId, htmlFrames, delaySeconds);
+      downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
+      setProgress("HTML portátil gerado.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha ao exportar monitor.");
       setProgress("");
@@ -440,18 +314,12 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            Gera uma cópia visual do conteúdo atualmente publicado neste monitor. O HTML é serializado sem canvas, preserva o enquadramento 16:9 e aplica fade entre quadros. O MP4 permanece experimental e tenta incorporar todos os recursos antes da codificação.
+            Gera um HTML portátil do conteúdo publicado neste monitor, com ajuste automático de tela, fade e controles de reprodução. Funciona localmente em Chrome, Edge ou Firefox sem internet.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" disabled={running} onClick={() => void exportOffline("html")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} HTML
-          </button>
-          <button type="button" disabled={running} onClick={() => void exportOffline("mp4")} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:border-sky-900 dark:bg-zinc-950 dark:text-sky-300">
-            <Download className="h-3 w-3" /> MP4
-          </button>
-          <button type="button" disabled={running} onClick={() => void exportOffline("both")} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-2.5 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
-            <Download className="h-3 w-3" /> Ambos
+          <button type="button" disabled={running} onClick={() => void exportOffline()} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
+            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} Exportar HTML portátil
           </button>
         </div>
       </div>
