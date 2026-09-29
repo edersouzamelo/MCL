@@ -69,14 +69,14 @@ function TextElement({ item, elements, ccol, slideWidth }: { item: MonitorSlideT
   );
 }
 
-function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: boolean }) {
+function LayoutScene({ scene, ccol, briefing = false }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean }) {
   const layout = scene.payload.layout;
   if (!layout) return null;
   const sorted = prepareMonitorElements(layout.elements).elements
     .sort((a,b) => a.z-b.z);
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden" style={{ containerType: "size" }}>
-      <div className="relative w-full overflow-hidden rounded-[18px] border border-white/[0.045] bg-transparent shadow-[0_26px_70px_rgba(2,6,23,.12)]" style={{ aspectRatio: String(layout.width) + " / " + String(layout.height), width: `min(100cqw, calc(100cqh * ${layout.width / layout.height}))`, containerType: "inline-size" }}>
+      <div className={"relative w-full overflow-hidden bg-transparent " + (briefing ? "" : "rounded-[18px] border border-white/[0.045] shadow-[0_26px_70px_rgba(2,6,23,.12)]")} style={{ aspectRatio: String(layout.width) + " / " + String(layout.height), width: `min(100cqw, calc(100cqh * ${layout.width / layout.height}))`, containerType: "inline-size" }}>
         {sorted.map((item: MonitorSlideElement, index) => {
           if (item.kind === "shape") {
             const area = item.w * item.h;
@@ -84,7 +84,7 @@ function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: bo
           }
           if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} />;
           if (item.kind === "image") {
-            const framed = item.w * item.h >= 0.005;
+            const framed = !briefing && item.w * item.h >= 0.005;
             return <div
               key={"image-" + String(index)}
               className={"absolute flex items-center justify-center overflow-hidden " + (framed ? "rounded-xl border border-slate-300/60 bg-white/95 p-[.3%] shadow-[0_8px_22px_rgba(2,6,23,.16)]" : "")}
@@ -94,9 +94,9 @@ function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: bo
             </div>;
           }
           if (item.kind === "chart") {
-            return <div key={"chart-" + String(index)} className="absolute overflow-hidden rounded-xl border border-white/[0.04] bg-slate-950/10 p-[1.2%]" style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} /></div>;
+            return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} /></div>;
           }
-          return <div key={"table-" + String(index)} className="absolute overflow-hidden rounded-lg border border-white/10 bg-slate-950/20" style={boxStyle(item)}>
+          return <div key={"table-" + String(index)} className={"absolute overflow-hidden " + (briefing ? "" : "rounded-lg border border-white/10 bg-slate-950/20")} style={boxStyle(item)}>
             <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
               <thead className="bg-white/[0.08]"><tr>{item.columns.map((cell,cellIndex)=><th key={cellIndex} className="px-2 py-1 text-left font-black">{cell}</th>)}</tr></thead>
               <tbody>{item.rows.map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.map((cell,cellIndex)=><td key={cellIndex} className="whitespace-normal break-words px-2 py-1 align-top">{cell}</td>)}</tr>)}</tbody>
@@ -104,11 +104,11 @@ function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: bo
           </div>;
         })}
       </div>
-      <div className={"pointer-events-none absolute right-2 top-2 rounded-lg border px-2.5 py-1.5 text-right text-[8px] leading-3 backdrop-blur " + (ccol ? "border-slate-300/70 bg-white/70 text-slate-600" : "border-white/10 bg-slate-950/55 text-slate-400")}>
+      {!briefing && <div className={"pointer-events-none absolute right-2 top-2 rounded-lg border px-2.5 py-1.5 text-right text-[8px] leading-3 backdrop-blur " + (ccol ? "border-slate-300/70 bg-white/70 text-slate-600" : "border-white/10 bg-slate-950/55 text-slate-400")}>
         <div className="font-black uppercase tracking-wider">Fonte</div>
         <div className="max-w-52 truncate">{scene.sourceFileName}</div>
         <div>{scene.sourcePage ? "slide/página " + String(scene.sourcePage) : "documento"}</div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -126,10 +126,11 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
   );
 }
 
-export function MonitorDocumentScene({ scene, ccol, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
+export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
   const tableSlide = payload.layout ? monitorTableSlide(prepareMonitorElements(payload.layout.elements).elements) : null;
-  useEffect(() => { if (!tableSlide) onPageCount?.(1); }, [Boolean(tableSlide), onPageCount]);
+  const hasTableSlide = Boolean(tableSlide);
+  useEffect(() => { if (!hasTableSlide) onPageCount?.(1); }, [hasTableSlide, onPageCount]);
   if (tableSlide) {
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
     const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
@@ -144,10 +145,10 @@ export function MonitorDocumentScene({ scene, ccol, cycleSeconds, paused, onPage
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
       <section className="relative h-full min-h-0 overflow-hidden">
-        <LayoutScene scene={scene} ccol={ccol} />
-        <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
+        <LayoutScene scene={scene} ccol={ccol} briefing={briefing} />
+        {!briefing && <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · fonte rastreável
-        </div>
+        </div>}
       </section>
     );
   }

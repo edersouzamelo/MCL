@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { MonitorContentCockpit } from "@/components/MonitorContentCockpit";
+import { BriefingExportButton } from "@/components/BriefingExportButton";
 import { OfflineExportControls } from "@/components/OfflineExportControls";
 import { CCO_CLASS_SLIDES, CCO_RULE_SOURCE, findUnmappedPis } from "@/modules/grupamento/cco";
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
@@ -521,7 +522,7 @@ export function GrupamentoCommandCenterClient({
                 <Field label="Estado"><select value={monitor.enabled ? "on" : "off"} onChange={(e) => updateMonitor(monitor.id, { enabled: e.target.value === "on" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="on">Ativo</option><option value="off">Desativado</option></select></Field>
                 <Field label="Modo"><select value={monitor.mode} onChange={(e) => updateMonitor(monitor.id, { mode: e.target.value as "single" | "loop" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="single">Tela fixa</option><option value="loop">Loop</option></select></Field>
                 <Field label="Delay"><input type="number" min={5} max={300} value={monitor.delaySeconds} onChange={(e) => updateMonitor(monitor.id, { delaySeconds: Math.max(5, Number(e.target.value) || CCO_DEFAULT_LOOP_DELAY_SECONDS) })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800" /></Field>
-                <Field label="Layout"><select value={monitor.layout} onChange={(e) => updateMonitor(monitor.id, { layout: e.target.value as "mcl" | "ccol" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="mcl">MCL</option><option value="ccol">Padrão CCOL</option></select></Field>
+                <Field label="Layout"><select value={monitor.layout} onChange={(e) => updateMonitor(monitor.id, { layout: e.target.value as "mcl" | "ccol" | "briefing" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="mcl">Modo escuro</option><option value="ccol">Modo claro</option><option value="briefing">Modo Briefing</option></select></Field>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
@@ -541,6 +542,7 @@ export function GrupamentoCommandCenterClient({
           ))}
         </div>
       </section>
+      <BriefingExportButton ready={monitorsReady && !monitorError} beforeExport={async () => { await Promise.all(Object.values(writeQueue.current)); if (pendingWrites.current) throw new Error("Aguarde o salvamento dos monitores."); }} />
     </div>
   );
 }

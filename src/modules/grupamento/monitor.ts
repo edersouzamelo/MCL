@@ -90,7 +90,7 @@ export function parseCcoMonitorConfig(value: unknown, monitorId: number): CcoMon
       item.screens.some((screen) => typeof screen !== "string" || !validScreens.has(screen)) ||
       new Set(item.screens).size !== item.screens.length ||
       !Number.isInteger(item.delaySeconds) || (item.delaySeconds as number) < 5 || (item.delaySeconds as number) > 300 ||
-      (item.layout !== "mcl" && item.layout !== "ccol")) return null;
+      (item.layout !== "mcl" && item.layout !== "ccol" && item.layout !== "briefing")) return null;
   return {
     id: monitorId, label: item.label.trim(), enabled: item.enabled, mode: item.mode,
     screens: item.screens as CcoScreenId[], delaySeconds: item.delaySeconds as number, layout: item.layout,

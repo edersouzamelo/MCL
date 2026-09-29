@@ -11,7 +11,7 @@ import {
   type SagSnapshot,
 } from "@/modules/grupamento/sag";
 
-export type CcoLayoutId = "mcl" | "ccol";
+export type CcoLayoutId = "mcl" | "ccol" | "briefing";
 
 export const CCO_RULE_SOURCE = {
   fileName: "algoritmo.xlsx",

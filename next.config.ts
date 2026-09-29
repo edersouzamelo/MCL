@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/grupamento/briefing-export": ["./public/briefing/model.pptx", "./public/briefing/frame.png"],
+  },
   async headers() {
     return [
       {

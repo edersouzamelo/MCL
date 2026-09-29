@@ -5,6 +5,8 @@ import { ChevronUp, Clock3, Database, Pause, Play, ShieldCheck, SkipBack, SkipFo
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
+import { latestBriefingUpdate } from "@/modules/grupamento/briefing";
+import { BriefingFrame } from "@/components/BriefingFrame";
 import { MonitorViewport } from "@/components/MonitorViewport";
 import { forgetMonitorSnapshot, prepareMonitorNavigation, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
@@ -297,7 +299,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     }
   }
 
-  const ccol = monitor.layout === "ccol";
+  const briefing = monitor.layout === "briefing";
+  const ccol = monitor.layout !== "mcl";
   const isRuleScreen = activeScreen ? activeScreen === "briefing" || activeScreen.startsWith("class-") : false;
 
   const screenContent = !monitor.enabled ? (
@@ -305,14 +308,20 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   ) : !activeItem ? (
     <Empty ccol={ccol} title="Sem conteúdo selecionado" description="Selecione uma tela SAG ou aprove conteúdo documental para esta saída." />
   ) : activeItem.kind === "document" ? (
-    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={onPageCount} />
+    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} briefing={briefing} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={onPageCount} />
   ) : !sag || !rpn ? (
     <MonitorBootScreen ccol={ccol} connectionState={connectionState} />
   ) : isRuleScreen ? (
-    <GrupamentoRuleMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} />
+    <GrupamentoRuleMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={briefing ? "ccol" : monitor.layout} />
   ) : (
-    <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={monitor.layout} page={activeItem.page} pageSize={activeItem.pageSize || undefined} />
+    <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={briefing ? "ccol" : monitor.layout} page={activeItem.page} pageSize={activeItem.pageSize || undefined} />
   );
+
+  if (briefing) return <BriefingFrame monitorId={monitorId} captureReady={Boolean(captureMode && activeItem && !transitioning)} playlistCount={playlist.length} frameIndex={safeIndex} frameLabel={screenLabel} updatedAt={activeItem?.kind === "document" ? activeItem.scene.sourceImportedAt : activeScreen === "rpn" || activeScreen?.startsWith("units-rpn-") ? rpn?.source.importedAt : latestBriefingUpdate(sag?.source.importedAt, rpn?.source.importedAt)}>
+    <div key={activeItem?.key ?? "empty"} className="h-full w-full" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
+      <MonitorViewport documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={activeItem?.kind === "system" ? onPageCount : undefined}>{screenContent}</MonitorViewport>
+    </div>
+  </BriefingFrame>;
 
   return (
     <main
