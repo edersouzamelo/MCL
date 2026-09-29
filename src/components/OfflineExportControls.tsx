@@ -5,7 +5,12 @@ import { Download, Loader2 } from "lucide-react";
 
 type ExportMode = "html" | "mp4" | "both";
 
-type CapturedFrame = {
+type CapturedHtmlFrame = {
+  html: string;
+  label: string;
+};
+
+type CapturedVideoFrame = {
   dataUrl: string;
   label: string;
 };
@@ -45,7 +50,11 @@ async function inlineComputedStyles(source: Element, clone: Element, sourceWindo
     if (src) {
       try {
         const response = await fetch(src, { credentials: "include", cache: "no-store" });
-        if (response.ok) target.src = await blobToDataUrl(await response.blob());
+        if (response.ok) {
+          target.src = await blobToDataUrl(await response.blob());
+          target.removeAttribute("srcset");
+          target.removeAttribute("sizes");
+        }
       } catch {
         // A captura prossegue. O teste visual revelará qualquer asset não incorporado.
       }
@@ -59,7 +68,7 @@ async function inlineComputedStyles(source: Element, clone: Element, sourceWindo
   }
 }
 
-async function captureRootAsJpeg(root: HTMLElement, sourceWindow: Window) {
+async function cloneCaptureRoot(root: HTMLElement, sourceWindow: Window) {
   const clone = root.cloneNode(true) as HTMLElement;
   await inlineComputedStyles(root, clone, sourceWindow);
 
@@ -70,7 +79,21 @@ async function captureRootAsJpeg(root: HTMLElement, sourceWindow: Window) {
   clone.style.transform = "none";
   clone.style.margin = "0";
   clone.style.overflow = "hidden";
+  clone.removeAttribute("data-mcl-capture-root");
+  clone.removeAttribute("data-mcl-capture-ready");
+  clone.removeAttribute("data-mcl-playlist-count");
+  clone.removeAttribute("data-mcl-frame-index");
+  clone.removeAttribute("data-mcl-frame-label");
+  return clone;
+}
 
+async function captureRootAsHtml(root: HTMLElement, sourceWindow: Window) {
+  const clone = await cloneCaptureRoot(root, sourceWindow);
+  return new XMLSerializer().serializeToString(clone);
+}
+
+async function captureRootAsJpeg(root: HTMLElement, sourceWindow: Window) {
+  const clone = await cloneCaptureRoot(root, sourceWindow);
   const serialized = new XMLSerializer().serializeToString(clone);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">
     <foreignObject width="100%" height="100%">
@@ -114,6 +137,7 @@ async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number
 async function captureMonitorFrames(
   monitorId: number,
   onProgress: (message: string) => void,
+  format: "html" | "video",
 ) {
   const iframe = document.createElement("iframe");
   iframe.width = String(WIDTH);
@@ -148,19 +172,28 @@ async function captureMonitorFrames(
       throw new Error("Este monitor não possui conteúdo ativo para exportar.");
     }
 
-    const frames: CapturedFrame[] = [];
+    const htmlFrames: CapturedHtmlFrame[] = [];
+    const videoFrames: CapturedVideoFrame[] = [];
     for (let index = 0; index < frameCount; index += 1) {
       onProgress(`Capturando quadro ${index + 1}/${frameCount}...`);
       if (index > 0) {
         iframe.contentWindow?.postMessage({ type: "MCL_CAPTURE_FRAME", frameIndex: index }, window.location.origin);
       }
       const root = await waitForCaptureFrame(iframe, index);
-      frames.push({
-        dataUrl: await captureRootAsJpeg(root, iframe.contentWindow!),
-        label: root.dataset.mclFrameLabel ?? `Quadro ${index + 1}`,
-      });
+      const label = root.dataset.mclFrameLabel ?? `Quadro ${index + 1}`;
+      if (format === "html") {
+        htmlFrames.push({
+          html: await captureRootAsHtml(root, iframe.contentWindow!),
+          label,
+        });
+      } else {
+        videoFrames.push({
+          dataUrl: await captureRootAsJpeg(root, iframe.contentWindow!),
+          label,
+        });
+      }
     }
-    return frames;
+    return { htmlFrames, videoFrames };
   } finally {
     iframe.remove();
   }
@@ -177,7 +210,7 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-function buildOfflineHtml(monitorId: number, frames: CapturedFrame[], delaySeconds: number) {
+function buildOfflineHtml(monitorId: number, frames: CapturedHtmlFrame[], delaySeconds: number) {
   const generatedAt = new Date().toISOString();
   const safeFrames = JSON.stringify(frames).replace(/</g, "\\u003c");
   return `<!doctype html>
@@ -189,19 +222,25 @@ function buildOfflineHtml(monitorId: number, frames: CapturedFrame[], delaySecon
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020617}
 body{display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif}
-#frame{width:100vw;height:100vh;object-fit:contain;background:#020617;user-select:none}
+#stage{position:fixed;inset:0;width:100vw;height:100vh;overflow:hidden;background:#020617}
+#stage>main{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important}
 #badge{position:fixed;right:10px;bottom:8px;padding:4px 7px;border-radius:5px;background:rgba(2,6,23,.68);color:rgba(255,255,255,.72);font:10px Arial,sans-serif;letter-spacing:.05em}
 </style>
 </head>
 <body>
-<img id="frame" alt="Exibição offline do MCL">
+<div id="stage" aria-label="Exibição offline do MCL"></div>
 <div id="badge">MCL OFFLINE · Monitor ${String(monitorId).padStart(2, "0")} · gerado ${generatedAt}</div>
 <script>
 const frames=${safeFrames};
 const delay=${Math.max(5, delaySeconds) * 1000};
-const img=document.getElementById("frame");
+const stage=document.getElementById("stage");
 let index=0;
-function show(){img.src=frames[index].dataUrl;img.alt=frames[index].label||"MCL";index=(index+1)%frames.length}
+function show(){
+  const frame=frames[index];
+  stage.innerHTML=frame.html;
+  stage.setAttribute("aria-label",frame.label||"MCL");
+  index=(index+1)%frames.length;
+}
 show();
 setInterval(show,delay);
 </script>
@@ -219,7 +258,7 @@ function supportedMp4Mime() {
 }
 
 async function renderMp4(
-  frames: CapturedFrame[],
+  frames: CapturedVideoFrame[],
   delaySeconds: number,
   onProgress: (message: string) => void,
 ) {
@@ -287,19 +326,31 @@ export function OfflineExportControls({
     setError("");
     setProgress("Preparando exibição offline...");
     try {
-      const frames = await captureMonitorFrames(monitorId, setProgress);
       const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
+      let htmlCreated = false;
 
       if (mode === "html" || mode === "both") {
+        const { htmlFrames } = await captureMonitorFrames(monitorId, setProgress, "html");
         setProgress("Gerando HTML offline...");
-        const html = buildOfflineHtml(monitorId, frames, delaySeconds);
+        const html = buildOfflineHtml(monitorId, htmlFrames, delaySeconds);
         downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
+        htmlCreated = true;
       }
 
       if (mode === "mp4" || mode === "both") {
-        setProgress("Iniciando codificação MP4...");
-        const mp4 = await renderMp4(frames, delaySeconds, setProgress);
-        downloadBlob(mp4, `${baseName}-offline.mp4`);
+        try {
+          const { videoFrames } = await captureMonitorFrames(monitorId, setProgress, "video");
+          setProgress("Iniciando codificação MP4...");
+          const mp4 = await renderMp4(videoFrames, delaySeconds, setProgress);
+          downloadBlob(mp4, `${baseName}-offline.mp4`);
+        } catch (mp4Error) {
+          if (htmlCreated) {
+            setError(`HTML gerado com sucesso. MP4 não pôde ser gerado: ${mp4Error instanceof Error ? mp4Error.message : "falha de captura de vídeo"}`);
+            setProgress("");
+            return;
+          }
+          throw mp4Error;
+        }
       }
 
       setProgress("Exportação concluída.");
@@ -317,7 +368,7 @@ export function OfflineExportControls({
         <div>
           <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            Gera uma cópia visual do conteúdo atualmente publicado neste monitor. O HTML roda em navegador sem rede. O MP4 é codificado localmente e pode levar alguns minutos.
+            Gera uma cópia visual do conteúdo atualmente publicado neste monitor. O HTML é serializado sem canvas e roda em navegador sem rede. O MP4 permanece experimental e pode ser bloqueado pelo navegador.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
