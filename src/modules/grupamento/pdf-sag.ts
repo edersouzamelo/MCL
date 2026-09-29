@@ -47,6 +47,35 @@ function pageContractText(page: PositionedPage) {
   return compactText(page.map((item) => item.str).join(" "));
 }
 
+function normalizedReferenceDate(day: string, month: string, year: string) {
+  const d = Number(day);
+  const m = Number(month);
+  const y = Number(year);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  if (
+    y < 2000 || y > 2100 ||
+    date.getUTCFullYear() !== y ||
+    date.getUTCMonth() !== m - 1 ||
+    date.getUTCDate() !== d
+  ) return undefined;
+  return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+export function extractSagReferenceDate(pages: PositionedPage[], fileName: string) {
+  const headerText = pages.slice(0, 2).flatMap((page) => readingOrder(page).slice(0, 80).map((item) => item.str)).join(" ");
+  const sources = [headerText, fileName];
+  const labeled = /(?:DATA(?:\s+DE\s+(?:EMISS[AÃ]O|REFER[EÊ]NCIA))?|EMISS[AÃ]O|GERADO\s+EM|ATUALIZADO\s+EM)\s*[:\-]?\s*([0-3]?\d)[\/.\-]([01]?\d)[\/.\-](20\d{2})/i;
+  const generic = /\b([0-3]?\d)[\/.\-]([01]?\d)[\/.\-](20\d{2})\b/;
+
+  for (const source of sources) {
+    const match = source.match(labeled) ?? source.match(generic);
+    if (!match) continue;
+    const normalized = normalizedReferenceDate(match[1], match[2], match[3]);
+    if (normalized) return normalized;
+  }
+  return undefined;
+}
+
 function hasCurrentContract(page: PositionedPage) {
   const text = pageContractText(page);
   return (
@@ -225,7 +254,7 @@ function addSagSnapshots(rows: SagRow[]): SagSnapshot {
   );
 }
 
-function buildSagPdfResult(rows: SagRow[], fileName: string, totalPages: number, warnings: string[]): SagImportResult {
+function buildSagPdfResult(rows: SagRow[], fileName: string, totalPages: number, warnings: string[], referenceDate?: string): SagImportResult {
   const byPiMap = new Map<string, SagRow[]>();
   const byUgMap = new Map<string, SagRow[]>();
   for (const row of rows) {
@@ -238,7 +267,7 @@ function buildSagPdfResult(rows: SagRow[], fileName: string, totalPages: number,
   }
 
   return {
-    source: { fileName, importedAt: new Date().toISOString(), origin: "MANUAL_SAG", nature: "DADO_IMPORTADO" },
+    source: { fileName, importedAt: new Date().toISOString(), origin: "MANUAL_SAG", nature: "DADO_IMPORTADO", referenceDate },
     sheets: Array.from({ length: totalPages }, (_, index) => `PDF página ${index + 1}`),
     rows,
     totals: addSagSnapshots(rows),
@@ -312,7 +341,7 @@ export function parseCurrentSagPositionedPages(pages: PositionedPage[], fileName
 
   if (!recognizedPages) warnings.push("O PDF não apresenta o contrato de Exercício Corrente esperado pelo MCL.");
   if (!rows.length) warnings.push("Nenhuma linha financeira válida de Exercício Corrente foi encontrada.");
-  return buildSagPdfResult(rows, fileName, pages.length, warnings);
+  return buildSagPdfResult(rows, fileName, pages.length, warnings, extractSagReferenceDate(pages, fileName));
 }
 
 export function parseRpnPositionedPages(pages: PositionedPage[], fileName: string): RpnImportResult {
@@ -366,7 +395,7 @@ export function parseRpnPositionedPages(pages: PositionedPage[], fileName: strin
 
   if (!recognizedPages) warnings.push("O PDF não apresenta o contrato RPNP esperado pelo MCL.");
   if (!rows.length) warnings.push("Nenhuma linha financeira válida de RPNP foi encontrada.");
-  return buildRpnImportResult(rows, fileName, pages.map((_, index) => `PDF página ${index + 1}`), warnings);
+  return buildRpnImportResult(rows, fileName, pages.map((_, index) => `PDF página ${index + 1}`), warnings, extractSagReferenceDate(pages, fileName));
 }
 
 async function extractPositionedPages(buffer: ArrayBuffer) {
