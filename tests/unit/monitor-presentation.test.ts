@@ -27,6 +27,20 @@ describe("institutional slide preparation", () => {
     ];
     expect(prepareMonitorElements(items).elements).toEqual(items);
   });
+  it("removes peripheral decorations and title banners around a structured chart in briefing mode", () => {
+    const title: MonitorSlideElement = { kind: "text", text: "Classe II – Duração dos Estoques PRDU", x: .28, y: .08, w: .58, h: .08, z: 5, role: "title" };
+    const chart: MonitorSlideElement = { kind: "chart", x: .14, y: .22, w: .72, h: .58, z: 10, chart: { type: "bar", series: [{ name: "Estoque OP", categories: ["Item A"], values: [3] }] } };
+    const banner: MonitorSlideElement = { kind: "shape", x: .26, y: .06, w: .62, h: .12, z: 2, fill: "#00C7A5" };
+    const sideBadge: MonitorSlideElement = { kind: "image", x: .025, y: .48, w: .07, h: .14, z: 4, assetId: "decorative-badge" };
+    const source: MonitorSlideElement = { kind: "text", text: "Dados extraídos do sistema em 28 SET 26", x: .72, y: .87, w: .24, h: .05, z: 6, role: "label" };
+    const result = prepareMonitorElements([banner, sideBadge, title, chart, source]);
+    expect(result.elements).toContain(title);
+    expect(result.elements).toContain(source);
+    expect(result.elements.some((item) => item.kind === "image" && item.assetId === "decorative-badge")).toBe(false);
+    expect(result.elements.some((item) => item.kind === "shape" && item.fill === "#00C7A5")).toBe(false);
+    expect(result.omitted.map((item) => item.reason).join(" ")).toContain("briefing");
+  });
+
   it("expands a simple dominant chart into unused slide space without covering title or footer", () => {
     const items: MonitorSlideElement[] = [
       { kind: "text", text: "Índice de disponibilidade", x: .1, y: .04, w: .8, h: .08, z: 1, role: "title" },
