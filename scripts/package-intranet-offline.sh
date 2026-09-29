@@ -21,24 +21,30 @@ docker save mcl-intranet:local postgres:16-alpine | gzip > "$OUT/mcl-intranet-im
 
 cp docker-compose.intranet.yml "$OUT/"
 cp .env.intranet.example "$OUT/"
+cp scripts/install-intranet-ubuntu-26.04.sh "$OUT/"
 
 cat > "$OUT/INSTALAR.txt" <<'EOF'
 MCL - INSTALACAO EM SERVIDOR LOCAL
+Servidor alvo: Ubuntu 26.04
+IP fixo: 10.56.120.28
 
-1. Instale Docker Engine + Docker Compose no servidor.
+1. Instale Docker Engine + Docker Compose no servidor, se ainda nao estiverem instalados.
 2. Copie esta pasta para o servidor.
 3. Execute:
    gunzip -c mcl-intranet-images.tar.gz | docker load
 4. Copie .env.intranet.example para .env.intranet.
-5. Edite .env.intranet e substitua IP_DO_SERVIDOR e todos os CHANGE_ME.
+5. Edite .env.intranet e substitua todos os CHANGE_ME.
+   O endereco ja esta configurado como:
+   MCL_BASE_URL=http://10.56.120.28:3000
 6. Inicie:
    docker compose --env-file .env.intranet -f docker-compose.intranet.yml up -d --no-build
 7. Valide:
-   http://IP_DO_SERVIDOR:3000/api/health/db
+   http://10.56.120.28:3000/api/health/db
 8. Abra:
-   http://IP_DO_SERVIDOR:3000
+   http://10.56.120.28:3000
 
 Para preservar dados do ambiente atual, restaure o dump PostgreSQL antes do uso operacional.
+A sincronizacao automatica com o Supabase e uma camada separada e nao deve ser presumida ate estar implantada.
 Consulte docs/INTRANET_SERVER.md no repositorio para o procedimento completo.
 EOF
 
