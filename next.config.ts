@@ -16,6 +16,17 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: "/grupamento/monitor-capture/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          {
+            key: "Content-Security-Policy",
+            value:
+              "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+          },
+        ],
+      },
     ];
   },
 };
