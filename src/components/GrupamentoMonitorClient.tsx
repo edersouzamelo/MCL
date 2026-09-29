@@ -59,6 +59,12 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
   const [deviceMessage, setDeviceMessage] = useState("");
   const [deviceEnrolled, setDeviceEnrolled] = useState(false);
+  const [captureMode] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("capture") === "1");
+  const [captureFrame, setCaptureFrame] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const value = Number(new URLSearchParams(window.location.search).get("frame") ?? "0");
+    return Number.isInteger(value) && value >= 0 ? value : 0;
+  });
   const activeVersion = useRef<string | null>(null);
   const activeSceneIds = useRef<string[]>([]);
   const pendingSnapshot = useRef<MonitorSnapshot | null>(null);
@@ -203,7 +209,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     ];
   }, [documentScenes, monitor.screens, rpn, sag]);
 
-  const safeIndex = Math.min(screenIndex, Math.max(0, playlist.length - 1));
+  const safeIndex = captureMode ? Math.min(captureFrame, Math.max(0, playlist.length - 1)) : Math.min(screenIndex, Math.max(0, playlist.length - 1));
   const activeItem = playlist[safeIndex] ?? null;
   const activeScreen = activeItem?.kind === "system" ? activeItem.screen : null;
   const screenLabel = activeItem?.label ?? "Sem conteúdo selecionado";
@@ -218,7 +224,20 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     return `Fonte: SAG · EC ${currentDate} · RPNP ${previousDate}`;
   }, [activeItem, rpn?.source.referenceDate, sag?.source.referenceDate]);
   const effectiveLoop = monitor.mode === "loop" && playlist.length > 1;
-  const autoAdvance = effectiveLoop && playbackState === "playing";
+  const autoAdvance = !captureMode && effectiveLoop && playbackState === "playing";
+
+  useEffect(() => {
+    if (!captureMode) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "MCL_CAPTURE_FRAME") return;
+      const index = Number(event.data.frameIndex);
+      if (!Number.isInteger(index) || index < 0 || index >= playlist.length) return;
+      setCaptureFrame(index);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [captureMode, playlist.length]);
 
   useEffect(() => {
     if (screenIndex < playlist.length) return;
@@ -291,7 +310,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   ) : !activeItem ? (
     <Empty ccol={ccol} title="Sem conteúdo selecionado" description="Selecione uma tela SAG ou aprove conteúdo documental para esta saída." />
   ) : activeItem.kind === "document" ? (
-    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={playbackState !== "playing"} onPageCount={onPageCount} />
+    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={onPageCount} />
   ) : !sag || !rpn ? (
     <MonitorBootScreen ccol={ccol} connectionState={connectionState} />
   ) : isRuleScreen ? (
@@ -302,6 +321,11 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
 
   return (
     <main
+      data-mcl-capture-root="1"
+      data-mcl-capture-ready={captureMode && activeItem && !transitioning ? "1" : "0"}
+      data-mcl-playlist-count={playlist.length}
+      data-mcl-frame-index={safeIndex}
+      data-mcl-frame-label={screenLabel}
       className={`mcl-monitor-shell fixed inset-0 overscroll-none ${ccol ? "mcl-monitor-shell-ccol" : "mcl-monitor-shell-mcl"} flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
       style={{
         backgroundImage: ccol
@@ -336,13 +360,13 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
           </div>
           <MonitorClock ccol={ccol} />
           <div
-            className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${connectionState === "offline"
+            className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur ${captureMode || connectionState === "offline"
               ? (ccol ? "border-amber-300 bg-amber-50 text-amber-700" : "border-amber-400/20 bg-amber-400/10 text-amber-300")
               : (ccol ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300")}`}
-            title={connectionState === "offline" ? (Boolean(sag && rpn) || documentScenes.length > 0) ? "Sem conexão confirmada · último conteúdo local aprovado" : "Sem conexão confirmada · sem conteúdo local" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
-            aria-label={connectionState === "offline" ? "Monitor offline" : "Monitor online"}
+            title={captureMode ? "Artefato de exportação offline" : connectionState === "offline" ? (Boolean(sag && rpn) || documentScenes.length > 0) ? "Sem conexão confirmada · último conteúdo local aprovado" : "Sem conexão confirmada · sem conteúdo local" : connectionState === "syncing" ? "Sincronizando atualizações" : "Online · sincronização ativa"}
+            aria-label={captureMode ? "Exportação offline" : connectionState === "offline" ? "Monitor offline" : "Monitor online"}
           >
-            {connectionState === "offline" ? <WifiOff className="h-4 w-4" /> : <Wifi className={`h-4 w-4 ${connectionState === "syncing" ? "animate-pulse" : ""}`} />}
+            {captureMode || connectionState === "offline" ? <WifiOff className="h-4 w-4" /> : <Wifi className={`h-4 w-4 ${connectionState === "syncing" ? "animate-pulse" : ""}`} />}
           </div>
           <div className={`rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${monitor.enabled ? "mcl-monitor-live " : ""}${monitor.enabled ? (ccol ? "bg-emerald-100 text-emerald-800" : "bg-emerald-400/10 text-emerald-300") : (ccol ? "bg-amber-100 text-amber-800" : "bg-amber-400/10 text-amber-300")}`}>
             {monitor.enabled ? "Saída ativa" : "Saída desativada"}
@@ -365,7 +389,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <MonitorViewport
               documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
-              paused={playbackState !== "playing"}
+              paused={captureMode || playbackState !== "playing"}
               onPageCount={activeItem?.kind === "document" || !activeItem ? undefined : onPageCount}
             >
               {screenContent}
@@ -374,7 +398,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         </div>
       </section>
 
-      {playlist.length > 1 ? (
+      {playlist.length > 1 && !captureMode ? (
         <div className={`absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
@@ -396,8 +420,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         </div>
       ) : null}
 
-      <button type="button" className="mcl-monitor-footer-toggle absolute bottom-1 left-2 z-50 rounded bg-slate-800/80 p-2 text-white" aria-controls="monitor-technical-band" aria-expanded={drawerOpen} aria-label="Mostrar ou ocultar informações do monitor" onClick={() => setDrawerOpen((open) => !open)}><ChevronUp className="h-4 w-4" /></button>
-      <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50" data-open={drawerOpen} onKeyDown={(event) => { if (event.key === "Escape") setDrawerOpen(false); }}>
+      {!captureMode ? <button type="button" className="mcl-monitor-footer-toggle absolute bottom-1 left-2 z-50 rounded bg-slate-800/80 p-2 text-white" aria-controls="monitor-technical-band" aria-expanded={drawerOpen} aria-label="Mostrar ou ocultar informações do monitor" onClick={() => setDrawerOpen((open) => !open)}><ChevronUp className="h-4 w-4" /></button> : null}
+      {!captureMode ? <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50" data-open={drawerOpen} onKeyDown={(event) => { if (event.key === "Escape") setDrawerOpen(false); }}>
 
         <footer id="monitor-technical-band" className={`mcl-monitor-footer relative flex h-10 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/92 text-slate-600" : "border-white/10 bg-slate-950/92 text-slate-400"}`}>
           <div className="flex min-w-0 items-center gap-4">
@@ -427,7 +451,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
           </div>
         </footer>
-      </div>
+      </div> : null}
     </main>
   );
 }
