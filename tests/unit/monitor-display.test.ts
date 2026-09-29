@@ -47,7 +47,7 @@ describe("monitor pagination", () => {
 });
 
 
-describe("PPTX semantic payload v3", () => {
+describe("PPTX semantic payload v4", () => {
   it("preserves sparse point indices, explicit point colors, grid, legend and axis scale", () => {
     const xml = `<c:chart><c:plotArea><c:barChart><c:barDir val="bar"/><c:grouping val="stacked"/>
       <c:ser><c:tx><c:v>Estoque OP</c:v></c:tx>
@@ -66,7 +66,7 @@ describe("PPTX semantic payload v3", () => {
     const graph = result.scenes[0].payload.layout!.elements.find((e) => e.kind === "chart");
     expect(graph?.kind).toBe("chart");
     if (graph?.kind !== "chart") return;
-    expect(graph.chart).toMatchObject({ semanticVersion: 3, orientation: "horizontal", grouping: "stacked", xAxisTitle: "Período", majorUnit: 20, showGridlines: true, gridlineColor: "#888888", legendPosition: "bottom", categoryReverse: true });
+    expect(graph.chart).toMatchObject({ semanticVersion: 4, orientation: "horizontal", grouping: "stacked", xAxisTitle: "Período", majorUnit: 20, showGridlines: true, gridlineColor: "#888888", legendPosition: "bottom", categoryReverse: true });
     expect(graph.chart.series[0]).toMatchObject({ values: [10, 0, 30], categories: ["Jan", "Fev", "Mar"], missingValueIndices: [1], pointColors: [null, null, "#FF0000"], color: "#008000" });
   });
 });

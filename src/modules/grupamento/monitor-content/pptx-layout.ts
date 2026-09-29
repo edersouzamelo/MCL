@@ -252,6 +252,17 @@ function axisTitle(axisXml: string) {
   return value || undefined;
 }
 
+function chartTitle(xml: string) {
+  const chartXml = xml.match(/<c:chart\b[^>]*>([\s\S]*?)<\/c:chart>/)?.[1] ?? xml;
+  const plotAreaStart = chartXml.search(/<c:plotArea\b/);
+  const header = plotAreaStart >= 0 ? chartXml.slice(0, plotAreaStart) : chartXml;
+  const titleXml = header.match(/<c:title\b[^>]*>([\s\S]*?)<\/c:title>/)?.[1] ?? "";
+  const rich = clean(textNodes(titleXml).join(" "));
+  if (rich) return rich;
+  const cached = [...cachedPoints(titleXml).values()].map(clean).filter(Boolean).join(" ");
+  return cached || undefined;
+}
+
 function chart(xml: string, theme: Theme) {
   const choices = [["barChart","bar"],["lineChart","line"],["pieChart","pie"],["doughnutChart","doughnut"],["areaChart","area"],["scatterChart","scatter"]] as const;
   const found = choices.find(([tag]) => new RegExp("<c:" + tag + "\\b").test(xml));
@@ -262,6 +273,7 @@ function chart(xml: string, theme: Theme) {
   const overlap = Number(block.match(/<c:overlap\b[^>]*\bval="(-?\d+)"/)?.[1] ?? "0");
   const categoryAxis = xml.match(/<c:(?:catAx|dateAx)\b[^>]*>([\s\S]*?)<\/c:(?:catAx|dateAx)>/)?.[1] ?? "";
   const valueAxis = xml.match(/<c:valAx\b[^>]*>([\s\S]*?)<\/c:valAx>/)?.[1] ?? "";
+  const title = chartTitle(xml);
   const categoryTitle = axisTitle(categoryAxis);
   const valueTitle = axisTitle(valueAxis);
   const format = decode(valueAxis.match(/<c:numFmt\b[^>]*\bformatCode="([^"]+)"/)?.[1] ?? "");
@@ -276,7 +288,8 @@ function chart(xml: string, theme: Theme) {
   const positions: Record<string, MonitorDocumentChart["legendPosition"]> = { t: "top", b: "bottom", l: "left", r: "right", tr: "right" };
   const gridXml = valueAxis.match(/<c:majorGridlines\b[^>]*>([\s\S]*?)<\/c:majorGridlines>/)?.[1] ?? "";
   return {
-    semanticVersion: 3 as const,
+    semanticVersion: 4 as const,
+    title,
     categoryFormat: decode(categoryAxis.match(/<c:numFmt\b[^>]*\bformatCode="([^"]+)"/)?.[1] ?? "") || undefined,
     categoryReverse: /<c:orientation\b[^>]*val="maxMin"/.test(categoryAxis),
     valueReverse: /<c:orientation\b[^>]*val="maxMin"/.test(valueAxis),
@@ -394,6 +407,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
           if (["unknown", "area", "scatter"].includes(parsed.type)) warnings.push("Slide " + page + ": gráfico " + parsed.type + " requer consulta ao original; renderização fiel ainda não disponível.");
           if (parsed.series.length) {
             parsed.series.forEach((s) => searchable.push(s.name,...s.categories,...s.values.map(String)));
+            if (parsed.title) searchable.push(parsed.title);
             if (parsed.xAxisTitle) searchable.push(parsed.xAxisTitle);
             if (parsed.yAxisTitle) searchable.push(parsed.yAxisTitle);
             elements.push({kind:"chart",...b,chart:parsed,z:z*10+1});
@@ -422,6 +436,9 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     const presentation = prepareMonitorElements(elements);
     for (const reason of new Set(presentation.omitted.map((item) => item.reason))) {
       warnings.push("Slide " + page + ": " + reason + ". Omitido na exibição institucional; original preservado.");
+    }
+    for (const adjustment of presentation.adjustments) {
+      warnings.push("Slide " + page + ": " + adjustment + " Original preservado.");
     }
     if (/p:grpSp\b/.test(xml)) warnings.push("Slide " + page + ": grupo de objetos detectado; revisar prévia.");
     scenes.push({

@@ -11,6 +11,7 @@ export type MonitorDocumentSeries = {
 };
 
 export type MonitorDocumentChart = {
+  title?: string;
   type: "bar" | "line" | "pie" | "doughnut" | "area" | "scatter" | "unknown";
   orientation?: "vertical" | "horizontal";
   grouping?: "clustered" | "stacked" | "percentStacked" | "standard";
@@ -22,7 +23,7 @@ export type MonitorDocumentChart = {
   xAxisTitle?: string;
   yAxisTitle?: string;
   legendPosition?: "top" | "bottom" | "left" | "right" | "none";
-  semanticVersion?: 3;
+  semanticVersion?: 3 | 4;
   categoryFormat?: string;
   categoryReverse?: boolean;
   valueReverse?: boolean;

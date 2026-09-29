@@ -1,6 +1,36 @@
 import type { MonitorSlideElement } from "./types";
 
-/** Presentation-only cleanup. The original payload and document remain intact. */
+function optimizeDominantChart(elements: MonitorSlideElement[]) {
+  const charts = elements.filter((item) => item.kind === "chart");
+  if (charts.length !== 1 || elements.some((item) => item.kind === "table" || item.kind === "image")) {
+    return { elements, adjustment: null as string | null };
+  }
+
+  const chart = charts[0];
+  const texts = elements.filter((item) => item.kind === "text");
+  const above = texts.filter((item) => item.y + item.h <= chart.y + .04);
+  const below = texts.filter((item) => item.y >= chart.y + chart.h - .04);
+  if (above.length + below.length !== texts.length) {
+    return { elements, adjustment: null as string | null };
+  }
+
+  const top = Math.max(.03, ...above.map((item) => item.y + item.h + .015));
+  const bottom = Math.min(.97, ...below.map((item) => item.y - .015));
+  if (bottom - top < .38) return { elements, adjustment: null as string | null };
+
+  const target = { x: .04, y: top, w: .92, h: bottom - top };
+  const currentArea = chart.w * chart.h;
+  const targetArea = target.w * target.h;
+  if (currentArea >= targetArea * .86) return { elements, adjustment: null as string | null };
+
+  const optimized = elements.map((item) => item === chart ? { ...item, ...target } : item);
+  return {
+    elements: optimized,
+    adjustment: "Gráfico dominante ampliado para aproveitar a área útil sem encobrir títulos ou notas.",
+  };
+}
+
+/** Presentation-only cleanup and adaptive reflow. The original payload and document remain intact. */
 export function prepareMonitorElements(elements: MonitorSlideElement[]) {
   const omitted: Array<{ element: MonitorSlideElement; reason: string }> = [];
   const charts = elements.filter((item) => item.kind === "chart" || item.kind === "table");
@@ -24,5 +54,6 @@ export function prepareMonitorElements(elements: MonitorSlideElement[]) {
     if (reason) omitted.push({ element: item, reason });
     return !reason;
   });
-  return { elements: visible, omitted };
+  const optimized = optimizeDominantChart(visible);
+  return { elements: optimized.elements, omitted, adjustments: optimized.adjustment ? [optimized.adjustment] : [] };
 }

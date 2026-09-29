@@ -75,70 +75,79 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   const legendItems = pie ? categories.map((name, i) => ({ name, color: chart.series[0]?.pointColors?.[i] || seriesColor({ ...chart.series[0], color: undefined }, i) })) : chart.series.map((series, i) => ({ name: series.name, color: seriesColor(series, i) }));
   const legend = chart.legendPosition === "none" ? null : <div className="flex shrink-0 flex-wrap justify-center gap-x-4 gap-y-1 p-1" style={{ color: foreground, fontSize: font, maxWidth: chart.legendPosition === "left" || chart.legendPosition === "right" ? "25%" : undefined, alignContent: "center" }} data-chart-legend>{legendItems.map((item, i) => <span key={i} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: item.color }} />{item.name}</span>)}</div>;
   const sideLegend = chart.legendPosition === "left" || chart.legendPosition === "right";
-  return <div className={`flex h-full w-full min-h-0 ${sideLegend ? "flex-row" : "flex-col"}`}>
-    {(chart.legendPosition === "top" || chart.legendPosition === "left") && legend}
-    <div ref={ref} className="relative min-h-0 min-w-0 flex-1">
-      {unsupported ? <div className="flex h-full items-center justify-center text-center text-xs" style={{ color: foreground }}>Gráfico {chart.type}: consulte o documento original. Renderização fiel ainda não disponível.</div> : pie ? <Pie chart={chart} colors={legendItems.map((item) => item.color)} /> : <svg width="100%" height="100%" viewBox={`0 0 ${size.width} ${size.height}`} role="img" aria-label={`Gráfico ${horizontal ? "horizontal" : chart.type} ${chart.series.map((s) => s.name).join(", ")}`} style={{ color: foreground, fontFamily: "inherit", fontSize: font }}>
-        <defs><clipPath id={clipId}><rect x={margin.left} y={margin.top} width={width} height={height} /></clipPath></defs>
-        {ticks.map((tick, i) => <g key={i} data-value-tick={tick}>
-          {chart.showGridlines !== false && <line x1={horizontal ? val(tick) : margin.left} x2={horizontal ? val(tick) : margin.left + width} y1={horizontal ? margin.top : val(tick)} y2={horizontal ? margin.top + height : val(tick)} stroke={grid} strokeWidth="1" />}
-          <text fill="currentColor" x={horizontal ? val(tick) : margin.left - 8} y={horizontal ? margin.top + height + font * (1.4 + tickLanes[i] * 1.3) : val(tick) + font * .3} textAnchor={horizontal ? "middle" : "end"} fontSize={font * .85}>{label(tick)}</text>
-        </g>)}
-        {Array.from({ length: count }, (_, i) => {
-          const layout = categoryLayouts[i];
-          const x = horizontal ? margin.left - 8 : cat(i);
-          const y = horizontal
-            ? cat(i) + layout.fontSize * .32 - (layout.lines.length - 1) * layout.lineHeight / 2
-            : margin.top + height + font * 1.4;
-          return <text key={i} fill="currentColor" x={x} y={y} textAnchor={horizontal ? "end" : "middle"} fontSize={layout.fontSize} data-category-label data-category-lines={layout.lines.length}>
-            {layout.lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex === 0 ? 0 : layout.lineHeight}>{line}</tspan>)}
-          </text>;
-        })}
-        <g clipPath={`url(#${clipId})`}>
-          {chart.type === "bar" ? Array.from({ length: count }, (_, index) => {
+  const title = chart.title?.trim();
+  const chartAria = [title, `Gráfico ${horizontal ? "horizontal" : chart.type}`, chart.series.map((s) => s.name).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
+  return <div className="flex h-full w-full min-h-0 flex-col">
+    {title && <div
+      className="shrink-0 px-2 pb-1 text-center font-black leading-tight"
+      style={{ color: foreground, fontSize: "clamp(14px,1.6vw,24px)" }}
+      data-chart-title
+    >{title}</div>}
+    <div className={`flex min-h-0 min-w-0 flex-1 ${sideLegend ? "flex-row" : "flex-col"}`}>
+      {(chart.legendPosition === "top" || chart.legendPosition === "left") && legend}
+      <div ref={ref} className="relative min-h-0 min-w-0 flex-1">
+        {unsupported ? <div className="flex h-full items-center justify-center text-center text-xs" style={{ color: foreground }}>Gráfico {chart.type}: consulte o documento original. Renderização fiel ainda não disponível.</div> : pie ? <Pie chart={chart} colors={legendItems.map((item) => item.color)} /> : <svg width="100%" height="100%" viewBox={`0 0 ${size.width} ${size.height}`} role="img" aria-label={chartAria} style={{ color: foreground, fontFamily: "inherit", fontSize: font }}>
+          <defs><clipPath id={clipId}><rect x={margin.left} y={margin.top} width={width} height={height} /></clipPath></defs>
+          {ticks.map((tick, i) => <g key={i} data-value-tick={tick}>
+            {chart.showGridlines !== false && <line x1={horizontal ? val(tick) : margin.left} x2={horizontal ? val(tick) : margin.left + width} y1={horizontal ? margin.top : val(tick)} y2={horizontal ? margin.top + height : val(tick)} stroke={grid} strokeWidth="1" />}
+            <text fill="currentColor" x={horizontal ? val(tick) : margin.left - 8} y={horizontal ? margin.top + height + font * (1.4 + tickLanes[i] * 1.3) : val(tick) + font * .3} textAnchor={horizontal ? "middle" : "end"} fontSize={font * .85}>{label(tick)}</text>
+          </g>)}
+          {Array.from({ length: count }, (_, i) => {
+            const layout = categoryLayouts[i];
+            const x = horizontal ? margin.left - 8 : cat(i);
+            const y = horizontal
+              ? cat(i) + layout.fontSize * .32 - (layout.lines.length - 1) * layout.lineHeight / 2
+              : margin.top + height + font * 1.4;
+            return <text key={i} fill="currentColor" x={x} y={y} textAnchor={horizontal ? "end" : "middle"} fontSize={layout.fontSize} data-category-label data-category-lines={layout.lines.length}>
+              {layout.lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex === 0 ? 0 : layout.lineHeight}>{line}</tspan>)}
+            </text>;
+          })}
+          <g clipPath={`url(#${clipId})`}>
+            {chart.type === "bar" ? Array.from({ length: count }, (_, index) => {
+              const overlap = !isStacked(chart) && (chart.overlap ?? 0) >= 90;
+              const segments = barSegments(chart, index);
+              if (overlap) segments.sort((a, b) => Math.abs(b.end) - Math.abs(a.end));
+              const band = (horizontal ? height : width) / count * .7;
+              const thickness = isStacked(chart) || overlap ? band : band / Math.max(1, chart.series.length);
+              return segments.map((segment) => {
+                const a = val(segment.start); const b = val(segment.end);
+                const cross = cat(index) - band / 2 + (isStacked(chart) || overlap ? 0 : thickness * segment.seriesIndex);
+                return <rect key={`${index}:${segment.seriesIndex}`} data-series={chart.series[segment.seriesIndex].name} data-value={segment.value} x={horizontal ? Math.min(a, b) : cross} y={horizontal ? cross : Math.min(a, b)} width={horizontal ? Math.abs(b - a) : Math.max(0, thickness - 1)} height={horizontal ? Math.max(0, thickness - 1) : Math.abs(b - a)} fill={segment.color}><title>{categories[index]} · {chart.series[segment.seriesIndex].name}: {label(segment.value)}</title></rect>;
+              });
+            }) : chart.series.map((series, seriesIndex) => {
+              let connected = false;
+              const path = series.values.map((value, index) => {
+                if (!hasPoint(series, index)) { connected = false; return ""; }
+                const command = connected ? "L" : "M"; connected = true;
+                return `${command}${cat(index)},${val(value)}`;
+              }).join(" ");
+              return <path key={seriesIndex} d={path} fill="none" stroke={seriesColor(series, seriesIndex)} strokeWidth="2.5" />;
+            })}
+          </g>
+          {chart.series.flatMap((series, seriesIndex) => (series.dataLabels ?? []).map((text, index) => {
+            if (!text || !hasPoint(series, index)) return null;
+            const segment = barSegments(chart, index).find(item => item.seriesIndex === seriesIndex);
+            if (!segment) return null;
             const overlap = !isStacked(chart) && (chart.overlap ?? 0) >= 90;
-            const segments = barSegments(chart, index);
-            if (overlap) segments.sort((a, b) => Math.abs(b.end) - Math.abs(a.end));
             const band = (horizontal ? height : width) / count * .7;
             const thickness = isStacked(chart) || overlap ? band : band / Math.max(1, chart.series.length);
-            return segments.map((segment) => {
-              const a = val(segment.start); const b = val(segment.end);
-              const cross = cat(index) - band / 2 + (isStacked(chart) || overlap ? 0 : thickness * segment.seriesIndex);
-              return <rect key={`${index}:${segment.seriesIndex}`} data-series={chart.series[segment.seriesIndex].name} data-value={segment.value} x={horizontal ? Math.min(a, b) : cross} y={horizontal ? cross : Math.min(a, b)} width={horizontal ? Math.abs(b - a) : Math.max(0, thickness - 1)} height={horizontal ? Math.max(0, thickness - 1) : Math.abs(b - a)} fill={segment.color}><title>{categories[index]} · {chart.series[segment.seriesIndex].name}: {label(segment.value)}</title></rect>;
-            });
-          }) : chart.series.map((series, seriesIndex) => {
-            let connected = false;
-            const path = series.values.map((value, index) => {
-              if (!hasPoint(series, index)) { connected = false; return ""; }
-              const command = connected ? "L" : "M"; connected = true;
-              return `${command}${cat(index)},${val(value)}`;
-            }).join(" ");
-            return <path key={seriesIndex} d={path} fill="none" stroke={seriesColor(series, seriesIndex)} strokeWidth="2.5" />;
-          })}
-        </g>
-        {chart.series.flatMap((series, seriesIndex) => (series.dataLabels ?? []).map((text, index) => {
-          if (!text || !hasPoint(series, index)) return null;
-          const segment = barSegments(chart, index).find(item => item.seriesIndex === seriesIndex);
-          if (!segment) return null;
-          const overlap = !isStacked(chart) && (chart.overlap ?? 0) >= 90;
-          const band = (horizontal ? height : width) / count * .7;
-          const thickness = isStacked(chart) || overlap ? band : band / Math.max(1, chart.series.length);
-          const cross = chart.type === "bar" ? cat(index) - band / 2 + (isStacked(chart) || overlap ? band / 2 : thickness * (seriesIndex + .5)) : cat(index);
-          const end = val(segment.end);
-          const lines = wrap(text, horizontal ? Math.max(100, width * .55) : Math.max(40, width / count - 8));
-          const textWidth = Math.max(...lines.map(line => line.length)) * font * .58;
-          const outsideFits = horizontal && end + textWidth + 12 < margin.left + width;
-          const x = horizontal ? outsideFits ? end + 8 : Math.max(margin.left + textWidth + 4, end - 8) : cross;
-          const y = horizontal ? cross - (lines.length - 1) * font * .55 + font * .3 : Math.max(font, end - 8 - (lines.length - 1) * font * 1.1);
-          return <text key={`${seriesIndex}:${index}`} data-point-label={`${seriesIndex}:${index}`} x={x} y={y} textAnchor={horizontal ? outsideFits ? "start" : "end" : "middle"} fill={foreground} stroke={ccol ? "#ffffff" : "#071421"} strokeWidth="3" paintOrder="stroke" strokeLinejoin="round" fontSize={font * .9} fontWeight="700">
-            {lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex ? font * 1.1 : 0}>{line}</tspan>)}
-          </text>;
-        }))}
-        {xTitle && <text x={margin.left + width / 2} y={size.height - 4} textAnchor="middle" fill="currentColor" fontWeight="700">{xTitle}</text>}
-        {yTitle && <text transform={`translate(${font},${margin.top + height / 2}) rotate(-90)`} textAnchor="middle" fill="currentColor" fontWeight="700">{yTitle}</text>}
-      </svg>}
+            const cross = chart.type === "bar" ? cat(index) - band / 2 + (isStacked(chart) || overlap ? band / 2 : thickness * (seriesIndex + .5)) : cat(index);
+            const end = val(segment.end);
+            const lines = wrap(text, horizontal ? Math.max(100, width * .55) : Math.max(40, width / count - 8));
+            const textWidth = Math.max(...lines.map(line => line.length)) * font * .58;
+            const outsideFits = horizontal && end + textWidth + 12 < margin.left + width;
+            const x = horizontal ? outsideFits ? end + 8 : Math.max(margin.left + textWidth + 4, end - 8) : cross;
+            const y = horizontal ? cross - (lines.length - 1) * font * .55 + font * .3 : Math.max(font, end - 8 - (lines.length - 1) * font * 1.1);
+            return <text key={`${seriesIndex}:${index}`} data-point-label={`${seriesIndex}:${index}`} x={x} y={y} textAnchor={horizontal ? outsideFits ? "start" : "end" : "middle"} fill={foreground} stroke={ccol ? "#ffffff" : "#071421"} strokeWidth="3" paintOrder="stroke" strokeLinejoin="round" fontSize={font * .9} fontWeight="700">
+              {lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex ? font * 1.1 : 0}>{line}</tspan>)}
+            </text>;
+          }))}
+          {xTitle && <text x={margin.left + width / 2} y={size.height - 4} textAnchor="middle" fill="currentColor" fontWeight="700">{xTitle}</text>}
+          {yTitle && <text transform={`translate(${font},${margin.top + height / 2}) rotate(-90)`} textAnchor="middle" fill="currentColor" fontWeight="700">{yTitle}</text>}
+        </svg>}
+      </div>
+      {(!chart.legendPosition || chart.legendPosition === "bottom" || chart.legendPosition === "right") && legend}
     </div>
-    {(!chart.legendPosition || chart.legendPosition === "bottom" || chart.legendPosition === "right") && legend}
   </div>;
 }
 function Pie({ chart, colors }: { chart: Chart; colors: string[] }) {

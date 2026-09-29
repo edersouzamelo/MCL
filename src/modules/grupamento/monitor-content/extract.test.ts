@@ -81,7 +81,7 @@ describe("monitor content extraction", () => {
     ).join("");
     const rels = Buffer.from("<Relationships>" + relItems + "<Relationship Id=\"rId7\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart\" Target=\"../charts/chart1.xml\"/></Relationships>");
     const chart = Buffer.from([
-      "<c:chartSpace xmlns:c=\"c\" xmlns:a=\"a\"><c:chart><c:plotArea><c:barChart>",
+      "<c:chartSpace xmlns:c=\"c\" xmlns:a=\"a\"><c:chart><c:title><c:tx><c:rich><a:p><a:r><a:t>Índice de disponibilidade por OM</a:t></a:r></a:p></c:rich></c:tx></c:title><c:plotArea><c:barChart>",
       "<c:barDir val=\"col\"/><c:grouping val=\"clustered\"/><c:ser><c:tx><c:v>Toneladas/litros</c:v></c:tx>",
       "<c:spPr><a:solidFill><a:srgbClr val=\"4F81BD\"/></a:solidFill></c:spPr>",
       "<c:cat><c:strCache><c:pt><c:v>Açúcar</c:v></c:pt><c:pt><c:v>Arroz</c:v></c:pt></c:strCache></c:cat>",
@@ -120,6 +120,7 @@ describe("monitor content extraction", () => {
     const graph = elements.find((item) => item.kind === "chart");
     expect(graph?.kind).toBe("chart");
     if (graph?.kind === "chart") {
+      expect(graph.chart.title).toBe("Índice de disponibilidade por OM");
       expect(graph.chart.orientation).toBe("vertical");
       expect(graph.chart.grouping).toBe("clustered");
       expect(graph.chart.series[0]?.values).toEqual([7.1, 20.1]);
@@ -127,6 +128,7 @@ describe("monitor content extraction", () => {
       expect(graph.chart.xAxisTitle).toBe("Itens de suprimento");
       expect(graph.chart.yAxisTitle).toBe("Toneladas/litros");
     }
+    expect(scene.payload.searchableText).toContain("Índice de disponibilidade por OM");
   });
 
   it("preserves horizontal chart semantics, overlap and multiple colored series", async () => {
