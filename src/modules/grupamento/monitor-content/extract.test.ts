@@ -120,7 +120,8 @@ describe("monitor content extraction", () => {
     const graph = elements.find((item) => item.kind === "chart");
     expect(graph?.kind).toBe("chart");
     if (graph?.kind === "chart") {
-      expect(graph.chart.title).toBe("Índice de disponibilidade por OM");\n      expect(graph.chart.orientation).toBe("vertical");
+      expect(graph.chart.title).toBe("Índice de disponibilidade por OM");
+      expect(graph.chart.orientation).toBe("vertical");
       expect(graph.chart.grouping).toBe("clustered");
       expect(graph.chart.series[0]?.values).toEqual([7.1, 20.1]);
       expect(graph.chart.series[0]?.color).toBe("#4F81BD");
