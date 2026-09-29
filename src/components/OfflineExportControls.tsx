@@ -413,13 +413,13 @@ export function OfflineExportControls({
 
     let displayStream: MediaStream | null = null;
     try {
-      const wantsMp4 = mode === "mp4" || mode === "both";
-      let mp4Mime: string | null = null;
+      const wantsVideo = mode === "webm" || mode === "both";
+      let videoMime: string | null = null;
 
-      if (wantsMp4) {
-        mp4Mime = supportedMp4Mime();
-        if (!mp4Mime) {
-          throw new Error("Este navegador não oferece gravação WebM nativa. Use Chrome ou Edge atual para o teste MP4.");
+      if (wantsVideo) {
+        videoMime = supportedWebmMime();
+        if (!videoMime) {
+          throw new Error("Este navegador não oferece gravação WebM nativa. Use Chrome ou Edge atual.");
         }
         if (!navigator.mediaDevices?.getDisplayMedia) {
           throw new Error("Este navegador não oferece captura de guia para gravação WebM.");
@@ -443,11 +443,11 @@ export function OfflineExportControls({
         downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${baseName}-offline.html`);
       }
 
-      if (wantsMp4 && displayStream && mp4Mime) {
+      if (wantsVideo && displayStream && videoMime) {
         setProgress("Preparando gravação WebM do monitor ao vivo...");
-        const mp4 = await recordWebmFromLiveMonitor(monitorId, delaySeconds, displayStream, mp4Mime, setProgress);
+        const webm = await recordWebmFromLiveMonitor(monitorId, delaySeconds, displayStream, videoMime, setProgress);
         displayStream = null;
-        downloadBlob(mp4, `${baseName}-offline.mp4`);
+        downloadBlob(webm, `${baseName}-offline.webm`);
       }
 
       setProgress("Exportação concluída.");
