@@ -59,6 +59,12 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
   const [deviceMessage, setDeviceMessage] = useState("");
   const [deviceEnrolled, setDeviceEnrolled] = useState(false);
+  const [captureMode] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("capture") === "1");
+  const [captureFrame, setCaptureFrame] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const value = Number(new URLSearchParams(window.location.search).get("frame") ?? "0");
+    return Number.isInteger(value) && value >= 0 ? value : 0;
+  });
   const activeVersion = useRef<string | null>(null);
   const activeSceneIds = useRef<string[]>([]);
   const pendingSnapshot = useRef<MonitorSnapshot | null>(null);
@@ -221,6 +227,26 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const autoAdvance = effectiveLoop && playbackState === "playing";
 
   useEffect(() => {
+    if (!captureMode || !playlist.length) return;
+    setPlaybackState("paused");
+    setTransitioning(false);
+    setScreenIndex(Math.min(captureFrame, playlist.length - 1));
+  }, [captureMode, captureFrame, playlist.length]);
+
+  useEffect(() => {
+    if (!captureMode) return;
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "MCL_CAPTURE_FRAME") return;
+      const index = Number(event.data.frameIndex);
+      if (!Number.isInteger(index) || index < 0 || index >= playlist.length) return;
+      setCaptureFrame(index);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [captureMode, playlist.length]);
+
+  useEffect(() => {
     if (screenIndex < playlist.length) return;
     const frame = window.requestAnimationFrame(() => setScreenIndex(0));
     return () => window.cancelAnimationFrame(frame);
@@ -302,6 +328,11 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
 
   return (
     <main
+      data-mcl-capture-root="1"
+      data-mcl-capture-ready={captureMode && activeItem && !transitioning ? "1" : "0"}
+      data-mcl-playlist-count={playlist.length}
+      data-mcl-frame-index={safeIndex}
+      data-mcl-frame-label={screenLabel}
       className={`mcl-monitor-shell fixed inset-0 overscroll-none ${ccol ? "mcl-monitor-shell-ccol" : "mcl-monitor-shell-mcl"} flex h-[100dvh] min-h-0 flex-col overflow-hidden ${ccol ? "bg-[#f7f8fa] text-slate-950" : "bg-slate-950 text-white"}`}
       style={{
         backgroundImage: ccol
@@ -374,7 +405,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         </div>
       </section>
 
-      {playlist.length > 1 ? (
+      {playlist.length > 1 && !captureMode ? (
         <div className={`absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
           <div className="flex items-center gap-1">
             <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
@@ -396,8 +427,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         </div>
       ) : null}
 
-      <button type="button" className="mcl-monitor-footer-toggle absolute bottom-1 left-2 z-50 rounded bg-slate-800/80 p-2 text-white" aria-controls="monitor-technical-band" aria-expanded={drawerOpen} aria-label="Mostrar ou ocultar informações do monitor" onClick={() => setDrawerOpen((open) => !open)}><ChevronUp className="h-4 w-4" /></button>
-      <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50" data-open={drawerOpen} onKeyDown={(event) => { if (event.key === "Escape") setDrawerOpen(false); }}>
+      {!captureMode ? <button type="button" className="mcl-monitor-footer-toggle absolute bottom-1 left-2 z-50 rounded bg-slate-800/80 p-2 text-white" aria-controls="monitor-technical-band" aria-expanded={drawerOpen} aria-label="Mostrar ou ocultar informações do monitor" onClick={() => setDrawerOpen((open) => !open)}><ChevronUp className="h-4 w-4" /></button> : null}
+      {!captureMode ? <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50" data-open={drawerOpen} onKeyDown={(event) => { if (event.key === "Escape") setDrawerOpen(false); }}>
 
         <footer id="monitor-technical-band" className={`mcl-monitor-footer relative flex h-10 items-center justify-between gap-4 border-t px-7 text-[10px] backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/92 text-slate-600" : "border-white/10 bg-slate-950/92 text-slate-400"}`}>
           <div className="flex min-w-0 items-center gap-4">
@@ -427,7 +458,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
           </div>
         </footer>
-      </div>
+      </div> : null}
     </main>
   );
 }
