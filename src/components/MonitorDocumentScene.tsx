@@ -12,7 +12,7 @@ import type {
 } from "@/modules/grupamento/monitor-content/types";
 
 import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
-import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
+import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";\nimport { presentationTextColor } from "@/modules/grupamento/monitor-content/presentation-intelligence";
 
 function SceneIcon({ type }: { type: MonitorDocumentSceneDto["sceneType"] }) {
   if (type === "CHART") return <BarChart3 className="h-4 w-4" />;
@@ -26,14 +26,6 @@ function hexLuminance(value?: string) {
   const parts = [1, 3, 5].map((start) => Number.parseInt(value.slice(start, start + 2), 16) / 255);
   const linear = parts.map((item) => item <= 0.03928 ? item / 12.92 : Math.pow((item + 0.055) / 1.055, 2.4));
   return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
-}
-
-function adaptedTextColor(original: string | undefined, ccol: boolean) {
-  const lum = hexLuminance(original);
-  if (lum === null) return ccol ? "#0f172a" : "#f8fafc";
-  if (!ccol && lum < 0.34) return "#f8fafc";
-  if (ccol && lum > 0.86) return "#0f172a";
-  return original;
 }
 
 function adaptedShapeFill(original: string | undefined, area: number, ccol: boolean) {
@@ -53,7 +45,7 @@ function boxStyle(item: { x: number; y: number; w: number; h: number; z: number 
   };
 }
 
-function TextElement({ item, ccol, slideWidth }: { item: MonitorSlideTextElement; ccol: boolean; slideWidth: number }) {
+function TextElement({ item, elements, ccol, slideWidth }: { item: MonitorSlideTextElement; elements: MonitorSlideElement[]; ccol: boolean; slideWidth: number }) {
   const size = item.fontSizePt ?? 18;
   const justify = item.verticalAlign === "middle" ? "center" : item.verticalAlign === "bottom" ? "flex-end" : "flex-start";
   const area = item.w * item.h;
@@ -66,7 +58,7 @@ function TextElement({ item, ccol, slideWidth }: { item: MonitorSlideTextElement
       fontSize: `${size / (slideWidth / 12700) * 100}cqw`,
       lineHeight: item.role === "metric" ? 1 : item.role === "label" ? 1.06 : 1.12,
       fontWeight: item.bold || item.role === "metric" || item.role === "title" ? 800 : 650,
-      color: adaptedTextColor(item.color, ccol),
+      color: presentationTextColor(item, elements, ccol),
       textShadow: ccol ? "none" : "0 2px 14px rgba(2,6,23,.55)",
       letterSpacing: item.role === "label" ? ".02em" : undefined,
       opacity: area < 0.002 ? 0.94 : 1,
@@ -89,7 +81,7 @@ function LayoutScene({ scene, ccol }: { scene: MonitorDocumentSceneDto; ccol: bo
             const area = item.w * item.h;
             return <div key={"shape-" + String(index)} className="absolute" style={{...boxStyle(item),background:adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? "1px solid " + item.lineColor : undefined,borderRadius:String((item.radius ?? 0)*100)+"%"}} />;
           }
-          if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} ccol={ccol} slideWidth={layout.width} />;
+          if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} />;
           if (item.kind === "image") {
             const framed = item.w * item.h >= 0.005;
             return <div
