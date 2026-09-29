@@ -271,7 +271,7 @@ const surface=document.getElementById("surface");
 let index=0;
 function fit(){
   const scale=Math.min(window.innerWidth/1920,window.innerHeight/1080);
-  surface.style.transform=`translate(-50%,-50%) scale(${scale})`;
+  surface.style.transform="translate(-50%,-50%) scale("+scale+")";
 }
 function mount(frame){
   surface.innerHTML=frame.html;
