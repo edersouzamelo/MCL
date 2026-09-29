@@ -86,7 +86,7 @@ export function parseCcoMonitorConfig(value: unknown, monitorId: number): CcoMon
   const validScreens = new Set<string>(CCO_SCREEN_CATALOG.map((screen) => screen.id));
   if (item.id !== monitorId || typeof item.label !== "string" || !item.label.trim() || item.label.length > 100 ||
       typeof item.enabled !== "boolean" || (item.mode !== "single" && item.mode !== "loop") ||
-      !Array.isArray(item.screens) || !item.screens.length || item.screens.length > validScreens.size ||
+      !Array.isArray(item.screens) || item.screens.length > validScreens.size ||
       item.screens.some((screen) => typeof screen !== "string" || !validScreens.has(screen)) ||
       new Set(item.screens).size !== item.screens.length ||
       !Number.isInteger(item.delaySeconds) || (item.delaySeconds as number) < 5 || (item.delaySeconds as number) > 300 ||
