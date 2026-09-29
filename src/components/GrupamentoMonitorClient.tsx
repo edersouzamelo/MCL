@@ -209,7 +209,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     ];
   }, [documentScenes, monitor.screens, rpn, sag]);
 
-  const safeIndex = Math.min(screenIndex, Math.max(0, playlist.length - 1));
+  const safeIndex = captureMode ? Math.min(captureFrame, Math.max(0, playlist.length - 1)) : Math.min(screenIndex, Math.max(0, playlist.length - 1));
   const activeItem = playlist[safeIndex] ?? null;
   const activeScreen = activeItem?.kind === "system" ? activeItem.screen : null;
   const screenLabel = activeItem?.label ?? "Sem conteúdo selecionado";
@@ -224,14 +224,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     return `Fonte: SAG · EC ${currentDate} · RPNP ${previousDate}`;
   }, [activeItem, rpn?.source.referenceDate, sag?.source.referenceDate]);
   const effectiveLoop = monitor.mode === "loop" && playlist.length > 1;
-  const autoAdvance = effectiveLoop && playbackState === "playing";
-
-  useEffect(() => {
-    if (!captureMode || !playlist.length) return;
-    setPlaybackState("paused");
-    setTransitioning(false);
-    setScreenIndex(Math.min(captureFrame, playlist.length - 1));
-  }, [captureMode, captureFrame, playlist.length]);
+  const autoAdvance = !captureMode && effectiveLoop && playbackState === "playing";
 
   useEffect(() => {
     if (!captureMode) return;
@@ -317,7 +310,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   ) : !activeItem ? (
     <Empty ccol={ccol} title="Sem conteúdo selecionado" description="Selecione uma tela SAG ou aprove conteúdo documental para esta saída." />
   ) : activeItem.kind === "document" ? (
-    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={playbackState !== "playing"} onPageCount={onPageCount} />
+    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={onPageCount} />
   ) : !sag || !rpn ? (
     <MonitorBootScreen ccol={ccol} connectionState={connectionState} />
   ) : isRuleScreen ? (
@@ -396,7 +389,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <MonitorViewport
               documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
-              paused={playbackState !== "playing"}
+              paused={captureMode || playbackState !== "playing"}
               onPageCount={activeItem?.kind === "document" || !activeItem ? undefined : onPageCount}
             >
               {screenContent}
