@@ -28,7 +28,9 @@
       "acronym": "13ª Bda Inf Mtz",
       "name": "13ª Brigada de Infantaria Motorizada",
       "city": "Cuiabá",
-      "aliases": [],
+      "aliases": [
+        "Cmdo 13ª Bda Inf Mtz"
+      ],
       "image": "/om-crests/13-bda-inf-mtz.png",
       "sourceDrawing": 106,
       "sourceBounds": [
@@ -64,7 +66,10 @@
       "city": "Cáceres",
       "aliases": [
         "66 BI MTZ",
-        "C FRON JAURU"
+        "C FRON JAURU",
+        "Cmdo Fron Jauru / 66º BI Mtz",
+        "Cmdo Fron Jauru",
+        "Cmdo Fron- Jauru/66º BI Mtz"
       ],
       "image": "/om-crests/c-fron-jauru-66-bi-mtz.png",
       "sourceDrawing": 305,
@@ -265,12 +270,12 @@
       "height": 461
     },
     {
-      "id": "9-bia-aaa-e",
-      "acronym": "9ª Bia AAAe",
-      "name": "9ª Bateria de Artilharia Antiaérea",
+      "id": "3-bia-aaa-e",
+      "acronym": "3ª Bia AAAe",
+      "name": "3ª Bateria de Artilharia Antiaérea",
       "city": "Três Lagoas",
       "aliases": [
-        "9 BIA A AE"
+        "3 BIA A AE"
       ],
       "image": "/om-crests/9-bia-aaa-e.png",
       "sourceDrawing": 1334,
@@ -412,7 +417,9 @@
       "city": "Campo Grande",
       "aliases": [
         "9 GPT LOG",
-        "GPT LOG"
+        "GPT LOG",
+        "Cmdo 9º Gpt Log",
+        "Cmdo 9º Grupamento Logístico"
       ],
       "image": "/om-crests/9-gpt-log.png",
       "sourceDrawing": 2394,
@@ -447,7 +454,9 @@
       "acronym": "4ª Bda C Mec",
       "name": "4ª Brigada de Cavalaria Mecanizada",
       "city": "Dourados",
-      "aliases": [],
+      "aliases": [
+        "Cmdo 4ª Bda C Mec"
+      ],
       "image": "/om-crests/4-bda-c-mec.png",
       "sourceDrawing": 2520,
       "sourceBounds": [
@@ -553,7 +562,9 @@
       "name": "18ª Brigada de Infantaria de Pantanal",
       "city": "Corumbá",
       "aliases": [
-        "18 BDA INF PANTANAL"
+        "18 BDA INF PANTANAL",
+        "Cmdo 18ª Bda Inf Pantanal",
+        "Cmdo 18ª Bda Inf Pan"
       ],
       "image": "/om-crests/18-bda-inf-pan.png",
       "sourceDrawing": 2823,
@@ -720,7 +731,9 @@
       "aliases": [
         "B ADM AP CMO",
         "B ADM AP/CMO",
-        "B ADMIN AP CMO"
+        "B ADMIN AP CMO",
+        "Ba Adm Ap / CMO",
+        "Ba Adm Ap CMO"
       ],
       "image": "/om-crests/b-adm-ap-cmo.png",
       "sourceDrawing": 4091,
@@ -859,7 +872,9 @@
       "acronym": "9ª RM",
       "name": "9ª Região Militar",
       "city": "Campo Grande",
-      "aliases": [],
+      "aliases": [
+        "Cmdo 9ª RM"
+      ],
       "image": "/om-crests/9-rm.png",
       "sourceDrawing": 4931,
       "sourceBounds": [
