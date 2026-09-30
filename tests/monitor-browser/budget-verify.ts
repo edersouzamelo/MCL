@@ -79,9 +79,9 @@ async function verify(){
   await context.route('**/api/grupamento/monitor-content?*',r=>r.fulfill({json:{imports:[]}}));
   const command=await context.newPage();await command.goto(origin+'/grupamento');
   await command.locator('summary').filter({hasText:'Conteúdo orçamentário do SAG'}).nth(8).click();
-  await command.getByRole('button',{name:'Classe I - Resumido',exact:true}).nth(8).hover();
+  await command.getByRole('button',{name:'Classe I - Resumido',exact:true}).first().hover();
   await expect(command.getByRole('tooltip')).toContainText('Visualização do total de recursos recebidos desta classe distribuído por PI');
-  await command.getByRole('button',{name:'Classe I - Resumido',exact:true}).nth(8).focus();
+  await command.getByRole('button',{name:'Classe I - Resumido',exact:true}).first().focus();
   await command.keyboard.press('Escape');
   await expect(command.getByRole('tooltip')).toHaveCount(0);
 

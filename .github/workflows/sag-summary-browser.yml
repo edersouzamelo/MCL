@@ -23,7 +23,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Prepare browser
+        run: |
+          if [ -x /usr/bin/google-chrome ]; then
+            echo "MONITOR_CHROMIUM_PATH=/usr/bin/google-chrome" >> "$GITHUB_ENV"
+          else
+            pnpm exec playwright install --with-deps chromium
+          fi
       - name: Budget frames and SAG popovers with explicit test fixtures
         run: node --import tsx tests/monitor-browser/budget-verify.ts
       - uses: actions/upload-artifact@v4
