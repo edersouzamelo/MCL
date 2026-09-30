@@ -1,3 +1,4 @@
+import { isCcoMonitorId } from "@/modules/grupamento/monitor";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getMonitorReader } from "@/modules/grupamento/monitor-device";
@@ -33,7 +34,7 @@ async function withTimeout<T>(promise: Promise<T>) {
 
 export async function GET(request: Request) {
   const monitorId = Number(new URL(request.url).searchParams.get("monitorId"));
-  if (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
+  if (!isCcoMonitorId(monitorId)) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
   const reader = await getMonitorReader(monitorId);
   if (!reader) return NextResponse.json({ error: "Autenticação obrigatória." }, { status: 401 });
 

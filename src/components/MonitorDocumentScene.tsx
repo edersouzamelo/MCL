@@ -46,7 +46,7 @@ function boxStyle(item: { x: number; y: number; w: number; h: number; z: number 
   };
 }
 
-function TextElement({ item, elements, ccol, slideWidth }: { item: MonitorSlideTextElement; elements: MonitorSlideElement[]; ccol: boolean; slideWidth: number }) {
+function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { item: MonitorSlideTextElement; elements: MonitorSlideElement[]; ccol: boolean; slideWidth: number; preserve?: boolean }) {
   const size = item.fontSizePt ?? 18;
   const justify = item.verticalAlign === "middle" ? "center" : item.verticalAlign === "bottom" ? "flex-end" : "flex-start";
   const area = item.w * item.h;
@@ -57,10 +57,11 @@ function TextElement({ item, elements, ccol, slideWidth }: { item: MonitorSlideT
       justifyContent: item.align === "center" ? "center" : item.align === "right" ? "flex-end" : "flex-start",
       textAlign: item.align,
       fontSize: `${size / (slideWidth / 12700) * 100}cqw`,
+      fontFamily: preserve ? item.fontFace : undefined,
       lineHeight: item.role === "metric" ? 1 : item.role === "label" ? 1.06 : 1.12,
-      fontWeight: item.bold || item.role === "metric" || item.role === "title" ? 800 : 650,
-      color: presentationTextColor(item, elements, ccol),
-      textShadow: ccol ? "none" : "0 2px 14px rgba(2,6,23,.55)",
+      fontWeight: preserve ? (item.bold ? 700 : 400) : item.bold || item.role === "metric" || item.role === "title" ? 800 : 650,
+      color: preserve ? item.color : presentationTextColor(item, elements, ccol),
+      textShadow: preserve || ccol ? "none" : "0 2px 14px rgba(2,6,23,.55)",
       letterSpacing: item.role === "label" ? ".02em" : undefined,
       opacity: area < 0.002 ? 0.94 : 1,
     }}>
@@ -72,7 +73,8 @@ function TextElement({ item, elements, ccol, slideWidth }: { item: MonitorSlideT
 function LayoutScene({ scene, ccol, briefing = false }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean }) {
   const layout = scene.payload.layout;
   if (!layout) return null;
-  const sorted = prepareMonitorElements(layout.elements).elements
+  const preserve = Boolean(scene.payload.correction?.preserveLayout);
+  const sorted = [...(preserve ? layout.elements : prepareMonitorElements(layout.elements).elements)]
     .sort((a,b) => a.z-b.z);
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden" style={{ containerType: "size" }}>
@@ -80,9 +82,9 @@ function LayoutScene({ scene, ccol, briefing = false }: { scene: MonitorDocument
         {sorted.map((item: MonitorSlideElement, index) => {
           if (item.kind === "shape") {
             const area = item.w * item.h;
-            return <div key={"shape-" + String(index)} className="absolute" style={{...boxStyle(item),background:adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? "1px solid " + item.lineColor : undefined,borderRadius:String((item.radius ?? 0)*100)+"%"}} />;
+            return <div key={"shape-" + String(index)} className="absolute" style={{...boxStyle(item),opacity:preserve ? item.opacity : undefined,background:preserve ? item.fill : adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? "1px solid " + item.lineColor : undefined,borderRadius:String((item.radius ?? 0)*100)+"%"}} />;
           }
-          if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} />;
+          if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} preserve={preserve} />;
           if (item.kind === "image") {
             const framed = !briefing && item.w * item.h >= 0.005;
             return <div
@@ -128,7 +130,7 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
 
 export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
-  const tableSlide = payload.layout ? monitorTableSlide(prepareMonitorElements(payload.layout.elements).elements) : null;
+  const tableSlide = payload.layout && !payload.correction?.preserveLayout ? monitorTableSlide(prepareMonitorElements(payload.layout.elements).elements) : null;
   const hasTableSlide = Boolean(tableSlide);
   useEffect(() => { if (!hasTableSlide) onPageCount?.(1); }, [hasTableSlide, onPageCount]);
   if (tableSlide) {

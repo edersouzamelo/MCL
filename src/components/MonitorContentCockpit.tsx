@@ -251,6 +251,7 @@ export function MonitorContentCockpit({
           {notice ? <div className="mt-3 rounded-lg bg-emerald-50 p-2.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">{notice}</div> : null}
 
           {previews.length > 1 ? <div className="mt-4 flex flex-wrap gap-2" aria-label="Arquivos aguardando avaliação">{previews.map((item) => <button key={item.id} type="button" onClick={() => { setSelectedImportId(item.id); setSelectedSceneId(null); }} className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold ${preview?.id === item.id ? "border-amber-600 bg-amber-100 dark:bg-amber-950" : "border-zinc-300 dark:border-zinc-700"}`}>{item.fileName}</button>)}</div> : null}
+          {preview?.scenes.some(scene => scene.payload?.correction?.preserveLayout) && <p className="mt-3 rounded-lg bg-sky-50 p-3 text-xs text-sky-900 dark:bg-sky-950 dark:text-sky-200">PPT de correção reconhecido. Ao aprovar, o layout corrigido substitui a sequência deste monitor. Para voltar à sequência anterior, retire este arquivo da exposição.</p>}
           {preview ? (
             <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/15">
               <div className="flex flex-wrap items-center justify-between gap-3">

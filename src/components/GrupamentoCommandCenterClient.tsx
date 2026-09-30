@@ -23,6 +23,11 @@ import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
 import { familyFieldName, SAG_PI_FAMILIES, type SagPiFamily } from "@/modules/grupamento/sag-family-batch";
 import {
+  CCO_MONITOR_COUNT,
+  CCO_RESPONSIBLE_SECTORS,
+  ccoLocalDate,
+  monitorUpdatedToday,
+  type CcoResponsibleSector,
   CCO_DEFAULT_LOOP_DELAY_SECONDS,
   CCO_SCREEN_CATALOG,
   GROUP_STORAGE_KEYS,
@@ -103,6 +108,7 @@ export function GrupamentoCommandCenterClient({
   const monitorsRef = useRef(monitors);
   const writeQueue = useRef<Record<number, Promise<void>>>({});
   const pendingWrites = useRef(0);
+  const failedWrites = useRef<Record<number, string>>({});
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [recovering, setRecovering] = useState(false);
@@ -138,7 +144,7 @@ export function GrupamentoCommandCenterClient({
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Falha ao sincronizar os monitores.");
       const next = payload.monitors as unknown[];
-      if (!Array.isArray(next) || next.length !== 8) throw new Error("Configuração dos monitores incompleta.");
+      if (!Array.isArray(next) || next.length !== CCO_MONITOR_COUNT) throw new Error("Configuração dos monitores incompleta.");
       const parsed = next.map((item, index) => parseCcoMonitorConfig(item, index + 1));
       if (parsed.some((item) => !item)) throw new Error("Configuração dos monitores inválida.");
       if (pendingWrites.current) return;
@@ -304,8 +310,10 @@ export function GrupamentoCommandCenterClient({
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Falha ao salvar a configuração.");
+      delete failedWrites.current[id];
       window.dispatchEvent(new CustomEvent("mcl-grupamento-monitors-updated"));
     }).catch((cause) => {
+      failedWrites.current[id] = cause instanceof Error ? cause.message : "Falha ao salvar configuração.";
       setMonitorError(cause instanceof Error ? cause.message : "Falha ao salvar a configuração.");
       void refreshMonitors();
     }).finally(() => { pendingWrites.current -= 1; if (!pendingWrites.current) void refreshMonitors(); });
@@ -323,22 +331,6 @@ export function GrupamentoCommandCenterClient({
       const screens = exists ? monitor.screens.filter((item) => item !== screen) : [...monitor.screens, screen];
       return { ...monitor, screens };
     }));
-  }
-
-  async function resetMonitors() {
-    await Promise.all(Object.values(writeQueue.current));
-    try {
-      const response = await fetch("/api/grupamento/monitors", { method: "DELETE" });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Falha ao restaurar monitores.");
-      monitorsRef.current = payload.monitors;
-      setMonitors(payload.monitors);
-      setNotice("Configuração dos 8 monitores restaurada para o padrão do CCOL.");
-      setMonitorError("");
-      window.dispatchEvent(new CustomEvent("mcl-grupamento-monitors-updated"));
-    } catch (cause) {
-      setMonitorError(cause instanceof Error ? cause.message : "Falha ao restaurar monitores.");
-    }
   }
 
   return (
@@ -504,8 +496,7 @@ export function GrupamentoCommandCenterClient({
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><div className="flex items-center gap-2 text-sm font-bold"><MonitorCog className="h-4 w-4" /> Matriz de distribuição — 8 monitores</div><p className="mt-1 text-xs text-zinc-500">Cada saída escolhe telas SAG, conteúdo documental, loop, intervalo e layout. É permitido deixar todas as telas SAG desmarcadas e exibir somente documentos aprovados.</p></div>
-          <button type="button" disabled={!monitorsReady} onClick={() => void resetMonitors()} className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-semibold hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-900">Restaurar padrão</button>
+          <div><div className="flex items-center gap-2 text-sm font-bold"><MonitorCog className="h-4 w-4" /> Matriz de distribuição · 8 monitores, Teste e Central</div><p className="mt-1 text-xs text-zinc-500">Cada saída escolhe telas SAG, conteúdo documental, loop, intervalo e layout. É permitido deixar todas as telas SAG desmarcadas e exibir somente documentos aprovados.</p></div>
         </div>
 
         {!monitorsReady ? <p className="mt-3 text-xs text-zinc-500">Sincronizando a configuração compartilhada dos monitores…</p> : null}
@@ -514,7 +505,13 @@ export function GrupamentoCommandCenterClient({
           {monitors.map((monitor) => (
             <article key={monitor.id} className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
               <div className="flex items-start justify-between gap-4">
-                <div><div className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">HDMI / SAÍDA {String(monitor.id).padStart(2, "0")}</div><div className="mt-1 font-bold">{monitor.label}</div></div>
+                <div className="min-w-0 flex-1"><div className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">{monitor.id === 9 ? "SIMULAÇÃO INDEPENDENTE" : monitor.id === 10 ? "PAINEL CENTRAL · 4 TELAS" : `HDMI / SAÍDA ${String(monitor.id).padStart(2, "0")}`}</div><div className="mt-1 font-bold">{monitor.label}</div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-[1.4fr_1fr]">
+                    <Field label="Classe / seção responsável"><select aria-label={`Responsável pelo ${monitor.label}`} value={monitor.responsibleSector ?? ""} onChange={(e) => updateMonitor(monitor.id, { responsibleSector: e.target.value ? e.target.value as CcoResponsibleSector : null })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="">Não definido</option>{CCO_RESPONSIBLE_SECTORS.map(sector => <option key={sector}>{sector}</option>)}</select></Field>
+                    <Field label="Atualizado hoje?"><select aria-label={`${monitor.label}: atualizado hoje?`} value={monitorUpdatedToday(monitor) ? "yes" : "no"} onChange={(e) => updateMonitor(monitor.id, { updatedOn: e.target.value === "yes" ? ccoLocalDate() : null })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="no">Não</option><option value="yes">Sim</option></select></Field>
+                  </div>
+                  {monitor.id === 9 && <p className="mt-2 text-xs text-zinc-500">As seleções e os documentos deste monitor não alteram os monitores em exposição.</p>}
+                </div>
                 <a href={`/grupamento/monitor/${monitor.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-semibold text-white dark:bg-white dark:text-zinc-950">Abrir <ExternalLink className="h-3.5 w-3.5" /></a>
               </div>
 
@@ -525,18 +522,21 @@ export function GrupamentoCommandCenterClient({
                 <Field label="Layout"><select value={monitor.layout} onChange={(e) => updateMonitor(monitor.id, { layout: e.target.value as "mcl" | "ccol" | "briefing" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="mcl">Modo escuro</option><option value="ccol">Modo claro</option><option value="briefing">Modo Briefing</option></select></Field>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <details className="mt-4 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+                <summary className="cursor-pointer text-xs font-semibold">Definir conteúdos orçamentários do SAG para exposição <span className="text-zinc-500">({monitor.screens.length})</span></summary>
+                <div className="mt-3 flex flex-wrap gap-2">
                 {CCO_SCREEN_CATALOG.map((screen) => {
                   const selected = monitor.screens.includes(screen.id);
                   return <button key={screen.id} type="button" onClick={() => toggleScreen(monitor.id, screen.id)} className={`rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition ${selected ? "border-sky-500 bg-sky-50 text-sky-800 dark:bg-sky-950/30 dark:text-sky-300" : "border-zinc-200 text-zinc-500 dark:border-zinc-800"}`}>{selected ? <CheckCircle2 className="mr-1 inline h-3 w-3" /> : null}{screen.label}</button>;
                 })}
-              </div>
+                </div>
+              </details>
               <MonitorContentCockpit
                 monitorId={monitor.id}
                 currentUserName={currentUserName}
                 requiresOperatorIdentification={requiresOperatorIdentification}
               />
-              <OfflineExportControls monitorId={monitor.id} delaySeconds={monitor.delaySeconds} />
+              <OfflineExportControls monitorId={monitor.id} delaySeconds={monitor.delaySeconds} beforeExport={async () => { await Promise.all(Object.values(writeQueue.current)); if (failedWrites.current[monitor.id]) throw new Error(failedWrites.current[monitor.id]); }} />
               {canManageDevices ? <MonitorDeviceControls monitorId={monitor.id} /> : null}
             </article>
           ))}

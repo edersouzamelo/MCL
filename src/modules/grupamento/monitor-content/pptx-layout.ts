@@ -1,6 +1,7 @@
 import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
 import { chartValueLabel } from "./chart-geometry";
+import { MONITOR_CORRECTION_MARKER } from "./correction";
 import { prepareMonitorElements } from "./presentation-layout";
 import type {
   MonitorDocumentAssetDraft,
@@ -360,6 +361,7 @@ function slideTitle(elements: MonitorSlideElement[], page: number) {
 
 export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
   const entries = zipEntries(buffer);
+  const correction = (entries.get("docProps/core.xml")?.toString("utf8") ?? "").includes(MONITOR_CORRECTION_MARKER);
   const size = slideSize(entries);
   const theme = themeColors(entries);
   const assets: MonitorDocumentAssetDraft[] = [];
@@ -383,13 +385,14 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const text = clean(paragraphs(item.xml).join("\n"));
         const sp = item.xml.match(/<p:spPr\b[^>]*>([\s\S]*?)<\/p:spPr>/)?.[1] ?? "";
         const f = fill(sp,theme);
-        const l = line(sp,theme);
+        const lineBlock = sp.match(/<a:ln\b[^>]*>([\s\S]*?)<\/a:ln>/)?.[1] ?? "";
+        const l = correction && /<a:alpha\b[^>]*\bval="0"/.test(lineBlock) ? undefined : line(sp,theme);
         const geometry = item.xml.match(/<a:prstGeom\b[^>]*\bprst="([^"]+)"/)?.[1];
-        if (f || l || geometry === "line") elements.push({kind:"shape",...b,fill:f,lineColor:l,radius:geometry==="roundRect"?0.018:0,z:z*10});
+        if (f || l || geometry === "line") elements.push({kind:"shape",...b,fill:f,opacity:correction ? Number(sp.match(/<a:solidFill\b[^>]*>[\s\S]*?<a:alpha\b[^>]*\bval="(\d+)"/)?.[1] ?? 100000) / 100000 : undefined,lineColor:l,radius:geometry==="roundRect"?0.018:0,z:z*10});
         if (text) {
           const fs = fontSize(item.xml);
           searchable.push(text);
-          elements.push({kind:"text",...b,text,fontSizePt:fs,bold:/<a:rPr\b[^>]*\bb="(?:1|true)"/i.test(item.xml),align:align(item.xml),verticalAlign:valign(item.xml),color:color(item.xml,theme),role:role(text,fs,b.y),z:z*10+1});
+          elements.push({kind:"text",...b,text,fontSizePt:fs,fontFace:item.xml.match(/<a:latin\b[^>]*\btypeface="([^"]+)"/)?.[1],bold:/<a:rPr\b[^>]*\bb="(?:1|true)"/i.test(item.xml),align:align(item.xml),verticalAlign:valign(item.xml),color:color(item.xml,theme),role:role(text,fs,b.y),z:z*10+1});
         }
       } else if (item.kind === "picture") {
         const rid = item.xml.match(/<a:blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
@@ -398,6 +401,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const meta = item.xml.match(/<p:cNvPr\b([^>]*)\/?\s*>/)?.[1] ?? "";
         const imageLabel = clean(attribute(meta, "descr") || attribute(meta, "title") || attribute(meta, "name"));
         if (imageLabel) searchable.push(imageLabel);
+        if (correction && !assetKey) throw new Error(`Slide ${page}: figura de correção indisponível. Nenhuma cena publicada.`);
         if (assetKey) elements.push({kind:"image",...b,assetKey,z:z*10+1});
       } else {
         const rid = item.xml.match(/<c:chart\b[^>]*\br:id="([^"]+)"/)?.[1];
@@ -420,7 +424,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     }
     const chartBoxes = elements.filter((element) => element.kind === "chart");
     const neutralFills = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
-    elements = elements.filter((element) => {
+    elements = correction ? elements : elements.filter((element) => {
       if (element.kind !== "shape" || !element.fill || !neutralFills.has(element.fill.toUpperCase())) return true;
       const area = element.w * element.h;
       if (area < 0.04) return true;
@@ -433,7 +437,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
       return !overlapsChart;
     });
 
-    const presentation = prepareMonitorElements(elements);
+    const presentation = correction ? { elements, omitted: [], adjustments: [] } : prepareMonitorElements(elements);
     for (const reason of new Set(presentation.omitted.map((item) => item.reason))) {
       warnings.push("Slide " + page + ": " + reason + ". Omitido na exibição institucional; original preservado.");
     }
@@ -446,6 +450,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
       title:slideTitle(elements,page),
       sourcePage:page,
       payload:{
+        ...(correction ? { correction: { version: 1 as const, preserveLayout: true as const, fullFrame: true as const } } : {}),
         layoutVersion:2,
         layout:{version:2,width:size.width,height:size.height,elements},
         searchableText:[...new Set(searchable.map(clean).filter(Boolean))],
@@ -453,6 +458,8 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
       }
     });
   });
+  if (correction) warnings.unshift("PPT de correção reconhecido. Posições, tamanhos e cores definidos pelo usuário têm prioridade. Após aprovação, este arquivo substitui a sequência exibida neste monitor; ao retirá-lo, a sequência anterior retorna.");
+  if (slides.length > 80) throw new Error("PowerPoint excede 80 slides. Divida o arquivo antes de importar; nenhum slide foi publicado.");
   if (!slides.length) throw new Error("PowerPoint sem slides XML reconhecíveis.");
   return {scenes:scenes.slice(0,80),assets,warnings};
 }

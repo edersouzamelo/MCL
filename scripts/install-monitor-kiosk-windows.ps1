@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateRange(1, 8)]
+  [ValidateRange(1, 10)]
   [int]$MonitorId,
   [string]$BaseUrl = "https://mcl-one.vercel.app",
   [int]$WindowX = 0,

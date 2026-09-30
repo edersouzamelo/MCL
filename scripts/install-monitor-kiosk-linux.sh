@@ -2,8 +2,8 @@
 set -euo pipefail
 
 monitor_id="${1:-}"
-if [[ ! "$monitor_id" =~ ^[1-8]$ ]]; then
-  echo "Uso: bash install-monitor-kiosk-linux.sh <monitor de 1 a 8> [URL base]" >&2
+if [[ ! "$monitor_id" =~ ^([1-9]|10)$ ]]; then
+  echo "Uso: bash install-monitor-kiosk-linux.sh <monitor de 1 a 10> [URL base]" >&2
   exit 2
 fi
 base_url="${2:-https://mcl-one.vercel.app}"

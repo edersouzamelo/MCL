@@ -1,3 +1,4 @@
+import { isCcoMonitorId } from "@/modules/grupamento/monitor";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
@@ -14,7 +15,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ moni
   if (!session.user.organizationId) return NextResponse.json({ error: "Sessão sem organização." }, { status: 422 });
   const { monitorId: id } = await params;
   const monitorId = Number(id);
-  if (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
+  if (!isCcoMonitorId(monitorId)) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
   try {
     const config = await saveCcoMonitorConfig(session.user.organizationId, session.user.id, await request.json(), monitorId);
     return NextResponse.json({ monitor: config });

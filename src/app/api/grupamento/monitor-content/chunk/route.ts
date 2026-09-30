@@ -1,3 +1,4 @@
+import { isCcoMonitorId } from "@/modules/grupamento/monitor";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
   const chunk = form.get("chunk");
 
   if (!validUploadId(uploadId)) return NextResponse.json({ error: "Identificador de carga inválido." }, { status: 400 });
-  if (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
+  if (!isCcoMonitorId(monitorId)) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
   if (!Number.isInteger(chunkIndex) || chunkIndex < 0 || !Number.isInteger(chunkCount) || chunkCount < 1 || chunkCount > MAX_CHUNKS || chunkIndex >= chunkCount) {
     return NextResponse.json({ error: "Sequência de blocos inválida." }, { status: 400 });
   }

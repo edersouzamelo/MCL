@@ -23,7 +23,7 @@ describe("Briefing editável", () => {
     expect(briefingDate("2026-09-29T02:00:00Z")).toBe("Atualizado em 28 SET 26");
   });
   it("preserva modelo original, classes, gráficos nativos e todas as linhas documentais", async () => {
-    const monitors = defaultCcoMonitorConfig().map((m) => ({ ...m, layout: "mcl" as const, screens: [] }));
+    const monitors = defaultCcoMonitorConfig().slice(0, 8).map((m) => ({ ...m, layout: "mcl" as const, screens: [] }));
     const tableScene: MonitorDocumentSceneDto = { ...scene, id: "fixture-table", monitorId: 2, sceneType: "TABLE", payload: { layoutVersion: 2, layout: { version: 2, width: 12192000, height: 6858000, elements: [
       { kind: "table", x: .02, y: .1, w: .96, h: .8, z: 1, columns: ["Item", "Quantidade"], rows: Array.from({ length: 23 }, (_, i) => [`ITEM TESTE ${i}`, String(i)]) },
     ] } } };

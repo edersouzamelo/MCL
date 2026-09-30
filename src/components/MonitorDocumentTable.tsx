@@ -46,6 +46,14 @@ export function MonitorDocumentTable({ columns, rows, cycleSeconds = 15, paused 
     const timer = window.setInterval(() => setPage(current => (current + 1) % fit.pages.length), cycleSeconds * 1000);
     return () => clearInterval(timer);
   }, [paused, fit.pages.length, cycleSeconds]);
+  useEffect(() => {
+    const capturePage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== "MCL_CAPTURE_TABLE_PAGE" || !Number.isInteger(event.data.page)) return;
+      setPage(Math.max(0, Math.min(event.data.page, fit.pages.length - 1)));
+    };
+    window.addEventListener("message", capturePage);
+    return () => window.removeEventListener("message", capturePage);
+  }, [fit.pages.length]);
   const widths = columns.map((column, index) => {
     const values = [column, ...rows.map(row => row[index] ?? '')];
     return Math.max(9, Math.min(40, Math.max(...values.map(value => value.length + 2))));
@@ -57,7 +65,7 @@ export function MonitorDocumentTable({ columns, rows, cycleSeconds = 15, paused 
     <thead className="bg-sky-400/10"><tr>{columns.map((column, i) => <th key={i} className="px-2 py-3 text-left align-top font-bold" style={{ overflowWrap: 'anywhere' }}>{column}</th>)}</tr></thead>
     <tbody>{indices.map(index => <tr key={index} className="border-b border-slate-400/20">{columns.map((_, i) => <td key={i} data-numeric-cell={/^(?:R\$\s*)?[+-]?[\d.,]+\s*%?$/.test(rows[index][i]?.trim() ?? '') || undefined} className="px-2 py-3 align-top" style={{ whiteSpace: !fit.wrapNumbers && /^(?:R\$\s*)?[+-]?[\d.,]+\s*%?$/.test(rows[index][i]?.trim() ?? '') ? 'nowrap' : 'normal', overflowWrap: 'anywhere' }}>{rows[index][i] ?? ''}</td>)}</tr>)}</tbody>
   </table>;
-  return <div ref={frameRef} className="relative min-h-0 flex-1" data-monitor-document-table>
+  return <div ref={frameRef} className="relative min-h-0 flex-1" data-monitor-document-table data-capture-page-count={fit.pages.length} data-capture-page={page}>
     <div className="pointer-events-none invisible absolute left-0 top-0 w-full" aria-hidden="true">{table(rows.map((_, i) => i), true)}</div>
     <div style={{ visibility: fit.ready ? 'visible' : 'hidden' }}>{table(fit.pages[Math.min(page, fit.pages.length - 1)])}</div>
     {fit.pages.length > 1 && <div className="absolute bottom-0 right-0 text-sm opacity-75">Quadro {page + 1}/{fit.pages.length}</div>}

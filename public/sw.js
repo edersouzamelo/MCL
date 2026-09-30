@@ -43,7 +43,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || request.headers.has("X-MCL-Revalidate")) return;
-  if (request.mode === "navigate" && /^\/grupamento\/monitor\/[1-8]\/?$/.test(url.pathname)) {
+  if (request.mode === "navigate" && /^\/grupamento\/monitor\/(?:[1-9]|10)\/?$/.test(url.pathname)) {
     event.respondWith(navigation(request));
   } else if (url.pathname.startsWith("/api/grupamento/monitor-content/assets/")) {
     event.respondWith(cacheFirst(request, ASSET_CACHE));
@@ -61,7 +61,7 @@ self.addEventListener("message", (event) => {
       const client = event.source;
       const source = client?.url ? new URL(client.url) : null;
       const path = event.data.path;
-      if (!source || source.origin !== self.location.origin || source.pathname !== path || !/^\/grupamento\/monitor\/[1-8]\/?$/.test(path)) throw new Error("Monitor inválido");
+      if (!source || source.origin !== self.location.origin || source.pathname !== path || !/^\/grupamento\/monitor\/(?:[1-9]|10)\/?$/.test(path)) throw new Error("Monitor inválido");
       const response = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(8000) });
       if (!response.ok || response.redirected || !response.headers.get("Content-Type")?.includes("text/html")) throw new Error("Navegação não autorizada ou indisponível");
       const html = await response.clone().text();

@@ -5,6 +5,7 @@ import { ChevronUp, Clock3, Database, Pause, Play, ShieldCheck, SkipBack, SkipFo
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
+import { activeMonitorCorrection } from "@/modules/grupamento/monitor-content/correction";
 import { latestBriefingUpdate } from "@/modules/grupamento/briefing";
 import { BriefingFrame } from "@/components/BriefingFrame";
 import { MonitorViewport } from "@/components/MonitorViewport";
@@ -16,6 +17,7 @@ import { formatMonitorSourceDate, sagMonitorProvenance } from "@/modules/grupame
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
+  CCO_MONITOR_COUNT,
   CCO_DEFAULT_LOOP_DELAY_SECONDS,
   CCO_PI_ROWS_PER_PAGE,
   CCO_SCREEN_CATALOG,
@@ -45,7 +47,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const [sag, setSag] = useState<SagImportResult | null>(null);
   const [rpn, setRpn] = useState<RpnImportResult | null>(null);
   const [documentScenes, setDocumentScenes] = useState<MonitorDocumentSceneDto[]>([]);
-  const [monitor, setMonitor] = useState<CcoMonitorConfig>(() => defaultCcoMonitorConfig()[Math.max(0, Math.min(7, monitorId - 1))]);
+  const [monitor, setMonitor] = useState<CcoMonitorConfig>(() => defaultCcoMonitorConfig()[Math.max(0, Math.min(CCO_MONITOR_COUNT - 1, monitorId - 1))]);
   const [screenIndex, setScreenIndex] = useState(0);
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
@@ -79,7 +81,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     let running = false;
     let hydrated = false;
     let navigationReady = false;
-    let selected = defaultCcoMonitorConfig()[Math.max(0, Math.min(7, monitorId - 1))];
+    let selected = defaultCcoMonitorConfig()[Math.max(0, Math.min(CCO_MONITOR_COUNT - 1, monitorId - 1))];
     const refresh = async () => {
       if (running) return;
       running = true;
@@ -168,7 +170,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     | { kind: "document"; key: string; scene: MonitorDocumentSceneDto; label: string };
 
   const playlist = useMemo<PlaylistItem[]>(() => {
-    const systemItems = (sag && rpn ? monitor.screens : []).flatMap((screen) => {
+    const correction = activeMonitorCorrection(documentScenes);
+    const systemItems = (!correction && sag && rpn ? monitor.screens : []).flatMap((screen) => {
       const pageSize = pageSizeForScreen(screen);
       let rowCount = 0;
       if (screen === "pis") rowCount = sag?.byPi.length ?? 0;
@@ -191,7 +194,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
 
     return [
       ...systemItems,
-      ...documentScenes.map((scene) => ({
+      ...(correction ?? documentScenes).map((scene) => ({
         kind: "document" as const,
         key: `document:${scene.id}`,
         scene,
@@ -308,7 +311,11 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={briefing ? "ccol" : monitor.layout} page={activeItem.page} pageSize={activeItem.pageSize || undefined} />
   );
 
-  if (briefing) return <BriefingFrame monitorId={monitorId} captureReady={Boolean(captureMode && activeItem && !transitioning)} playlistCount={playlist.length} frameIndex={safeIndex} frameLabel={screenLabel} updatedAt={activeItem?.kind === "document" ? activeItem.scene.sourceImportedAt : activeScreen === "rpn" || activeScreen?.startsWith("units-rpn-") ? rpn?.source.importedAt : latestBriefingUpdate(sag?.source.importedAt, rpn?.source.importedAt)}>
+  if (monitor.enabled && activeItem?.kind === "document" && activeItem.scene.payload.correction?.fullFrame) return <main data-mcl-capture-root="1" data-mcl-capture-ready={captureMode && !transitioning ? "1" : "0"} data-mcl-playlist-count={playlist.length} data-mcl-frame-index={safeIndex} data-mcl-frame-label={screenLabel} className="fixed inset-0 overflow-hidden bg-black" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
+    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} briefing />
+  </main>;
+
+  if (briefing) return <BriefingFrame monitorId={monitorId} responsibleSector={monitor.responsibleSector} captureReady={Boolean(captureMode && activeItem && !transitioning)} playlistCount={playlist.length} frameIndex={safeIndex} frameLabel={screenLabel} updatedAt={activeItem?.kind === "document" ? activeItem.scene.sourceImportedAt : activeScreen === "rpn" || activeScreen?.startsWith("units-rpn-") ? rpn?.source.importedAt : latestBriefingUpdate(sag?.source.importedAt, rpn?.source.importedAt)}>
     <div key={activeItem?.key ?? "empty"} className="h-full w-full" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
       <MonitorViewport documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={activeItem?.kind === "system" ? onPageCount : undefined}>{screenContent}</MonitorViewport>
     </div>

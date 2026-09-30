@@ -65,9 +65,17 @@ export function MonitorViewport({ children, documentMode, cycleSeconds, paused, 
     return () => clearInterval(timer);
   }, [paused, fit.pages.length, cycleSeconds]);
 
+  useEffect(() => {
+    const capturePage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== "MCL_CAPTURE_VIEWPORT_PAGE" || !Number.isInteger(event.data.page)) return;
+      setPage(Math.max(0, Math.min(event.data.page, fit.pages.length - 1)));
+    };
+    window.addEventListener("message", capturePage);
+    return () => window.removeEventListener("message", capturePage);
+  }, [fit.pages.length]);
   const current = fit.pages[Math.min(page, fit.pages.length - 1)];
   return (
-    <div ref={frameRef} className="relative h-full w-full overflow-hidden" data-monitor-viewport data-page-count={fit.pages.length} data-scale={fit.scale}>
+    <div ref={frameRef} className="relative h-full w-full overflow-hidden" data-monitor-viewport data-page-count={fit.pages.length} data-capture-page={page} data-scale={fit.scale}>
       <div className="w-full overflow-hidden" style={{ height: documentMode ? "100%" : current.height * fit.scale, visibility: fit.ready ? "visible" : "hidden" }}>
         <div ref={contentRef} className={documentMode ? "relative h-full w-full" : "relative flow-root w-full"} style={{
           height: documentMode ? "100%" : undefined,

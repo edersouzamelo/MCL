@@ -1,3 +1,4 @@
+import { isCcoMonitorId } from "@/modules/grupamento/monitor";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
@@ -10,7 +11,7 @@ const WRITE_ROLES = new Set(["ADMIN", "LOGISTICS_MANAGER"]);
 export async function GET(request: Request) {
   const monitorIdParam = new URL(request.url).searchParams.get("monitorId");
   const monitorId = monitorIdParam ? Number(monitorIdParam) : undefined;
-  if (monitorId !== undefined && (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8)) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
+  if (monitorId !== undefined && (!isCcoMonitorId(monitorId))) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
   const reader = await getMonitorReader(monitorId);
   if (!reader || (reader.device && monitorId === undefined)) return NextResponse.json({ error: "Autenticação obrigatória." }, { status: 401 });
   const monitors = await listCcoMonitorConfigs(reader.organizationId);

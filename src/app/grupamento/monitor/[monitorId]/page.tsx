@@ -1,3 +1,4 @@
+import { isCcoMonitorId } from "@/modules/grupamento/monitor";
 import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { GrupamentoMonitorClient } from "@/components/GrupamentoMonitorClient";
@@ -13,7 +14,7 @@ export default async function GrupamentoMonitorPage({ params, searchParams }: { 
   const requestedFrame = Number(query.frame ?? "0");
   const initialCaptureFrame = Number.isInteger(requestedFrame) && requestedFrame >= 0 ? requestedFrame : 0;
   const monitorId = Number(monitorIdParam);
-  if (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8) notFound();
+  if (!isCcoMonitorId(monitorId)) notFound();
   const reader = await getMonitorReader(monitorId);
   if (!reader) redirect("/entrar");
   const session = await getServerSession(authOptions);

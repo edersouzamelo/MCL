@@ -19,7 +19,7 @@ export function useAnimatedValue(
     let timer = 0;
     let cancelled = false;
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches || window.location.pathname.startsWith("/grupamento/monitor-capture/");
     if (reduceMotion || !Number.isFinite(value)) {
       frame = window.requestAnimationFrame(() => setDisplay(value));
       return () => window.cancelAnimationFrame(frame);

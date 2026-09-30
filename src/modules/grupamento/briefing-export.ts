@@ -87,7 +87,7 @@ export async function buildBriefingPowerPoint(input: BriefingExportInput) {
     slide.background = { color: "FFFFFF" };
     slide.addImage({ data: frameData, x: 0, y: 0, w: W, h: H });
     // White text belongs to the green title band.
-    slide.addText(briefingClass(id), { x: W * .3232, y: H * .04124, w: W * .5267, h: H * .082, fontFace: "Arial", fontSize: 28.01, color: "FFFFFF", bold: true, align: "center", valign: "middle", margin: 0, fit: "shrink" });
+    slide.addText(input.monitors.find(m => m.id === id)?.responsibleSector ?? briefingClass(id), { x: W * .3232, y: H * .04124, w: W * .5267, h: H * .082, fontFace: "Arial", fontSize: 28.01, color: "FFFFFF", bold: true, align: "center", valign: "middle", margin: 0, fit: "shrink" });
     slide.addText(briefingDate(date), { x: W * .80852, y: H * .96368, w: W * .19129, h: H * .03679, fontFace: "Arial", fontSize: 12.2, color: "000000", bold: true, align: "center", margin: 0, fit: "shrink" });
     slide.addNotes(`Monitor ${id}. ${note ?? ""} Data do conteúdo: ${date ?? "não informada"}. Moldura decorativa derivada do modelo fornecido. Textos, tabelas e gráficos são objetos nativos. Figuras permanecem imagens.`);
     count++; slideFrames.push({ id, date });

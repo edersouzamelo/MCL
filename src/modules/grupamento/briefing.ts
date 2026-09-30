@@ -6,7 +6,7 @@ export const BRIEFING_CLASSES = [
 // Proportions measured from the supplied PowerPoint, in EMU.
 export const BRIEFING_SIZE = { width: 13444525, height: 7562850 };
 export const BRIEFING_CONTENT = { x: .065, y: .155, w: .915, h: .795 };
-export function briefingClass(monitorId: number) { return BRIEFING_CLASSES[monitorId - 1] ?? `Monitor ${monitorId}`; }
+export function briefingClass(monitorId: number) { return BRIEFING_CLASSES[monitorId - 1] ?? (monitorId === 9 ? "Monitor Teste" : monitorId === 10 ? "Seção de Planejamento" : `Monitor ${monitorId}`); }
 export function latestBriefingUpdate(...dates: Array<string | null | undefined>) {
   return dates.filter((v): v is string => Boolean(v)).sort((a, b) => new Date(a).getTime() - new Date(b).getTime()).at(-1);
 }

@@ -44,6 +44,7 @@ export type MonitorSlideTextElement = MonitorSlideBox & {
   kind: "text";
   text: string;
   fontSizePt?: number;
+  fontFace?: string;
   bold?: boolean;
   align?: "left" | "center" | "right";
   verticalAlign?: "top" | "middle" | "bottom";
@@ -63,6 +64,7 @@ export type MonitorSlideImageElement = MonitorSlideBox & {
 
 export type MonitorSlideShapeElement = MonitorSlideBox & {
   kind: "shape";
+  opacity?: number;
   fill?: string;
   lineColor?: string;
   radius?: number;
@@ -97,6 +99,7 @@ export type MonitorSlideLayout = {
 };
 
 export type MonitorDocumentScenePayload = {
+  correction?: { version: 1; preserveLayout: true; fullFrame: true };
   extractionVersion?: number;
   layoutVersion?: number;
   layout?: MonitorSlideLayout;

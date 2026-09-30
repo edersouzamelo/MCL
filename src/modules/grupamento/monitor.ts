@@ -47,6 +47,19 @@ export const CCO_SCREEN_CATALOG = [
 
 export type CcoScreenId = (typeof CCO_SCREEN_CATALOG)[number]["id"];
 
+export const CCO_MONITOR_COUNT = 10;
+export const CCO_TEST_MONITOR_ID = 9;
+export const CCO_CENTRAL_MONITOR_ID = 10;
+export const CCO_RESPONSIBLE_SECTORS = ["Classe I", "Classe II", "Classe III", "Classe V Mun", "Classe V Armt", "Classe VII", "Classe VIII e PASA", "Classe IX", "Seção de Planejamento", "Seção de Transporte"] as const;
+export type CcoResponsibleSector = (typeof CCO_RESPONSIBLE_SECTORS)[number];
+export function isCcoMonitorId(id: number) { return Number.isInteger(id) && id >= 1 && id <= CCO_MONITOR_COUNT; }
+export function ccoLocalDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Campo_Grande", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const get = (type: string) => parts.find((part) => part.type === type)!.value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+export function monitorUpdatedToday(config: Pick<CcoMonitorConfig, "updatedOn">, now = new Date()) { return config.updatedOn === ccoLocalDate(now); }
+
 export type CcoMonitorConfig = {
   id: number;
   label: string;
@@ -55,6 +68,8 @@ export type CcoMonitorConfig = {
   screens: CcoScreenId[];
   delaySeconds: number;
   layout: CcoLayoutId;
+  responsibleSector?: CcoResponsibleSector | null;
+  updatedOn?: string | null;
 };
 
 export function defaultCcoMonitorConfig(): CcoMonitorConfig[] {
@@ -67,20 +82,25 @@ export function defaultCcoMonitorConfig(): CcoMonitorConfig[] {
     { screens: ["pis", "overview"] },
     { screens: ["rpn", "class-diversas"] },
     { screens: ["overview", "execution", "class-i", "class-ii", "class-iii", "class-v", "class-viii", "class-ix", "class-diversas", "rpn"] },
+    { screens: ["overview"] },
+    { screens: [], layout: "briefing" },
   ];
 
   return presets.map(({ screens, layout }, index) => ({
     id: index + 1,
-    label: `Monitor ${index + 1}`,
-    enabled: true,
+    label: index === 8 ? "Monitor Teste" : index === 9 ? "Monitor Central" : `Monitor ${index + 1}`,
+    enabled: index !== 9,
     mode: screens.length === 1 ? "single" : "loop",
     screens,
     delaySeconds: CCO_DEFAULT_LOOP_DELAY_SECONDS,
     layout: layout ?? "mcl",
+    responsibleSector: index === 9 ? "Seção de Planejamento" : null,
+    updatedOn: null,
   }));
 }
 
 export function parseCcoMonitorConfig(value: unknown, monitorId: number): CcoMonitorConfig | null {
+  if (!isCcoMonitorId(monitorId)) return null;
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const item = value as Record<string, unknown>;
   const validScreens = new Set<string>(CCO_SCREEN_CATALOG.map((screen) => screen.id));
@@ -90,9 +110,13 @@ export function parseCcoMonitorConfig(value: unknown, monitorId: number): CcoMon
       item.screens.some((screen) => typeof screen !== "string" || !validScreens.has(screen)) ||
       new Set(item.screens).size !== item.screens.length ||
       !Number.isInteger(item.delaySeconds) || (item.delaySeconds as number) < 5 || (item.delaySeconds as number) > 300 ||
-      (item.layout !== "mcl" && item.layout !== "ccol" && item.layout !== "briefing")) return null;
+      (item.layout !== "mcl" && item.layout !== "ccol" && item.layout !== "briefing") ||
+      (item.responsibleSector != null && !(CCO_RESPONSIBLE_SECTORS as readonly unknown[]).includes(item.responsibleSector)) ||
+      (item.updatedOn != null && (typeof item.updatedOn !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(item.updatedOn) || Number.isNaN(Date.parse(item.updatedOn))))) return null;
   return {
     id: monitorId, label: item.label.trim(), enabled: item.enabled, mode: item.mode,
     screens: item.screens as CcoScreenId[], delaySeconds: item.delaySeconds as number, layout: item.layout,
+    responsibleSector: item.responsibleSector as CcoResponsibleSector | null | undefined ?? null,
+    updatedOn: item.updatedOn as string | null | undefined ?? null,
   };
 }

@@ -1,3 +1,4 @@
+import { CCO_MONITOR_COUNT, CCO_TEST_MONITOR_ID } from "@/modules/grupamento/monitor";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -21,9 +22,9 @@ export async function POST(request: Request) {
   try {
     const [monitors, pair, scenePairs] = await Promise.all([
       listCcoMonitorConfigs(organizationId), getLatestFinancialSnapshotPair(organizationId),
-      Promise.all(Array.from({ length: 8 }, async (_, i) => [i + 1, await getApprovedMonitorScenes(organizationId, i + 1)] as const)),
+      Promise.all(Array.from({ length: CCO_MONITOR_COUNT }, async (_, i) => [i + 1, await getApprovedMonitorScenes(organizationId, i + 1)] as const)),
     ]);
-    const result = await buildBriefingPowerPoint({ monitors, sag: pair.current, rpn: pair.rpn, scenes: Object.fromEntries(scenePairs), loadAsset: (id, monitorId) => getMonitorContentAsset(id, organizationId, monitorId) });
+    const result = await buildBriefingPowerPoint({ monitors: monitors.filter(m => m.id !== CCO_TEST_MONITOR_ID && (m.id <= 8 || m.enabled)), sag: pair.current, rpn: pair.rpn, scenes: Object.fromEntries(scenePairs), loadAsset: (id, monitorId) => getMonitorContentAsset(id, organizationId, monitorId) });
     await prisma.auditLog.create({ data: {
       id: randomUUID(), occurredAt: new Date(), actorId: session.user.id, organizationId,
       action: "CCOL_BRIEFING_EXPORT", resourceType: "CCOL_MONITORS", resourceId: organizationId,

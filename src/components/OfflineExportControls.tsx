@@ -122,7 +122,12 @@ async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number
     const ready = root?.dataset.mclCaptureReady === "1";
     const currentFrame = Number(root?.dataset.mclFrameIndex ?? "-1");
     if (root && ready && currentFrame === frameIndex) {
-      await wait(500);
+      await iframe.contentDocument!.fonts.ready;
+      // Finish entry effects before copying dimensions; counters are disabled in capture mode.
+      for (const animation of iframe.contentDocument!.getAnimations()) {
+        if (animation.effect?.getTiming().iterations !== Infinity) { try { animation.finish(); } catch {} }
+      }
+      await wait(350);
       return root;
     }
     await wait(150);
@@ -133,6 +138,7 @@ async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number
 async function captureMonitorFrames(
   monitorId: number,
   onProgress: (message: string) => void,
+  capture?: (root: HTMLElement, win: Window, label: string) => Promise<void>,
 ) {
   const iframe = document.createElement("iframe");
   iframe.width = String(WIDTH);
@@ -175,10 +181,22 @@ async function captureMonitorFrames(
       }
       const root = await waitForCaptureFrame(iframe, index);
       const label = root.dataset.mclFrameLabel ?? `Quadro ${index + 1}`;
-      htmlFrames.push({
-        html: await captureRootAsHtml(root, iframe.contentWindow!),
-        label,
-      });
+      const table = root.querySelector<HTMLElement>("[data-monitor-document-table]");
+      const viewport = root.querySelector<HTMLElement>("[data-monitor-viewport]");
+      const paginated = Number(table?.dataset.capturePageCount ?? "1") > 1 ? table : viewport;
+      const pageCount = Math.max(1, Number(paginated === table ? table?.dataset.capturePageCount ?? "1" : viewport?.dataset.pageCount ?? "1"));
+      for (let page = 0; page < pageCount; page++) {
+        if (page > 0) {
+          iframe.contentWindow?.postMessage({ type: paginated === table ? "MCL_CAPTURE_TABLE_PAGE" : "MCL_CAPTURE_VIEWPORT_PAGE", page }, window.location.origin);
+          const deadline = Date.now() + 5000;
+          while (Number(paginated?.dataset.capturePage) !== page && Date.now() < deadline) await wait(50);
+          if (Number(paginated?.dataset.capturePage) !== page) throw new Error("Falha ao capturar página documental.");
+          await wait(150);
+        }
+        const pageLabel = pageCount > 1 ? `${label} · página ${page + 1}/${pageCount}` : label;
+        if (capture) await capture(root, iframe.contentWindow!, pageLabel);
+        else htmlFrames.push({ html: await captureRootAsHtml(root, iframe.contentWindow!), label: pageLabel });
+      }
     }
     return htmlFrames;
   } finally {
@@ -280,9 +298,11 @@ schedule();
 export function OfflineExportControls({
   monitorId,
   delaySeconds,
+  beforeExport,
 }: {
   monitorId: number;
   delaySeconds: number;
+  beforeExport?: () => Promise<void>;
 }) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
@@ -294,6 +314,7 @@ export function OfflineExportControls({
     setError("");
     setProgress("Preparando exibição offline...");
     try {
+      await beforeExport?.();
       const baseName = `MCL-Monitor-${String(monitorId).padStart(2, "0")}`;
       const htmlFrames = await captureMonitorFrames(monitorId, setProgress);
       setProgress("Gerando HTML portátil...");
@@ -308,16 +329,35 @@ export function OfflineExportControls({
     }
   }
 
+  async function exportForCorrection() {
+    if (running) return;
+    setRunning(true); setError(""); setProgress("Preparando PowerPoint para correção…");
+    try {
+      await beforeExport?.();
+      const { createMonitorCorrectionPowerPoint, addMonitorCorrectionSlide } = await import("@/modules/grupamento/monitor-correction-export");
+      const pptx = createMonitorCorrectionPowerPoint(monitorId);
+      let slideCount = 0;
+      await captureMonitorFrames(monitorId, setProgress, async (root, win, label) => {
+        if (++slideCount > 80) throw new Error("Mais de 80 quadros selecionados. Reduza a seleção para exportar e reimportar sem perder conteúdo.");
+        await addMonitorCorrectionSlide(pptx, root, win, label);
+      });
+      await pptx.writeFile({ fileName: `MCL-Monitor-${String(monitorId).padStart(2, "0")}-para-corrigir.pptx`, compression: true });
+      setProgress("PPT gerado. Corrija no PowerPoint, importe neste monitor e revise antes de aprovar. Os dados ficam congelados até uma nova exportação.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Falha ao exportar para correção."); setProgress(""); }
+    finally { setRunning(false); }
+  }
+
   return (
     <div className="mt-3 rounded-xl border border-dashed border-sky-200 bg-sky-50/40 p-3 dark:border-sky-900/60 dark:bg-sky-950/10">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação offline experimental</div>
+          <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação do monitor</div>
           <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            Gera um HTML portátil do conteúdo publicado neste monitor, com ajuste automático de tela, fade e controles de reprodução. Funciona localmente em Chrome, Edge ou Firefox sem internet.
+            Gera um HTML portátil do conteúdo publicado neste monitor, com ajuste automático de tela, fade e controles de reprodução. Funciona localmente em Chrome, Edge ou Firefox sem internet. No PPT de correção, textos e formas são editáveis; gráficos são figuras.
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
+          <button type="button" disabled={running} onClick={() => void exportForCorrection()} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"><Download className="h-3 w-3" /> Exportar para corrigir</button>
           <button type="button" disabled={running} onClick={() => void exportOffline()} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
             {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} Exportar HTML portátil
           </button>

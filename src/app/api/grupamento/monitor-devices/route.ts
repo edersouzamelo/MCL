@@ -1,3 +1,4 @@
+import { isCcoMonitorId } from "@/modules/grupamento/monitor";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
   const user = await manager();
   if (!user) return NextResponse.json({ error: "Permissão insuficiente." }, { status: 403 });
   const monitorId = Number(new URL(request.url).searchParams.get("monitorId"));
-  if (!Number.isInteger(monitorId) || monitorId < 1 || monitorId > 8) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
+  if (!isCcoMonitorId(monitorId)) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
   const devices = await prisma.monitorDisplayDevice.findMany({
     where: { organizationId: user.organizationId!, monitorId, revokedAt: null },
     orderBy: { enrolledAt: "desc" },
@@ -30,8 +31,8 @@ export async function POST(request: Request) {
   const user = await manager();
   if (!user) return NextResponse.json({ error: "Faça login como gestor neste notebook para vinculá-lo." }, { status: 403 });
   const body = await request.json().catch(() => null) as { monitorId?: number; label?: string } | null;
-  const monitorId = body?.monitorId;
-  if (!Number.isInteger(monitorId) || !monitorId || monitorId < 1 || monitorId > 8) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
+  const monitorId = Number(body?.monitorId);
+  if (!isCcoMonitorId(monitorId)) return NextResponse.json({ error: "Monitor inválido." }, { status: 400 });
   const label = typeof body?.label === "string" ? body.label.trim().slice(0, 80) : "Notebook HDMI";
   const existing = await getDisplayDevice();
   if (existing && existing.organizationId === user.organizationId) {
