@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { monitorTitleColor, normalizeMonitorTitle } from "@/modules/grupamento/monitor-content/presentation-title";
 
-export function MonitorTitleFrame({ title, light, children, system = false }: { title: string; light: boolean; children: ReactNode; system?: boolean }) {
+export function MonitorTitleFrame({ title, light, children, system = false, omitTitle = false }: { title: string; light: boolean; children: ReactNode; system?: boolean; omitTitle?: boolean }) {
   const text = useRef<HTMLHeadingElement>(null);
   const normalized = normalizeMonitorTitle(title);
   useLayoutEffect(() => {
@@ -22,7 +22,8 @@ export function MonitorTitleFrame({ title, light, children, system = false }: { 
     fit();
     void document.fonts.ready.then(fit);
     return () => observer.disconnect();
-  }, [normalized]);
+  }, [normalized, omitTitle]);
+  if (omitTitle) return <div className="h-full w-full" data-integral-image-slide>{children}</div>;
   return <div className="mcl-standard-slide" data-standard-monitor-title data-title-theme={light ? "light" : "dark"}>
     <header className="mcl-standard-title-box" style={{ color: monitorTitleColor(light) }}>
       <h1 ref={text}>{normalized}</h1>

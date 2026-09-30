@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronUp, Clock3, Database, Pause, Play, ShieldCheck, SkipBack, SkipForward, Wifi, WifiOff } from "lucide-react";
+import { ChevronUp, Clock3, Database, ShieldCheck, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoClassSummaryScreen } from "@/components/GrupamentoClassSummaryScreen";
 import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from "@/modules/grupamento/class-summary";
@@ -12,8 +12,10 @@ import { latestBriefingUpdate } from "@/modules/grupamento/briefing";
 import { BriefingFrame } from "@/components/BriefingFrame";
 import { MonitorViewport } from "@/components/MonitorViewport";
 import { forgetMonitorSnapshot, prepareMonitorNavigation, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
+import { MonitorPlaybackControls } from "@/components/MonitorPlaybackControls";
 import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
+import { monitorSceneTitle } from "@/modules/grupamento/monitor-content/presentation-title";
 import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 import { CCO_RULE_SOURCE } from "@/modules/grupamento/cco";
 import { formatMonitorSourceDate, sagMonitorProvenance } from "@/modules/grupamento/source-provenance";
@@ -53,9 +55,10 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const [documentScenes, setDocumentScenes] = useState<MonitorDocumentSceneDto[]>([]);
   const [monitor, setMonitor] = useState<CcoMonitorConfig>(() => defaultCcoMonitorConfig()[Math.max(0, Math.min(CCO_MONITOR_COUNT - 1, monitorId - 1))]);
   const [screenIndex, setScreenIndex] = useState(0);
+  const [playbackReset, setPlaybackReset] = useState(0);
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
-  const [playbackState, setPlaybackState] = useState<"playing" | "paused">("playing");
+  const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "stopped">("playing");
   const [connectionState, setConnectionState] = useState<"online" | "offline" | "syncing">("syncing");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
@@ -204,7 +207,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         kind: "document" as const,
         key: `document:${scene.id}`,
         scene,
-        label: scene.title,
+        label: scene.payload.layout ? monitorSceneTitle(scene.payload.layout.elements, scene.title) : scene.payload.chart?.title || scene.title,
       })),
     ];
   }, [documentScenes, monitor.screens, rpn, sag]);
@@ -313,10 +316,16 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={briefing ? "ccol" : monitor.layout} page={activeItem.page} pageSize={activeItem.pageSize || undefined} />
   );
 
+  const playbackControls = playlist.length && !captureMode ? <MonitorPlaybackControls light={ccol || briefing} state={playbackState}
+    previous={() => stepPlaylist(-1)} next={() => stepPlaylist(1)}
+    pause={() => { setTransitioning(false); setPlaybackState("paused"); }}
+    play={() => { setTransitioning(false); setPlaybackState("playing"); }}
+    stop={() => { setTransitioning(false); setPlaybackState("stopped"); setScreenIndex(0); setPlaybackReset(value => value + 1); setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000); }} /> : null;
+
   const titledContent = activeItem?.kind === "system" && sag && rpn ? <MonitorTitleFrame title={activeScreen === "overview" ? `${sag.totals.committedPercent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% empenhado` : activeScreen === "execution" ? "Execução orçamentária" : activeScreen === "rpn" ? "Execução dos créditos do exercício anterior" : activeScreen === "pis" ? "Execução por PI" : screenLabel} light={ccol || briefing} system>{screenContent}</MonitorTitleFrame> : screenContent;
 
-  if (briefing) return <BriefingFrame monitorId={monitorId} responsibleSector={monitor.responsibleSector} captureReady={Boolean(captureMode && activeItem && !transitioning)} playlistCount={playlist.length} frameIndex={safeIndex} frameLabel={screenLabel} updatedAt={activeItem?.kind === "document" ? activeItem.scene.sourceImportedAt : activeScreen === "rpn" || activeScreen?.startsWith("units-rpn-") ? rpn?.source.importedAt : latestBriefingUpdate(sag?.source.importedAt, rpn?.source.importedAt)}>
-    <div key={activeItem?.key ?? "empty"} className="h-full w-full" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
+  if (briefing) return <BriefingFrame controls={playbackControls} monitorId={monitorId} responsibleSector={monitor.responsibleSector} captureReady={Boolean(captureMode && activeItem && !transitioning)} playlistCount={playlist.length} frameIndex={safeIndex} frameLabel={screenLabel} updatedAt={activeItem?.kind === "document" ? activeItem.scene.sourceImportedAt : activeScreen === "rpn" || activeScreen?.startsWith("units-rpn-") ? rpn?.source.importedAt : latestBriefingUpdate(sag?.source.importedAt, rpn?.source.importedAt)}>
+    <div key={`${activeItem?.key ?? "empty"}:${playbackReset}`} className="h-full w-full" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
       <MonitorViewport fillFrame={activeItem?.kind === "system" && Boolean(sag && rpn)} documentMode={!activeItem || documentFillsFrame || !sag || !rpn} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={activeItem?.kind === "system" ? onPageCount : undefined}>{titledContent}</MonitorViewport>
     </div>
   </BriefingFrame>;
@@ -356,24 +365,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <div className="mt-1 truncate text-lg font-black">{monitor.label} · {screenLabel}</div>
           </div>
         </div>
-        {playlist.length > 1 && !captureMode ? (
-          <nav aria-label="Controles da apresentação" className={`relative z-10 flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 shadow-sm ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
-            <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
-            <button
-              type="button"
-              onClick={() => {
-                setTransitioning(false);
-                setPlaybackState((state) => state === "playing" ? "paused" : "playing");
-              }}
-              className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300"
-              aria-label={playbackState === "playing" ? "Pausar apresentação" : "Retomar apresentação"}
-              title={playbackState === "playing" ? "Pausar no quadro atual" : "Retomar do quadro atual"}
-            >
-              {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </button>
-            <button type="button" onClick={() => stepPlaylist(1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Avançar quadro" title="Avançar"><SkipForward className="h-4 w-4" /></button>
-          </nav>
-        ) : <div aria-hidden />}
+        {playbackControls ?? <div aria-hidden />}
         <div className="flex min-w-0 items-center justify-end gap-4 text-right">
           <div className={`min-w-0 max-w-[360px] truncate text-[10px] font-bold uppercase tracking-[0.12em] ${ccol ? "text-slate-600" : "text-slate-300"}`} title={dataProvenance}>
             {dataProvenance}
@@ -405,7 +397,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
           className={`h-full w-full transition-opacity ease-[cubic-bezier(0.22,1,0.36,1)] ${transitioning ? "opacity-0" : "opacity-100"}`}
           style={{ transitionDuration: `${SCREEN_FADE_MS}ms` }}
         >
-          <div key={activeItem?.key ?? "empty-playlist"} className="mcl-monitor-scene h-full w-full">
+          <div key={`${activeItem?.key ?? "empty-playlist"}:${playbackReset}`} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
               fillFrame={activeItem?.kind === "system" && Boolean(sag && rpn)}
               documentMode={!activeItem || documentFillsFrame || !sag || !rpn}

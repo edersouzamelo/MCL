@@ -1,3 +1,4 @@
+import { monitorSceneTitle } from "./presentation-title";
 import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
 import { chartValueLabel } from "./chart-geometry";
@@ -356,7 +357,7 @@ function slideTitle(elements: MonitorSlideElement[], page: number) {
   const texts = elements.filter((item): item is MonitorSlideTextElement => item.kind === "text");
   const best = [...texts].filter((item) => item.y < 0.28).sort((a,b) => (b.fontSizePt ?? 0)-(a.fontSizePt ?? 0) || a.y-b.y)[0];
   const value = clean(best?.text.split("\n")[0] ?? "");
-  return value ? value.slice(0,110) : "Slide " + page;
+  return monitorSceneTitle(elements, value || "Slide " + page);
 }
 
 export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
