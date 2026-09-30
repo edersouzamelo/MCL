@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
+import { monitorTitleElements } from "@/modules/grupamento/monitor-content/presentation-title";
 import { OmMentions } from "@/components/OmIdentity";
 import { useEffect, useRef } from "react";
 import { MonitorDocumentTable } from "@/components/MonitorDocumentTable";
@@ -76,7 +78,8 @@ function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPa
   const layout = scene.payload.layout;
   if (!layout) return null;
   const preserve = Boolean(scene.payload.correction?.preserveLayout);
-  const sorted = [...(preserve ? layout.elements : prepareMonitorElements(layout.elements).elements)]
+  const prepared = monitorTitleElements(prepareMonitorElements(layout.elements).elements, scene.title);
+  const sorted = [...prepared.elements]
     .sort((a,b) => a.z-b.z);
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden" style={{ containerType: "size" }}>
@@ -135,9 +138,11 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
 
 export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
-  const tableSlide = payload.layout && !payload.correction?.preserveLayout ? monitorTableSlide(prepareMonitorElements(payload.layout.elements).elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
+  const prepared = payload.layout ? monitorTitleElements(prepareMonitorElements(payload.layout.elements).elements, scene.title) : null;
+  const title = prepared?.title ?? scene.title;
+  const tableSlide = prepared && !payload.correction?.preserveLayout ? monitorTableSlide(prepared.elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
     table: { columns: payload.columns, rows: payload.rows, y: 1 },
-    texts: [scene.title, ...(payload.bullets ?? [])].map((text, index): MonitorSlideTextElement => ({kind:'text', text, role:index === 0 ? 'title' : 'body', bold:index === 0, x:0, y:0, w:1, h:.1, z:index})),
+    texts: (payload.bullets ?? []).map((text, index): MonitorSlideTextElement => ({kind:'text', text, role:'body', bold:false, x:0, y:0, w:1, h:.1, z:index})),
   } : null;
   const hasTableSlide = Boolean(tableSlide || (!payload.correction?.preserveLayout && payload.layout?.elements.some(item => item.kind === 'table')));
   useEffect(() => { if (!hasTableSlide) onPageCount?.(1); }, [hasTableSlide, onPageCount]);
@@ -145,34 +150,34 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
     const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
     const text = (items: typeof before) => items.map((item, i) => <div key={i} className="whitespace-pre-line break-words" style={{ fontSize: item.role === 'title' || i === 0 && items === before ? 'clamp(24px, 2.4vw, 40px)' : 'clamp(16px, 1.3vw, 24px)', fontWeight: item.bold ? 800 : 600 }}><OmMentions text={item.text} header={items === before} /></div>);
-    return <section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
-      <header className="shrink-0 space-y-2">{before.length ? text(before) : <h1 className="text-3xl font-bold"><OmMentions text={scene.title} header /></h1>}</header>
+    return <MonitorTitleFrame title={title} light={ccol || briefing}><section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
+      {before.length > 0 && <header className="shrink-0 space-y-2">{text(before)}</header>}
       <MonitorDocumentTable columns={tableSlide.table.columns} rows={tableSlide.table.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
       {after.length > 0 && <div className="shrink-0 space-y-1">{text(after)}</div>}
       <footer className="shrink-0 text-xs opacity-65">{scene.sourceFileName} · slide/página {scene.sourcePage ?? 'não informada'}</footer>
-    </section>;
+    </section></MonitorTitleFrame>;
   }
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
-      <section className="relative h-full min-h-0 overflow-hidden">
-        <LayoutScene scene={scene} ccol={ccol} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
+      <MonitorTitleFrame title={title} light={ccol || briefing}><section className="relative h-full min-h-0 overflow-hidden">
+        <LayoutScene scene={scene} ccol={ccol || briefing} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
         {!briefing && <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · fonte rastreável
         </div>}
-      </section>
+      </section></MonitorTitleFrame>
     );
   }
 
   const assets = payload.assetIds ?? [];
   const bullets = payload.bullets ?? [];
   return (
-    <section className="relative h-full min-h-[58vh]">
+    <MonitorTitleFrame title={title} light={ccol || briefing}><section className="relative h-full min-h-0">
       <div className="mb-5 flex items-start justify-between gap-5">
         <div>
           <div className={"flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] " + (ccol ? "text-sky-800" : "text-sky-300")}>
             <SceneIcon type={scene.sceneType} /> Conteúdo documental aprovado
           </div>
-          <h1 className="mcl-broadcast-title mt-2 max-w-5xl text-4xl font-black tracking-tight"><OmMentions text={scene.title} header /></h1>
+
         </div>
       </div>
       <div className={"grid gap-5 " + (assets.length ? "lg:grid-cols-[1.15fr_.85fr]" : "grid-cols-1")}>
@@ -188,6 +193,6 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
         {payload.columns && payload.rows && <table className="w-full text-sm"><thead><tr>{payload.columns.map((cell, i) => <th key={i} className="p-2 text-left">{cell}</th>)}</tr></thead><tbody>{payload.rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} className="p-2"><OmMentions text={cell} /></td>)}</tr>)}</tbody></table>}
         <AssetGrid assetIds={assets} title={scene.title} />
       </div>
-    </section>
+    </section></MonitorTitleFrame>
   );
 }

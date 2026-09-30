@@ -67,8 +67,10 @@ export function prepareMonitorElements(elements: MonitorSlideElement[]) {
       reason = "Adorno de borda fora da área do slide";
     } else if (hasData && item.kind === "image" && item.y >= 0 && item.y + item.h <= .18 && area < .015 && item.w < .12 && item.h < .16) {
       reason = "Pequeno ícone de cabeçalho em slide de dados";
-    } else if (hasStructuredData && item.kind === "image" && area < .035 && dataOverlap < .08 && nearOuterEdge(item)) {
-      reason = "Imagem periférica decorativa removida no modo briefing";
+    } else if (hasStructuredData && item.kind === "image" && area < .08 && item.w < .35 && item.h < .35) {
+      // Product thumbnails and badges can overlap the chart and sit away from edges.
+      // Substantial figures and image-only documents remain available.
+      reason = "Imagem decorativa removida na apresentação de dados (inclui briefing)";
     } else if (item.kind === "shape" && area >= .04 && neutral.has(item.fill?.toUpperCase() ?? "") && dataElements.some((data) => intersection(item, data) / area >= .25)) {
       reason = "Fundo redundante sobre gráfico ou tabela";
     } else if (
