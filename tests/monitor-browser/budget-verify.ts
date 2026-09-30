@@ -60,7 +60,7 @@ async function verify(){
       const summaryId=summaryClassId(configs[8].screens.filter(s=>s.endsWith('-summary')).find(s=>info.label?.startsWith(CCO_SCREEN_CATALOG.find(d=>d.id===s)?.label??s))!);
       expect(summaryId).toBeDefined();
       const summary=buildCcoClassSummary(summaryId!,sag.rows);
-      await expect(page.locator('.mcl-class-summary-total strong')).toHaveText(summary.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));
+      await expect(page.locator('.mcl-class-summary-total strong .mcl-animated-value > span:not([aria-hidden])')).toHaveText(summary.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));
       const pageIndex=Number(await page.locator('main').getAttribute('data-mcl-frame-label').then(label=>label?.match(/ · (\d+)\//)?.[1]??'1'))-1;
       const expected=summary.byPi.slice(pageIndex*CCO_SUMMARY_ROWS_PER_PAGE,(pageIndex+1)*CCO_SUMMARY_ROWS_PER_PAGE);
       await expect(page.locator('.mcl-class-summary-label > strong')).toHaveText(expected.map(item=>item.pi));
