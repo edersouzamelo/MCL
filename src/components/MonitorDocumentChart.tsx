@@ -1,12 +1,14 @@
 "use client";
 
+import { OmMentions } from "@/components/OmIdentity";
+import { findOmCrest } from "@/modules/grupamento/om-crests";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { MonitorDocumentChart as Chart } from "@/modules/grupamento/monitor-content/types";
 import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStacked, seriesColor } from "@/modules/grupamento/monitor-content/chart-geometry";
 import { estimatedChartLabelWidth, fitHorizontalCategoryLabel, fitVerticalCategoryAxis } from "@/modules/grupamento/monitor-content/chart-label-layout";
 import { pieArcPath, pieLabelPositions, pieSliceGeometry } from "@/modules/grupamento/monitor-content/pie-layout";
 
-export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; ccol?: boolean }) {
+export function MonitorDocumentChart({ chart, ccol = false, decorateOms = true }: { chart: Chart; ccol?: boolean; decorateOms?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const clipId = useId().replaceAll(":", "");
   const [size, setSize] = useState({ width: 900, height: 480 });
@@ -33,9 +35,11 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   const xTitle = chart.xAxisTitle;
   const yTitle = chart.yAxisTitle;
   const categoryLabels = Array.from({ length: count }, (_, i) => chart.categoryFormat && categories[i]?.trim() && Number.isFinite(Number(categories[i])) ? chartValueLabel(Number(categories[i]), chart.categoryFormat) : categories[i] ?? "");
+  const categoryCrests = categoryLabels.map((name) => decorateOms ? findOmCrest(name) : undefined);
+  const crestSpace = categoryCrests.some(Boolean) ? font * 2.4 : 0;
   const preferredCategoryFont = font * .9;
   const categoryWidth = Math.min(size.width * .48, Math.max(88, ...categoryLabels.map((text) => estimatedChartLabelWidth(text, preferredCategoryFont) + 8)));
-  const margin = { left: (horizontal ? categoryWidth + 16 : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: chart.series.some(series => series.dataLabels?.some(Boolean)) && !horizontal ? font * 4 : font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
+  const margin = { left: (horizontal ? categoryWidth + 16 + crestSpace : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: chart.series.some(series => series.dataLabels?.some(Boolean)) && !horizontal ? font * 4 : font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
   const width = Math.max(1, size.width - margin.left - margin.right);
   const wrap = (text: string, available: number) => {
     const limit = Math.max(1, Math.floor(available / (font * .58)));
@@ -62,7 +66,7 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
     });
   margin.bottom = horizontal
     ? font * (2 + Math.max(1, laneEnds.length) * 1.3) + (xTitle ? font * 2 : 0)
-    : Math.max(font * 3.2, (verticalAxisLayout?.bottomExtent ?? font * 1.5) + font * 1.6) + (xTitle ? font * 2 : 0);
+    : Math.max(font * 3.2, (verticalAxisLayout?.bottomExtent ?? font * 1.5) + font * 1.6) + (xTitle ? font * 2 : 0) + crestSpace;
   const height = Math.max(1, size.height - margin.top - margin.bottom);
   const categoryLayouts = categoryLabels.map((text, index) => horizontal
     ? fitHorizontalCategoryLabel(text, Math.max(40, categoryWidth - 6), height / count, preferredCategoryFont)
@@ -77,7 +81,7 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
   const pie = chart.type === "pie" || chart.type === "doughnut";
   const unsupported = !["bar", "line", "pie", "doughnut"].includes(chart.type);
   const legendItems = pie ? categories.map((name, i) => ({ name, color: chart.series[0]?.pointColors?.[i] || seriesColor({ ...chart.series[0], color: undefined }, i) })) : chart.series.map((series, i) => ({ name: series.name, color: seriesColor(series, i) }));
-  const legend = chart.legendPosition === "none" ? null : <div className="flex shrink-0 flex-wrap justify-center gap-x-4 gap-y-1 p-1" style={{ color: foreground, fontSize: font, maxWidth: chart.legendPosition === "left" || chart.legendPosition === "right" ? "25%" : undefined, alignContent: "center" }} data-chart-legend>{legendItems.map((item, i) => <span key={i} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: item.color }} />{item.name}</span>)}</div>;
+  const legend = chart.legendPosition === "none" ? null : <div className="flex shrink-0 flex-wrap justify-center gap-x-4 gap-y-1 p-1" style={{ color: foreground, fontSize: font, maxWidth: chart.legendPosition === "left" || chart.legendPosition === "right" ? "25%" : undefined, alignContent: "center" }} data-chart-legend>{legendItems.map((item, i) => <span key={i} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: item.color }} />{decorateOms ? <OmMentions text={item.name} /> : item.name}</span>)}</div>;
   const sideLegend = chart.legendPosition === "left" || chart.legendPosition === "right";
   const title = chart.title?.trim();
   const chartAria = [title, `Gráfico ${horizontal ? "horizontal" : chart.type}`, chart.series.map((s) => s.name).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
@@ -101,9 +105,11 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
             const x = horizontal ? margin.left - 8 : cat(i);
             const y = horizontal
               ? cat(i) + layout.fontSize * .32 - (layout.lines.length - 1) * layout.lineHeight / 2
-              : margin.top + height + font * 1.25;
+              : margin.top + height + font * 1.25 + crestSpace;
             const angle = horizontal ? 0 : verticalAxisLayout?.angle ?? 0;
-            return <text
+            const crest = categoryCrests[i];
+            const crestHeight = horizontal ? Math.min(crestSpace, height / count * .8) : crestSpace;
+            return <g key={i}>{crest && <image href={crest.image} x={horizontal ? margin.left - categoryWidth - crestSpace : x - crestHeight * .36} y={horizontal ? cat(i) - crestHeight / 2 : margin.top + height + 3} width={crestHeight * .72} height={crestHeight} preserveAspectRatio="xMidYMid meet" aria-label={crest.acronym} />}<text
               key={i}
               fill="currentColor"
               x={x}
@@ -116,7 +122,7 @@ export function MonitorDocumentChart({ chart, ccol = false }: { chart: Chart; cc
               data-category-angle={angle}
             >
               {layout.lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex === 0 ? 0 : layout.lineHeight}>{line}</tspan>)}
-            </text>;
+            </text></g>;
           })}
           <g clipPath={`url(#${clipId})`}>
             {chart.type === "bar" ? Array.from({ length: count }, (_, index) => {

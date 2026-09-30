@@ -45,7 +45,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin || request.headers.has("X-MCL-Revalidate")) return;
   if (request.mode === "navigate" && /^\/grupamento\/monitor\/(?:[1-9]|10)\/?$/.test(url.pathname)) {
     event.respondWith(navigation(request));
-  } else if (url.pathname.startsWith("/api/grupamento/monitor-content/assets/")) {
+  } else if (url.pathname.startsWith("/api/grupamento/monitor-content/assets/") || url.pathname.startsWith("/om-crests/")) {
     event.respondWith(cacheFirst(request, ASSET_CACHE));
   } else if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname === "/manifest.json") {
     event.respondWith(cacheFirst(request, STATIC_CACHE));

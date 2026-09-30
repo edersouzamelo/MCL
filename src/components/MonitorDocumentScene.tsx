@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { OmMentions } from "@/components/OmIdentity";
 import { useEffect } from "react";
 import { MonitorDocumentTable } from "@/components/MonitorDocumentTable";
 import { monitorTableSlide } from "@/modules/grupamento/monitor-content/table-layout";
@@ -65,7 +66,7 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
       letterSpacing: item.role === "label" ? ".02em" : undefined,
       opacity: area < 0.002 ? 0.94 : 1,
     }}>
-      {item.text}
+      {preserve ? item.text : <OmMentions text={item.text} header={item.role === "title" || item.y < .15} />}
     </div>
   );
 }
@@ -96,12 +97,12 @@ function LayoutScene({ scene, ccol, briefing = false }: { scene: MonitorDocument
             </div>;
           }
           if (item.kind === "chart") {
-            return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} /></div>;
+            return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} decorateOms={!preserve} /></div>;
           }
           return <div key={"table-" + String(index)} className={"absolute overflow-hidden " + (briefing ? "" : "rounded-lg border border-white/10 bg-slate-950/20")} style={boxStyle(item)}>
             <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
               <thead className="bg-white/[0.08]"><tr>{item.columns.map((cell,cellIndex)=><th key={cellIndex} className="px-2 py-1 text-left font-black">{cell}</th>)}</tr></thead>
-              <tbody>{item.rows.map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.map((cell,cellIndex)=><td key={cellIndex} className="whitespace-normal break-words px-2 py-1 align-top">{cell}</td>)}</tr>)}</tbody>
+              <tbody>{item.rows.map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.map((cell,cellIndex)=><td key={cellIndex} className="whitespace-normal break-words px-2 py-1 align-top">{preserve ? cell : <OmMentions text={cell} />}</td>)}</tr>)}</tbody>
             </table>
           </div>;
         })}
@@ -136,9 +137,9 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   if (tableSlide) {
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
     const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
-    const text = (items: typeof before) => items.map((item, i) => <div key={i} className="whitespace-pre-line break-words" style={{ fontSize: item.role === 'title' || i === 0 && items === before ? 'clamp(24px, 2.4vw, 40px)' : 'clamp(16px, 1.3vw, 24px)', fontWeight: item.bold ? 800 : 600 }}>{item.text}</div>);
+    const text = (items: typeof before) => items.map((item, i) => <div key={i} className="whitespace-pre-line break-words" style={{ fontSize: item.role === 'title' || i === 0 && items === before ? 'clamp(24px, 2.4vw, 40px)' : 'clamp(16px, 1.3vw, 24px)', fontWeight: item.bold ? 800 : 600 }}><OmMentions text={item.text} header={items === before} /></div>);
     return <section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
-      <header className="shrink-0 space-y-2">{before.length ? text(before) : <h1 className="text-3xl font-bold">{scene.title}</h1>}</header>
+      <header className="shrink-0 space-y-2">{before.length ? text(before) : <h1 className="text-3xl font-bold"><OmMentions text={scene.title} header /></h1>}</header>
       <MonitorDocumentTable columns={tableSlide.table.columns} rows={tableSlide.table.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
       {after.length > 0 && <div className="shrink-0 space-y-1">{text(after)}</div>}
       <footer className="shrink-0 text-xs opacity-65">{scene.sourceFileName} · slide/página {scene.sourcePage ?? 'não informada'}</footer>
@@ -164,7 +165,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
           <div className={"flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] " + (ccol ? "text-sky-800" : "text-sky-300")}>
             <SceneIcon type={scene.sceneType} /> Conteúdo documental aprovado
           </div>
-          <h1 className="mcl-broadcast-title mt-2 max-w-5xl text-4xl font-black tracking-tight">{scene.title}</h1>
+          <h1 className="mcl-broadcast-title mt-2 max-w-5xl text-4xl font-black tracking-tight"><OmMentions text={scene.title} header /></h1>
         </div>
       </div>
       <div className={"grid gap-5 " + (assets.length ? "lg:grid-cols-[1.15fr_.85fr]" : "grid-cols-1")}>
@@ -172,12 +173,12 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
           {bullets.map((bullet, index) => (
             <div key={index} className={"mcl-broadcast-card flex items-start gap-3 rounded-2xl border px-5 py-4 text-lg font-semibold leading-7 " + (ccol ? "border-slate-300 bg-white/80" : "border-white/10 bg-white/[0.03]")}>
               <span className={"mt-2 h-2 w-2 shrink-0 rounded-full " + (ccol ? "bg-sky-700" : "bg-sky-400")} />
-              <span>{bullet}</span>
+              <span><OmMentions text={bullet} /></span>
             </div>
           ))}
         </div>
         {payload.chart && <div className="h-[50vh]"><MonitorDocumentChart chart={payload.chart} ccol={ccol} /></div>}
-        {payload.columns && payload.rows && <table className="w-full text-sm"><thead><tr>{payload.columns.map((cell, i) => <th key={i} className="p-2 text-left">{cell}</th>)}</tr></thead><tbody>{payload.rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} className="p-2">{cell}</td>)}</tr>)}</tbody></table>}
+        {payload.columns && payload.rows && <table className="w-full text-sm"><thead><tr>{payload.columns.map((cell, i) => <th key={i} className="p-2 text-left">{cell}</th>)}</tr></thead><tbody>{payload.rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} className="p-2"><OmMentions text={cell} /></td>)}</tr>)}</tbody></table>}
         <AssetGrid assetIds={assets} title={scene.title} />
       </div>
     </section>

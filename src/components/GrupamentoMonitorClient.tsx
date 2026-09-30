@@ -317,7 +317,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
 
   if (briefing) return <BriefingFrame monitorId={monitorId} responsibleSector={monitor.responsibleSector} captureReady={Boolean(captureMode && activeItem && !transitioning)} playlistCount={playlist.length} frameIndex={safeIndex} frameLabel={screenLabel} updatedAt={activeItem?.kind === "document" ? activeItem.scene.sourceImportedAt : activeScreen === "rpn" || activeScreen?.startsWith("units-rpn-") ? rpn?.source.importedAt : latestBriefingUpdate(sag?.source.importedAt, rpn?.source.importedAt)}>
     <div key={activeItem?.key ?? "empty"} className="h-full w-full" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
-      <MonitorViewport documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={activeItem?.kind === "system" ? onPageCount : undefined}>{screenContent}</MonitorViewport>
+      <MonitorViewport fillFrame={activeItem?.kind === "system" && Boolean(sag && rpn)} documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={activeItem?.kind === "system" ? onPageCount : undefined}>{screenContent}</MonitorViewport>
     </div>
   </BriefingFrame>;
 
@@ -389,6 +389,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         >
           <div key={activeItem?.key ?? "empty-playlist"} className="mcl-monitor-scene h-full w-full">
             <MonitorViewport
+              fillFrame={activeItem?.kind === "system" && Boolean(sag && rpn)}
               documentMode={!activeItem || (activeItem.kind === "document" && Boolean(activeItem.scene.payload.layout)) || !sag || !rpn}
               cycleSeconds={Math.max(5, monitor.delaySeconds)}
               paused={captureMode || playbackState !== "playing"}
@@ -495,8 +496,8 @@ function MonitorClock({ ccol }: { ccol: boolean }) {
   }, []);
   return (
     <div>
-      <div className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
-      <div className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
+      <div suppressHydrationWarning className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
+      <div suppressHydrationWarning className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
     </div>
   );
 }

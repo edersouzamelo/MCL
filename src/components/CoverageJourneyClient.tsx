@@ -1,5 +1,6 @@
 "use client";
 
+import { OmIdentity } from "@/components/OmIdentity";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -506,7 +507,7 @@ export function CoverageJourneyClient({
             </div>
           </div>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Organizacao</dt><dd className="font-semibold">{organizationName}</dd></div>
+            <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Organizacao</dt><dd className="font-semibold"><OmIdentity name={organizationName} /></dd></div>
             <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Classe interna</dt><dd className="font-semibold">{item.supplyClass}</dd></div>
             <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Solicitado</dt><dd className="font-semibold">{need.quantityRequested} {variant.unit}</dd></div>
             <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt className="text-zinc-500 dark:text-zinc-400">Estoque coberto</dt><dd className="font-semibold">{projection.stockCovered} {variant.unit}</dd></div>
@@ -814,7 +815,7 @@ export function CoverageJourneyClient({
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="font-extrabold text-base text-zinc-900 dark:text-zinc-50">{entry.instrument.reference}</p>
-                        <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">{entry.instrument.organizationName ?? entry.instrument.organizationCode}</p>
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 font-medium"><OmIdentity name={entry.instrument.organizationName ?? entry.instrument.organizationCode ?? ""} /></p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`px-2.5 py-1 text-xs font-extrabold rounded-full border ${scoreResult.tierBadgeColor}`} title="Score MCL (0 a 100 pts) baseado em Preço, Saldo Legal, Vigência e Prioridade de UASG.">

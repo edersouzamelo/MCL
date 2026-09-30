@@ -3,6 +3,7 @@ import { parseCcoMonitorConfig } from "./monitor";
 import type { SagImportResult } from "./sag";
 import type { RpnImportResult } from "./rpn";
 import type { MonitorDocumentSceneDto } from "./monitor-content/types";
+import { OM_CREST_CATALOG } from "./om-crests";
 
 export const MONITOR_ASSET_CACHE = "mcl-monitor-assets-v4";
 const SNAPSHOT_CACHE = "mcl-monitor-snapshots-v4";
@@ -82,6 +83,9 @@ export async function synchronizeMonitor(organizationId: string, monitor: CcoMon
     if (result !== null && (!result || !result.totals || !Array.isArray(result.byUg) || !Array.isArray(result.byPi) || !Array.isArray(result.rows))) throw new Error("Snapshot SAG inválido.");
   }
   let assets = sceneAssetUrls(scenes);
+  // Small, versioned official catalog: prepare every shield before offline use,
+  // including units that only appear on later pages or documentary tables.
+  const crestUrls = OM_CREST_CATALOG.units.map((unit) => unit.image);
   const assetCache = await caches.open(MONITOR_ASSET_CACHE);
   // All assets finish before the single snapshot pointer is committed.
   try {
@@ -100,6 +104,15 @@ export async function synchronizeMonitor(organizationId: string, monitor: CcoMon
     const cachedIds = new Set(previous.scenes.map((scene) => scene.id));
     scenes = scenes.filter((scene) => cachedIds.has(scene.id));
     assets = sceneAssetUrls(scenes);
+  }
+  // Decoration must never prevent a financial refresh or keep a revoked scene.
+  const crestSignal = AbortSignal.timeout(3000);
+  for (let start = 0; start < crestUrls.length; start += 4) {
+    await Promise.allSettled(crestUrls.slice(start, start + 4).map(async (url) => {
+      if (await assetCache.match(url)) return;
+      const response = await fetch(url, { headers: { "X-MCL-Revalidate": "1" }, signal: crestSignal });
+      if (response.ok && !response.redirected && response.headers.get("content-type")?.startsWith("image/")) await assetCache.put(url, response);
+    }));
   }
   const data = { organizationId, monitorId: monitor.id, monitor: sharedMonitor, sag: financial.current, rpn: financial.rpn, scenes, assets };
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(data)));

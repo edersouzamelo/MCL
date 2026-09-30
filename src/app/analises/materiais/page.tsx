@@ -1,3 +1,4 @@
+import { OmIdentity } from "@/components/OmIdentity";
 import { AppShell } from "@/components/AppShell";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import Link from "next/link";
@@ -143,7 +144,7 @@ export default async function MaterialAnalysesPage() {
                   {item.itemName} - {item.variantLabel} (Tam: {item.size})
                 </h2>
                 <p className="text-sm text-zinc-650 dark:text-zinc-400 mt-1">
-                  Demandante: <strong className="font-semibold text-zinc-800 dark:text-zinc-200">{item.orgName}</strong>
+                  Demandante: <strong className="font-semibold text-zinc-800 dark:text-zinc-200"><OmIdentity name={item.orgName} /></strong>
                 </p>
 
                 <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl p-4 text-xs text-zinc-600 dark:text-zinc-400 border border-zinc-200/40 dark:border-zinc-800/60 shadow-sm">

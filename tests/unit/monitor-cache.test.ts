@@ -8,9 +8,10 @@ const monitor = defaultCcoMonitorConfig()[0];
 let failAsset = false;
 let failApi = false;
 let failSag = false;
+let failCrest = false;
 let scenes = [scene];
 beforeEach(() => {
-  failAsset = false; failApi = false; failSag = false; scenes = [scene];
+  failAsset = false; failApi = false; failSag = false; failCrest = false; scenes = [scene];
   const stores = new Map<string, Map<string, Response>>();
   vi.stubGlobal("caches", { open: async (name: string) => {
     if (!stores.has(name)) stores.set(name, new Map());
@@ -18,6 +19,7 @@ beforeEach(() => {
     return { match: async (key: string) => store.get(key)?.clone(), put: async (key: string, value: Response) => { store.set(key, value.clone()); } };
   } });
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    if (url.startsWith("/om-crests/")) return new Response("test crest bytes", { status: failCrest ? 503 : 200, headers: { "Content-Type": "image/png" } });
     if (url.includes("/assets/")) return new Response("test image bytes", { status: failAsset ? 503 : 200, headers: { "Content-Type": "image/png" } });
     if (failApi) return new Response("unavailable", { status: 503 });
     if (failSag && url.includes("sag/latest")) return new Response("unavailable", { status: 503 });
@@ -27,6 +29,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("atomic monitor cache", () => {
+  it("publishes current financial data even when the crest catalog cannot be downloaded", async () => {
+    failCrest = true;
+    const snapshot = await synchronizeMonitor("org-a", monitor);
+    expect(snapshot.scenes).toEqual([scene]);
+    expect((await readMonitorSnapshot("org-a", 1))?.version).toBe(snapshot.version);
+    expect(await (await caches.open("mcl-monitor-assets-v4")).match("/om-crests/9-b-sup.png")).toBeUndefined();
+  });
+  it("prepares official crests for offline use without blocking revocations on decoration failure", async () => {
+    const old = await synchronizeMonitor("org-a", monitor);
+    const assets = await caches.open("mcl-monitor-assets-v4");
+    expect(await assets.match("/om-crests/9-b-sup.png")).toBeTruthy();
+    failCrest = true; scenes = [];
+    const updated = await synchronizeMonitor("org-a", monitor, old);
+    expect(updated.scenes).toEqual([]);
+  });
   it("validates shared monitor identity and selected screens", () => {
     const config = { ...defaultCcoMonitorConfig()[5], screens: ["pis", "rpn"], delaySeconds: 15 };
     expect(parseCcoMonitorConfig(config, 6)).toEqual(config);

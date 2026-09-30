@@ -1,5 +1,6 @@
 "use client";
 
+import { OmIdentity } from "@/components/OmIdentity";
 import { useEffect, useState } from "react";
 
 type Revision = { id: string; source: string; version: number; kind: string; observedAt: string; recordedAt: string;
@@ -56,7 +57,7 @@ export function PcaHistory({ itemId, uasg, year }: { itemId?: string; uasg?: str
   function reset() { setRefresh(value => value + 1); setCursor(""); setExpanded(null); setLoading(true); }
   return <section aria-label="Histórico preservado do PCA" className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
     <h3 className="font-bold">Histórico do PCA e dos DFDs</h3>
-    {result?.unitName && <p className="mt-1 text-sm font-semibold">{result.unitName} · {itemId ? year : selectedYear}</p>}
+    {result?.unitName && <p className="mt-1 text-sm font-semibold"><OmIdentity name={result.unitName} /> · {itemId ? year : selectedYear}</p>}
     <p className="mt-1 text-xs text-zinc-500">Versões observadas pelo MCL. A base inicial preserva a cópia existente; alterações anteriores não podem ser reconstruídas. Consultas sem mudança de conteúdo não criam versões.</p>
     <form className="my-4 flex flex-wrap gap-2" onSubmit={event => { event.preventDefault(); reset(); setAppliedQuery(query.trim()); }}>
       {!itemId && <><input aria-label="Pesquisar histórico" value={query} onChange={event => setQuery(event.target.value)} maxLength={200} placeholder="Descrição, código ou número do item" className="min-w-64 rounded border border-zinc-300 bg-transparent px-3 py-2 text-sm dark:border-zinc-700"/><button className="rounded border px-3 py-2 text-sm">Pesquisar</button></>}

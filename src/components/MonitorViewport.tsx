@@ -3,9 +3,10 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MIN_MONITOR_SCALE, paginateMonitor, type MonitorPage } from "@/modules/grupamento/monitor-pagination";
 
-export function MonitorViewport({ children, documentMode, cycleSeconds, paused, onPageCount }: {
+export function MonitorViewport({ children, documentMode, fillFrame = false, cycleSeconds, paused, onPageCount }: {
   children: ReactNode;
   documentMode: boolean;
+  fillFrame?: boolean;
   cycleSeconds: number;
   paused: boolean;
   onPageCount?: (count: number) => void;
@@ -32,7 +33,7 @@ export function MonitorViewport({ children, documentMode, cycleSeconds, paused, 
       const capacity = frame.clientHeight - 24;
       if (!height || capacity <= 0) return;
       measuredFrame = frameSize;
-      if (documentMode) {
+      if (documentMode || fillFrame) {
         setFit({ scale: 1, pages: [{ top: 0, height: frame.clientHeight }], ready: true });
         return;
       }
@@ -56,7 +57,7 @@ export function MonitorViewport({ children, documentMode, cycleSeconds, paused, 
     const observer = new ResizeObserver(schedule);
     observer.observe(frame);
     return () => { disposed = true; observer.disconnect(); cancelAnimationFrame(raf); };
-  }, [documentMode]);
+  }, [documentMode, fillFrame]);
 
   useEffect(() => { onPageCount?.(fit.pages.length); }, [fit.pages.length, onPageCount]);
   useEffect(() => {
@@ -76,9 +77,10 @@ export function MonitorViewport({ children, documentMode, cycleSeconds, paused, 
   const current = fit.pages[Math.min(page, fit.pages.length - 1)];
   return (
     <div ref={frameRef} className="relative h-full w-full overflow-hidden" data-monitor-viewport data-page-count={fit.pages.length} data-capture-page={page} data-scale={fit.scale}>
-      <div className="w-full overflow-hidden" style={{ height: documentMode ? "100%" : current.height * fit.scale, visibility: fit.ready ? "visible" : "hidden" }}>
-        <div ref={contentRef} className={documentMode ? "relative h-full w-full" : "relative flow-root w-full"} style={{
-          height: documentMode ? "100%" : undefined,
+      <div className="w-full overflow-hidden" style={{ height: documentMode || fillFrame ? "100%" : current.height * fit.scale, visibility: fit.ready ? "visible" : "hidden" }}>
+        <div ref={contentRef} className={documentMode || fillFrame ? "relative h-full w-full" : "relative flow-root w-full"} style={{
+          height: documentMode || fillFrame ? "100%" : undefined,
+          containerType: fillFrame ? "size" : undefined,
           transform: `scale(${fit.scale}) translateY(-${current.top}px)`, transformOrigin: "top center",
         }}>{children}</div>
       </div>

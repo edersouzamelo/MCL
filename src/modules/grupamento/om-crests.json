@@ -1,0 +1,960 @@
+{
+  "version": 1,
+  "source": {
+    "fileName": "Organograma Atualizado.pdf",
+    "sha256": "f0c44869cb17bba0d3100344a24aec7566442ed768b96425afe2f2697d5f0f9f",
+    "page": 1
+  },
+  "units": [
+    {
+      "id": "cmcg",
+      "acronym": "CMCG",
+      "name": "Colégio Militar de Campo Grande",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/cmcg.png",
+      "sourceDrawing": 44,
+      "sourceBounds": [
+        929.6532,
+        493.4245,
+        969.8763,
+        550.2806
+      ],
+      "width": 328,
+      "height": 462
+    },
+    {
+      "id": "13-bda-inf-mtz",
+      "acronym": "13ª Bda Inf Mtz",
+      "name": "13ª Brigada de Infantaria Motorizada",
+      "city": "Cuiabá",
+      "aliases": [],
+      "image": "/om-crests/13-bda-inf-mtz.png",
+      "sourceDrawing": 106,
+      "sourceBounds": [
+        292.8801,
+        245.7224,
+        333.1032,
+        302.5792
+      ],
+      "width": 328,
+      "height": 462
+    },
+    {
+      "id": "58-bi-mtz",
+      "acronym": "58º BI Mtz",
+      "name": "58º Batalhão de Infantaria Motorizado",
+      "city": "Aragarças",
+      "aliases": [],
+      "image": "/om-crests/58-bi-mtz.png",
+      "sourceDrawing": 209,
+      "sourceBounds": [
+        328.2197,
+        337.1406,
+        368.4427,
+        393.9974
+      ],
+      "width": 329,
+      "height": 461
+    },
+    {
+      "id": "c-fron-jauru-66-bi-mtz",
+      "acronym": "C Fron Jauru / 66º BI Mtz",
+      "name": "Comando de Fronteira Jauru / 66º Batalhão de Infantaria Motorizado",
+      "city": "Cáceres",
+      "aliases": [
+        "66 BI MTZ",
+        "C FRON JAURU"
+      ],
+      "image": "/om-crests/c-fron-jauru-66-bi-mtz.png",
+      "sourceDrawing": 305,
+      "sourceBounds": [
+        257.4122,
+        416.2995,
+        297.6352,
+        473.1568
+      ],
+      "width": 328,
+      "height": 462
+    },
+    {
+      "id": "18-gac",
+      "acronym": "18º GAC",
+      "name": "18º Grupo de Artilharia de Campanha",
+      "city": "Rondonópolis",
+      "aliases": [],
+      "image": "/om-crests/18-gac.png",
+      "sourceDrawing": 415,
+      "sourceBounds": [
+        328.2197,
+        416.2995,
+        368.4427,
+        473.1568
+      ],
+      "width": 329,
+      "height": 462
+    },
+    {
+      "id": "13-pel-com",
+      "acronym": "13º Pel Com",
+      "name": "13º Pelotão de Comunicações",
+      "city": "Cuiabá",
+      "aliases": [],
+      "image": "/om-crests/13-pel-com.png",
+      "sourceDrawing": 439,
+      "sourceBounds": [
+        328.2197,
+        495.3785,
+        368.4427,
+        552.2349
+      ],
+      "width": 329,
+      "height": 461
+    },
+    {
+      "id": "47-bi",
+      "acronym": "47º BI",
+      "name": "47º Batalhão de Infantaria",
+      "city": "Coxim",
+      "aliases": [],
+      "image": "/om-crests/47-bi.png",
+      "sourceDrawing": 473,
+      "sourceBounds": [
+        455.5709,
+        337.1406,
+        495.9218,
+        393.9974
+      ],
+      "width": 330,
+      "height": 461
+    },
+    {
+      "id": "10-rc-mec",
+      "acronym": "10º RC Mec",
+      "name": "10º Regimento de Cavalaria Mecanizado",
+      "city": "Bela Vista",
+      "aliases": [],
+      "image": "/om-crests/10-rc-mec.png",
+      "sourceDrawing": 563,
+      "sourceBounds": [
+        511.6258,
+        337.1406,
+        551.8483,
+        393.9974
+      ],
+      "width": 328,
+      "height": 461
+    },
+    {
+      "id": "2-cia-fron",
+      "acronym": "2ª Cia Fron",
+      "name": "2ª Companhia de Fronteira",
+      "city": "Corumbá",
+      "aliases": [],
+      "image": "/om-crests/2-cia-fron.png",
+      "sourceDrawing": 638,
+      "sourceBounds": [
+        385.7451,
+        415.5245,
+        425.9682,
+        472.1225
+      ],
+      "width": 328,
+      "height": 459
+    },
+    {
+      "id": "11-rc-mec",
+      "acronym": "11º RC Mec",
+      "name": "11º Regimento de Cavalaria Mecanizado",
+      "city": "Ponta Porã",
+      "aliases": [],
+      "image": "/om-crests/11-rc-mec.png",
+      "sourceDrawing": 739,
+      "sourceBounds": [
+        511.4917,
+        415.872,
+        551.8431,
+        472.7288
+      ],
+      "width": 329,
+      "height": 461
+    },
+    {
+      "id": "17-rc-mec",
+      "acronym": "17º RC Mec",
+      "name": "17º Regimento de Cavalaria Mecanizado",
+      "city": "Amambai",
+      "aliases": [],
+      "image": "/om-crests/17-rc-mec.png",
+      "sourceDrawing": 853,
+      "sourceBounds": [
+        613.0182,
+        337.1406,
+        653.2407,
+        393.9974
+      ],
+      "width": 328,
+      "height": 461
+    },
+    {
+      "id": "20-rcb",
+      "acronym": "20º RCB",
+      "name": "20º Regimento de Cavalaria Blindado",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/20-rcb.png",
+      "sourceDrawing": 1064,
+      "sourceBounds": [
+        613.0511,
+        416.5487,
+        653.2739,
+        473.4057
+      ],
+      "width": 328,
+      "height": 462
+    },
+    {
+      "id": "9-gac",
+      "acronym": "9º GAC",
+      "name": "9º Grupo de Artilharia de Campanha",
+      "city": "Nioaque",
+      "aliases": [],
+      "image": "/om-crests/9-gac.png",
+      "sourceDrawing": 1152,
+      "sourceBounds": [
+        613.0925,
+        494.1777,
+        653.4439,
+        551.0347
+      ],
+      "width": 330,
+      "height": 462
+    },
+    {
+      "id": "28-b-log",
+      "acronym": "28º B Log",
+      "name": "28º Batalhão Logístico",
+      "city": "Dourados",
+      "aliases": [],
+      "image": "/om-crests/28-b-log.png",
+      "sourceDrawing": 1204,
+      "sourceBounds": [
+        512.6074,
+        493.8948,
+        552.8305,
+        550.7521
+      ],
+      "width": 328,
+      "height": 461
+    },
+    {
+      "id": "4-cia-e-cmb-mec",
+      "acronym": "4ª Cia E Cmb Mec",
+      "name": "4ª Companhia de Engenharia de Combate Mecanizada",
+      "city": "Jardim",
+      "aliases": [],
+      "image": "/om-crests/4-cia-e-cmb-mec.png",
+      "sourceDrawing": 1226,
+      "sourceBounds": [
+        613.7328,
+        571.6412,
+        653.9553,
+        628.498
+      ],
+      "width": 328,
+      "height": 461
+    },
+    {
+      "id": "9-bia-aaa-e",
+      "acronym": "9ª Bia AAAe",
+      "name": "9ª Bateria de Artilharia Antiaérea",
+      "city": "Três Lagoas",
+      "aliases": [
+        "9 BIA A AE"
+      ],
+      "image": "/om-crests/9-bia-aaa-e.png",
+      "sourceDrawing": 1334,
+      "sourceBounds": [
+        512.824,
+        570.7828,
+        553.1754,
+        627.6396
+      ],
+      "width": 330,
+      "height": 461
+    },
+    {
+      "id": "3-gpt-e",
+      "acronym": "3º Gpt E",
+      "name": "3º Grupamento de Engenharia",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/3-gpt-e.png",
+      "sourceDrawing": 1420,
+      "sourceBounds": [
+        723.8942,
+        245.7224,
+        764.2451,
+        302.5792
+      ],
+      "width": 329,
+      "height": 462
+    },
+    {
+      "id": "9-be-cmb",
+      "acronym": "9º BE Cmb",
+      "name": "9º Batalhão de Engenharia de Combate",
+      "city": "Aquidauana",
+      "aliases": [],
+      "image": "/om-crests/9-be-cmb.png",
+      "sourceDrawing": 1472,
+      "sourceBounds": [
+        672.6195,
+        337.1406,
+        712.9709,
+        393.9974
+      ],
+      "width": 329,
+      "height": 461
+    },
+    {
+      "id": "9-be-c",
+      "acronym": "9º BEC",
+      "name": "9º Batalhão de Engenharia de Construção",
+      "city": "Cuiabá",
+      "aliases": [],
+      "image": "/om-crests/9-be-c.png",
+      "sourceDrawing": 1591,
+      "sourceBounds": [
+        723.8942,
+        337.1406,
+        764.2451,
+        393.9974
+      ],
+      "width": 329,
+      "height": 461
+    },
+    {
+      "id": "cro-9",
+      "acronym": "CRO/9",
+      "name": "Comissão Regional de Obras da 9ª Região Militar",
+      "city": "Campo Grande",
+      "aliases": [
+        "CRO 9",
+        "CRO9"
+      ],
+      "image": "/om-crests/cro-9.png",
+      "sourceDrawing": 1645,
+      "sourceBounds": [
+        774.1409,
+        337.1406,
+        814.3634,
+        393.9974
+      ],
+      "width": 328,
+      "height": 461
+    },
+    {
+      "id": "18-cia-com",
+      "acronym": "18ª Cia Com",
+      "name": "18ª Companhia de Comunicações",
+      "city": "Corumbá",
+      "aliases": [],
+      "image": "/om-crests/18-cia-com.png",
+      "sourceDrawing": 1653,
+      "sourceBounds": [
+        455.5709,
+        415.5245,
+        495.9218,
+        472.3818
+      ],
+      "width": 330,
+      "height": 461
+    },
+    {
+      "id": "18-pel-pe",
+      "acronym": "18º Pel PE",
+      "name": "18º Pelotão de Polícia do Exército",
+      "city": "Corumbá",
+      "aliases": [],
+      "image": "/om-crests/18-pel-pe.png",
+      "sourceDrawing": 1685,
+      "sourceBounds": [
+        384.6345,
+        495.3785,
+        424.986,
+        552.2349
+      ],
+      "width": 329,
+      "height": 461
+    },
+    {
+      "id": "3-b-av-ex",
+      "acronym": "3º B Av Ex",
+      "name": "3º Batalhão de Aviação do Exército",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/3-b-av-ex.png",
+      "sourceDrawing": 1915,
+      "sourceBounds": [
+        719.2276,
+        494.0567,
+        757.1373,
+        550.2469
+      ],
+      "width": 309,
+      "height": 456
+    },
+    {
+      "id": "9-gpt-log",
+      "acronym": "9º Gpt Log",
+      "name": "9º Grupamento Logístico",
+      "city": "Campo Grande",
+      "aliases": [
+        "9 GPT LOG",
+        "GPT LOG"
+      ],
+      "image": "/om-crests/9-gpt-log.png",
+      "sourceDrawing": 2394,
+      "sourceBounds": [
+        880.4163,
+        245.7224,
+        920.6388,
+        302.5792
+      ],
+      "width": 328,
+      "height": 462
+    },
+    {
+      "id": "9-bpe",
+      "acronym": "9º BPE",
+      "name": "9º Batalhão de Polícia do Exército",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/9-bpe.png",
+      "sourceDrawing": 2422,
+      "sourceBounds": [
+        851.6013,
+        567.6299,
+        891.0142,
+        625.7501
+      ],
+      "width": 321,
+      "height": 471
+    },
+    {
+      "id": "4-bda-c-mec",
+      "acronym": "4ª Bda C Mec",
+      "name": "4ª Brigada de Cavalaria Mecanizada",
+      "city": "Dourados",
+      "aliases": [],
+      "image": "/om-crests/4-bda-c-mec.png",
+      "sourceDrawing": 2520,
+      "sourceBounds": [
+        562.7245,
+        245.7193,
+        602.1439,
+        300.9792
+      ],
+      "width": 322,
+      "height": 449
+    },
+    {
+      "id": "9-b-mnt",
+      "acronym": "9º B Mnt",
+      "name": "9º Batalhão de Manutenção",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/9-b-mnt.png",
+      "sourceDrawing": 2564,
+      "sourceBounds": [
+        827.3194,
+        337.0105,
+        867.5419,
+        393.7391
+      ],
+      "width": 329,
+      "height": 460
+    },
+    {
+      "id": "9-b-sup",
+      "acronym": "9º B Sup",
+      "name": "9º Batalhão de Suprimento",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/9-b-sup.png",
+      "sourceDrawing": 2630,
+      "sourceBounds": [
+        880.3287,
+        336.4492,
+        920.6802,
+        393.306
+      ],
+      "width": 330,
+      "height": 462
+    },
+    {
+      "id": "18-b-trnp",
+      "acronym": "18º B Trnp",
+      "name": "18º Batalhão de Transporte",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/18-b-trnp.png",
+      "sourceDrawing": 2652,
+      "sourceBounds": [
+        933.5126,
+        336.3191,
+        973.7357,
+        393.306
+      ],
+      "width": 328,
+      "height": 463
+    },
+    {
+      "id": "9-b-sau",
+      "acronym": "9º B Sau",
+      "name": "9º Batalhão de Saúde",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/9-b-sau.png",
+      "sourceDrawing": 2749,
+      "sourceBounds": [
+        906.7921,
+        405.5409,
+        947.2734,
+        462.5272
+      ],
+      "width": 330,
+      "height": 463
+    },
+    {
+      "id": "ciac-9-gpt-log",
+      "acronym": "CIAC / 9º Gpt Log",
+      "name": "Companhia de Comando do 9º Grupamento Logístico",
+      "city": "Campo Grande",
+      "aliases": [
+        "CIA C 9 GPT LOG",
+        "CIAC 9 GPT LOG"
+      ],
+      "image": "/om-crests/ciac-9-gpt-log.png",
+      "sourceDrawing": 2797,
+      "sourceBounds": [
+        854.2738,
+        405.5015,
+        893.7286,
+        461.0957
+      ],
+      "width": 322,
+      "height": 451
+    },
+    {
+      "id": "18-bda-inf-pan",
+      "acronym": "18ª Bda Inf Pan",
+      "name": "18ª Brigada de Infantaria de Pantanal",
+      "city": "Corumbá",
+      "aliases": [
+        "18 BDA INF PANTANAL"
+      ],
+      "image": "/om-crests/18-bda-inf-pan.png",
+      "sourceDrawing": 2823,
+      "sourceBounds": [
+        419.9791,
+        245.5623,
+        460.69,
+        302.6342
+      ],
+      "width": 332,
+      "height": 463
+    },
+    {
+      "id": "17-b-fron",
+      "acronym": "17º B Fron",
+      "name": "17º Batalhão de Fronteira",
+      "city": "Corumbá",
+      "aliases": [],
+      "image": "/om-crests/17-b-fron.png",
+      "sourceDrawing": 3174,
+      "sourceBounds": [
+        384.9171,
+        337.2064,
+        425.3063,
+        394.2987
+      ],
+      "width": 330,
+      "height": 464
+    },
+    {
+      "id": "ciac-18-bda-inf-pan",
+      "acronym": "Cia C / 18ª Bda Inf Pan",
+      "name": "Companhia de Comando da 18ª Brigada de Infantaria de Pantanal",
+      "city": "Corumbá",
+      "aliases": [
+        "CIAC 18 BDA INF PAN",
+        "CIAC 18 BDA INF PANTANAL"
+      ],
+      "image": "/om-crests/ciac-18-bda-inf-pan.png",
+      "sourceDrawing": 3196,
+      "sourceBounds": [
+        455.6486,
+        495.4879,
+        496.0106,
+        552.5411
+      ],
+      "width": 329,
+      "height": 463
+    },
+    {
+      "id": "h-mil-a-cg",
+      "acronym": "H Mil A CG",
+      "name": "Hospital Militar de Área de Campo Grande",
+      "city": "Campo Grande",
+      "aliases": [
+        "H MIL A CG",
+        "H MIL A C G",
+        "HMACG",
+        "HMILACG"
+      ],
+      "image": "/om-crests/h-mil-a-cg.png",
+      "sourceDrawing": 3527,
+      "sourceBounds": [
+        119.8772,
+        337.9261,
+        160.1646,
+        394.8744
+      ],
+      "width": 329,
+      "height": 462
+    },
+    {
+      "id": "9-b-com-ge",
+      "acronym": "9º B Com GE",
+      "name": "9º Batalhão de Comunicações e Guerra Eletrônica",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/9-b-com-ge.png",
+      "sourceDrawing": 3626,
+      "sourceBounds": [
+        850.6052,
+        493.2752,
+        890.0274,
+        550.493
+      ],
+      "width": 322,
+      "height": 464
+    },
+    {
+      "id": "6-cta",
+      "acronym": "6º CTA",
+      "name": "6º Centro de Telemática de Área",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/6-cta.png",
+      "sourceDrawing": 3654,
+      "sourceBounds": [
+        984.8917,
+        567.9142,
+        1025.411,
+        625.1908
+      ],
+      "width": 331,
+      "height": 465
+    },
+    {
+      "id": "44-bi-mtz",
+      "acronym": "44º BI Mtz",
+      "name": "44º Batalhão de Infantaria Motorizado",
+      "city": "Cuiabá",
+      "aliases": [],
+      "image": "/om-crests/44-bi-mtz.png",
+      "sourceDrawing": 3682,
+      "sourceBounds": [
+        257.2838,
+        337.1236,
+        297.9754,
+        394.1691
+      ],
+      "width": 332,
+      "height": 463
+    },
+    {
+      "id": "13-pel-pe",
+      "acronym": "13º Pel PE",
+      "name": "13º Pelotão de Polícia do Exército",
+      "city": "Cuiabá",
+      "aliases": [],
+      "image": "/om-crests/13-pel-pe.png",
+      "sourceDrawing": 3752,
+      "sourceBounds": [
+        256.9567,
+        495.1338,
+        297.7566,
+        552.3302
+      ],
+      "width": 333,
+      "height": 464
+    },
+    {
+      "id": "ciac-13-bda-inf-mtz",
+      "acronym": "Cia C / 13ª Bda Inf Mtz",
+      "name": "Companhia de Comando da 13ª Brigada de Infantaria Motorizada",
+      "city": "Cuiabá",
+      "aliases": [
+        "CIAC 13 BDA INF MTZ"
+      ],
+      "image": "/om-crests/ciac-13-bda-inf-mtz.png",
+      "sourceDrawing": 3949,
+      "sourceBounds": [
+        292.8572,
+        571.2872,
+        333.252,
+        628.0245
+      ],
+      "width": 329,
+      "height": 460
+    },
+    {
+      "id": "b-adm-ap-cmo",
+      "acronym": "B Adm Ap CMO",
+      "name": "Base de Administração e Apoio do Comando Militar do Oeste",
+      "city": "Campo Grande",
+      "aliases": [
+        "B ADM AP CMO",
+        "B ADM AP/CMO",
+        "B ADMIN AP CMO"
+      ],
+      "image": "/om-crests/b-adm-ap-cmo.png",
+      "sourceDrawing": 4091,
+      "sourceBounds": [
+        719.3934,
+        570.6315,
+        758.1254,
+        627.7391
+      ],
+      "width": 316,
+      "height": 463
+    },
+    {
+      "id": "cmo",
+      "acronym": "CMO",
+      "name": "Comando Militar do Oeste",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/cmo.png",
+      "sourceDrawing": 4261,
+      "sourceBounds": [
+        552.4296,
+        129.7902,
+        611.8149,
+        213.0412
+      ],
+      "width": 482,
+      "height": 673
+    },
+    {
+      "id": "9-cgcfex",
+      "acronym": "9º CGCFEx",
+      "name": "9º Centro de Gestão, Contabilidade e Finanças do Exército",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/9-cgcfex.png",
+      "sourceDrawing": 4277,
+      "sourceBounds": [
+        1036.806,
+        494.4073,
+        1077.662,
+        551.6825
+      ],
+      "width": 334,
+      "height": 465
+    },
+    {
+      "id": "esqd-c-4-bda-c-mec",
+      "acronym": "Esqd C / 4ª Bda C Mec",
+      "name": "Esquadrão de Comando da 4ª Brigada de Cavalaria Mecanizada",
+      "city": "Dourados",
+      "aliases": [
+        "ESQD C 4 BDA C MEC"
+      ],
+      "image": "/om-crests/esqd-c-4-bda-c-mec.png",
+      "sourceDrawing": 4356,
+      "sourceBounds": [
+        563.1001,
+        738.3892,
+        603.3226,
+        795.246
+      ],
+      "width": 328,
+      "height": 461
+    },
+    {
+      "id": "4-pel-pe-mec",
+      "acronym": "4º Pel PE Mec",
+      "name": "4º Pelotão de Polícia do Exército Mecanizado",
+      "city": "Dourados",
+      "aliases": [],
+      "image": "/om-crests/4-pel-pe-mec.png",
+      "sourceDrawing": 4486,
+      "sourceBounds": [
+        613.5846,
+        662.5129,
+        653.8071,
+        719.3693
+      ],
+      "width": 329,
+      "height": 461
+    },
+    {
+      "id": "14-cia-com-mec",
+      "acronym": "14ª Cia Com Mec",
+      "name": "14ª Companhia de Comunicações Mecanizada",
+      "city": "Dourados",
+      "aliases": [],
+      "image": "/om-crests/14-cia-com-mec.png",
+      "sourceDrawing": 4738,
+      "sourceBounds": [
+        512.8716,
+        661.7484,
+        553.0941,
+        718.606
+      ],
+      "width": 328,
+      "height": 461
+    },
+    {
+      "id": "cibt",
+      "acronym": "CIBT",
+      "name": "Centro de Instrução Barão de Três Barras",
+      "city": "Miranda",
+      "aliases": [],
+      "image": "/om-crests/cibt.png",
+      "sourceDrawing": 4819,
+      "sourceBounds": [
+        851.7336,
+        671.3586,
+        890.5425,
+        729.5267
+      ],
+      "width": 317,
+      "height": 472
+    },
+    {
+      "id": "6-bim",
+      "acronym": "6º BIM",
+      "name": "6º Batalhão de Inteligência Militar",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/6-bim.png",
+      "sourceDrawing": 4844,
+      "sourceBounds": [
+        720.235,
+        671.637,
+        758.916,
+        728.8973
+      ],
+      "width": 316,
+      "height": 464
+    },
+    {
+      "id": "9-rm",
+      "acronym": "9ª RM",
+      "name": "9ª Região Militar",
+      "city": "Campo Grande",
+      "aliases": [],
+      "image": "/om-crests/9-rm.png",
+      "sourceDrawing": 4931,
+      "sourceBounds": [
+        165.4517,
+        245.6998,
+        205.9509,
+        302.4753
+      ],
+      "width": 331,
+      "height": 461
+    },
+    {
+      "id": "tg-09-001",
+      "acronym": "TG 09-001",
+      "name": "Tiro de Guerra 09-001",
+      "city": "Alta Floresta",
+      "aliases": [],
+      "image": "/om-crests/tg-09-001.png",
+      "sourceDrawing": 4315,
+      "sourceBounds": [
+        120.5416,
+        418.2551,
+        170.7338,
+        451.7598
+      ],
+      "width": 408,
+      "height": 274
+    },
+    {
+      "id": "tg-09-002",
+      "acronym": "TG 09-002",
+      "name": "Tiro de Guerra 09-002",
+      "city": "Sinop",
+      "aliases": [],
+      "image": "/om-crests/tg-09-002.png",
+      "sourceDrawing": 4323,
+      "sourceBounds": [
+        189.834,
+        418.1491,
+        240.0259,
+        451.6538
+      ],
+      "width": 409,
+      "height": 275
+    },
+    {
+      "id": "tg-09-003",
+      "acronym": "TG 09-003",
+      "name": "Tiro de Guerra 09-003",
+      "city": "Colíder",
+      "aliases": [],
+      "image": "/om-crests/tg-09-003.png",
+      "sourceDrawing": 4331,
+      "sourceBounds": [
+        126.4876,
+        502.3426,
+        176.6795,
+        535.847
+      ],
+      "width": 408,
+      "height": 275
+    },
+    {
+      "id": "tg-09-004",
+      "acronym": "TG 09-004",
+      "name": "Tiro de Guerra 09-004",
+      "city": "Juara",
+      "aliases": [],
+      "image": "/om-crests/tg-09-004.png",
+      "sourceDrawing": 4340,
+      "sourceBounds": [
+        189.8337,
+        499.7617,
+        240.0256,
+        533.2662
+      ],
+      "width": 409,
+      "height": 274
+    },
+    {
+      "id": "tg-09-005",
+      "acronym": "TG 09-005",
+      "name": "Tiro de Guerra 09-005",
+      "city": "Juína",
+      "aliases": [],
+      "image": "/om-crests/tg-09-005.png",
+      "sourceDrawing": 4983,
+      "sourceBounds": [
+        168.7272,
+        554.0576,
+        218.9191,
+        587.5623
+      ],
+      "width": 408,
+      "height": 275
+    }
+  ]
+}

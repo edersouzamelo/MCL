@@ -1,5 +1,6 @@
 "use client";
 
+import { OmMentions } from "@/components/OmIdentity";
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { tableRowPages } from '@/modules/grupamento/monitor-content/table-layout';
 
@@ -63,7 +64,7 @@ export function MonitorDocumentTable({ columns, rows, cycleSeconds = 15, paused 
     className="w-full border-collapse" style={{ tableLayout: 'fixed', fontSize: fit.font, lineHeight: 1.3 }}>
     <colgroup>{widths.map((width, i) => <col key={i} style={{ width: `${width / total * 100}%` }} />)}</colgroup>
     <thead className="bg-sky-400/10"><tr>{columns.map((column, i) => <th key={i} className="px-2 py-3 text-left align-top font-bold" style={{ overflowWrap: 'anywhere' }}>{column}</th>)}</tr></thead>
-    <tbody>{indices.map(index => <tr key={index} className="border-b border-slate-400/20">{columns.map((_, i) => <td key={i} data-numeric-cell={/^(?:R\$\s*)?[+-]?[\d.,]+\s*%?$/.test(rows[index][i]?.trim() ?? '') || undefined} className="px-2 py-3 align-top" style={{ whiteSpace: !fit.wrapNumbers && /^(?:R\$\s*)?[+-]?[\d.,]+\s*%?$/.test(rows[index][i]?.trim() ?? '') ? 'nowrap' : 'normal', overflowWrap: 'anywhere' }}>{rows[index][i] ?? ''}</td>)}</tr>)}</tbody>
+    <tbody>{indices.map(index => <tr key={index} className="border-b border-slate-400/20">{columns.map((_, i) => <td key={i} data-numeric-cell={/^(?:R\$\s*)?[+-]?[\d.,]+\s*%?$/.test(rows[index][i]?.trim() ?? '') || undefined} className="px-2 py-3 align-top" style={{ whiteSpace: !fit.wrapNumbers && /^(?:R\$\s*)?[+-]?[\d.,]+\s*%?$/.test(rows[index][i]?.trim() ?? '') ? 'nowrap' : 'normal', overflowWrap: 'anywhere' }}><OmMentions text={rows[index][i] ?? ''} /></td>)}</tr>)}</tbody>
   </table>;
   return <div ref={frameRef} className="relative min-h-0 flex-1" data-monitor-document-table data-capture-page-count={fit.pages.length} data-capture-page={page}>
     <div className="pointer-events-none invisible absolute left-0 top-0 w-full" aria-hidden="true">{table(rows.map((_, i) => i), true)}</div>

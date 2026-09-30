@@ -1,3 +1,4 @@
+import { OmIdentity } from "@/components/OmIdentity";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
@@ -301,7 +302,7 @@ export default async function CatalogoPage({
                   {needDetails.need.persistentCode} — {needDetails.item?.name}
                 </h3>
                 <p className="text-sm text-zinc-650 dark:text-zinc-400 mt-0.5">
-                  {needDetails.variant?.label} ({needDetails.variant?.size}) • Organização: {needDetails.orgName}
+                  {needDetails.variant?.label} ({needDetails.variant?.size}) • Organização: <OmIdentity name={needDetails.orgName} />
                 </p>
               </div>
               <div className="text-right sm:text-left shrink-0">

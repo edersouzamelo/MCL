@@ -33,6 +33,12 @@ async function svgImage(source: SVGSVGElement, win: Window, width: number, heigh
   });
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("width", String(width)); clone.setAttribute("height", String(height));
+  for (const image of Array.from(clone.querySelectorAll("image"))) {
+    const href = image.getAttribute("href") ?? image.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+    if (!href || href.startsWith("#")) continue;
+    image.setAttribute("href", await embeddedImage(new URL(href, win.location.href).href));
+    image.removeAttributeNS("http://www.w3.org/1999/xlink", "href");
+  }
   const data = await blobData(new Blob([new XMLSerializer().serializeToString(clone)], { type: "image/svg+xml" }));
   const img = new Image(); img.src = data; await img.decode();
   const canvas = document.createElement("canvas"); canvas.width = Math.ceil(width * 2); canvas.height = Math.ceil(height * 2);

@@ -1,3 +1,4 @@
+import { OmIdentity } from "@/components/OmIdentity";
 import { AppShell } from "@/components/AppShell";
 import { Badge, Card, InlineLink, PageHeader } from "@/components/ui";
 import { PrduCoverageDashboard } from "@/components/PrduCoverageDashboard";
@@ -78,7 +79,7 @@ export default function DashboardPage() {
                 {tableRows.map((row) => (
                   <tr key={row.needId} className="transition-colors duration-150 hover:bg-zinc-50 dark:hover:bg-zinc-900/35">
                     <td className="px-3 py-3 font-bold text-zinc-900 dark:text-zinc-100">{row.material}</td>
-                    <td className="text-zinc-700 dark:text-zinc-300">{row.organization}</td>
+                    <td className="text-zinc-700 dark:text-zinc-300"><OmIdentity name={row.organization} /></td>
                     <td className="text-zinc-800 dark:text-zinc-300">{row.requested}</td>
                     <td className="text-zinc-800 dark:text-zinc-300">{row.covered}</td>
                     <td className="font-extrabold text-rose-650 dark:text-rose-400">{row.deficit}</td>

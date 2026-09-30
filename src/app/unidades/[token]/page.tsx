@@ -1,3 +1,4 @@
+import { OmIdentity } from "@/components/OmIdentity";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
@@ -59,7 +60,7 @@ export default async function UnitPassportPage({ params }: { params: Promise<{ t
               <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Quantidade</dt><dd className="font-semibold">{unit.quantity} {unit.unit}</dd></div>
               <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Condicao</dt><dd className="font-semibold">{passport.projection.condition}</dd></div>
               <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Localizacao</dt><dd className="font-semibold">{passport.location?.name}</dd></div>
-              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Organizacao</dt><dd className="font-semibold">{passport.organization?.name}</dd></div>
+              <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Organizacao</dt><dd className="font-semibold"><OmIdentity name={passport.organization?.name ?? ""} /></dd></div>
               <div className="rounded bg-zinc-50 dark:bg-zinc-800/50 p-3"><dt>Confianca</dt><dd className="font-semibold">{Math.round(passport.projection.confidence * 100)}%</dd></div>
             </dl>
             <div className="mt-4">

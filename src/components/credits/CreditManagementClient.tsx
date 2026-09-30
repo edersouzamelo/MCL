@@ -1,5 +1,6 @@
 "use client";
 
+import { OmIdentity } from "@/components/OmIdentity";
 import { TgSourcePanel } from "./TgSourcePanel";
 import type { TgSnapshotMetadata } from "@/modules/credits-tg/repository";
 import { projectTgOperational } from "@/modules/credits-tg/projection";
@@ -318,7 +319,7 @@ export function CreditManagementClient() {
                     {filteredPiNd.slice(0, 500).map(row => (
                       <tr key={row.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                         <td className="py-2.5 px-3 font-bold">{row.ug}</td>
-                        <td className="py-2.5 px-3 font-sans text-[11px]">{row.om}</td>
+                        <td className="py-2.5 px-3 font-sans text-[11px]"><OmIdentity name={row.om} /></td>
                         <td className="py-2.5 px-3 font-bold text-emerald-700 dark:text-emerald-400">{row.pi}</td>
                         <td className="py-2.5 px-3 font-sans text-[11px]">{row.piDescription ?? "—"}</td>
                         <td className="py-2.5 px-3">{row.nd}</td>
@@ -396,7 +397,7 @@ export function CreditManagementClient() {
                     {!filteredNCs.length && <tr><td colSpan={10} className="p-6 text-center text-zinc-500">Nenhuma NC disponível para os filtros selecionados.</td></tr>}
                     {filteredNCs.slice(0, 500).map((nc) => (
                       <tr key={nc.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">{nc.om}</td>
+                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white"><OmIdentity name={nc.om} /></td>
                         <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{nc.date}</td>
                         <td className="py-2.5 px-3">{nc.action}</td>
                         <td className="py-2.5 px-3 font-bold text-cyan-600 dark:text-cyan-400">{nc.nc}</td>
@@ -448,7 +449,7 @@ export function CreditManagementClient() {
                     {!filteredNEs.length && <tr><td colSpan={8} className="p-6 text-center text-zinc-500">Nenhuma NE disponível para os filtros selecionados.</td></tr>}
                     {filteredNEs.slice(0, 500).map((ne) => (
                       <tr key={ne.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">{ne.om}</td>
+                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white"><OmIdentity name={ne.om} /></td>
                         <td className="py-2.5 px-3 font-bold text-cyan-600 dark:text-cyan-400">{ne.ne}</td>
                         <td className="py-2.5 px-3 font-sans max-w-sm text-[11px]">{ne.supplier ?? "—"}</td>
                         <td className="py-2.5 px-3 font-bold">{ne.pi ?? "—"}</td>
@@ -498,7 +499,7 @@ export function CreditManagementClient() {
                     {!filteredRPNPs.length && <tr><td colSpan={8} className="p-6 text-center text-zinc-500">Nenhum RPNP disponível para os filtros selecionados.</td></tr>}
                     {filteredRPNPs.slice(0, 500).map((r) => (
                       <tr key={r.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">{r.om}</td>
+                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white"><OmIdentity name={r.om} /></td>
                         <td className="py-2.5 px-3 text-zinc-500 dark:text-zinc-400">{r.ug}</td>
                         <td className="py-2.5 px-3 font-bold text-cyan-600 dark:text-cyan-400">{r.ne}</td>
                         <td className="py-2.5 px-3 font-sans max-w-xs text-[11px]">{r.supplier}</td>
@@ -639,7 +640,7 @@ export function CreditManagementClient() {
                     <tr><td colSpan={10} className="p-6 text-center text-zinc-500">Aguardando fonte validada desta seção.</td></tr>
                     {filteredRpcm.map((item) => (
                       <tr key={item.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white">{item.om}</td>
+                        <td className="py-2.5 px-3 font-bold text-zinc-900 dark:text-white"><OmIdentity name={item.om} /></td>
                         <td className="py-2.5 px-3 font-bold text-amber-600 dark:text-amber-400">{item.codigo}</td>
                         <td className="py-2.5 px-3 font-bold">{item.pi}</td>
                         <td className="py-2.5 px-3">{item.nd}</td>
