@@ -1,0 +1,33 @@
+name: sag-summary-browser
+on:
+  push:
+    branches: [codex/ccol-sag-class-summaries]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AUTH_SECRET: local-budget-layout-test-only
+      NEXTAUTH_SECRET: local-budget-layout-test-only
+      NEXTAUTH_URL: http://127.0.0.1:3010
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Budget frames and SAG popovers with explicit test fixtures
+        run: node --import tsx tests/monitor-browser/budget-verify.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sag-summary-browser-evidence
+          path: /tmp/mcl-budget-qa
