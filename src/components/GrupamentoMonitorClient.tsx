@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronUp, Clock3, Database, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
+import { ChevronUp, Clock3, Database, Pause, Play, ShieldCheck, SkipBack, SkipForward, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoClassSummaryScreen } from "@/components/GrupamentoClassSummaryScreen";
 import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from "@/modules/grupamento/class-summary";
@@ -55,7 +55,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const [screenIndex, setScreenIndex] = useState(0);
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
-  const [playbackState, setPlaybackState] = useState<"playing" | "stopped">("playing");
+  const [playbackState, setPlaybackState] = useState<"playing" | "paused">("playing");
   const [connectionState, setConnectionState] = useState<"online" | "offline" | "syncing">("syncing");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
@@ -276,14 +276,6 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     setScreenIndex((current) => (current + direction + playlist.length) % playlist.length);
   };
 
-  const stopPlayback = () => {
-    setPlaybackState("stopped");
-    commitPending();
-    setTransitioning(false);
-    setScreenCycleMs(Math.max(5, monitor.delaySeconds) * 1000);
-    setScreenIndex(0);
-  };
-
   async function enrollNotebook() {
     try {
       const response = await fetch("/api/grupamento/monitor-devices", {
@@ -370,17 +362,14 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <button
               type="button"
               onClick={() => {
-                if (playbackState === "playing") stopPlayback();
-                else {
-                  setTransitioning(false);
-                  setPlaybackState("playing");
-                }
+                setTransitioning(false);
+                setPlaybackState((state) => state === "playing" ? "paused" : "playing");
               }}
               className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300"
-              aria-label={playbackState === "playing" ? "Parar apresentação" : "Retomar apresentação"}
-              title={playbackState === "playing" ? "Parar e voltar ao primeiro quadro" : "Retomar"}
+              aria-label={playbackState === "playing" ? "Pausar apresentação" : "Retomar apresentação"}
+              title={playbackState === "playing" ? "Pausar no quadro atual" : "Retomar do quadro atual"}
             >
-              {playbackState === "playing" ? <Square className="h-3.5 w-3.5" /> : <Play className="h-4 w-4" />}
+              {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </button>
             <button type="button" onClick={() => stepPlaylist(1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Avançar quadro" title="Avançar"><SkipForward className="h-4 w-4" /></button>
           </nav>
