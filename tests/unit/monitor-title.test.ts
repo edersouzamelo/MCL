@@ -1,9 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { normalizeMonitorTitle, monitorTitleColor, monitorTitleElements } from "@/modules/grupamento/monitor-content/presentation-title";
+import { normalizeMonitorTitle, monitorTitleColor, monitorTitleElements, monitorIntegralImage } from "@/modules/grupamento/monitor-content/presentation-title";
 import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
 import type { MonitorSlideElement } from "@/modules/grupamento/monitor-content/types";
 
 describe("standard monitor presentation", () => {
+  it.each(["Sup Cl VIII - Movimentos de 01JAN26 a 28SET26 (Quantidade de Itens)", "Módulo Orçamentário - Saúde Operacional"])("recognizes a native chart title when the persisted title is Slide N: %s", title => {
+    const elements: MonitorSlideElement[] = [
+      { kind:"chart", x:.1,y:.2,w:.8,h:.7,z:1,chart:{title,type:"bar",series:[{name:"Recebido",categories:["PI A"],values:[88]}]} },
+      { kind:"text",text:"Dados extraídos do SISCOFIS/OP",x:.7,y:.9,w:.25,h:.05,z:2,role:"label" },
+    ];
+    const result = monitorTitleElements(elements, "Slide 3");
+    expect(result.title).toBe(title);
+    expect(result.promotedChartTitle).toBe(true);
+    expect(result.elements[0].kind === "chart" && result.elements[0].chart.series).toEqual(elements[0].kind === "chart" && elements[0].chart.series);
+  });
+  it("uses a real header even when the parser marked it as body, preserving distinct chart titles", () => {
+    const elements: MonitorSlideElement[] = [
+      {kind:"text",text:"Situação logística",x:.1,y:.05,w:.8,h:.1,z:1,role:"body",fontSizePt:18},
+      {kind:"chart",x:.1,y:.2,w:.8,h:.7,z:2,chart:{title:"Recebimento",type:"bar",series:[]}},
+    ];
+    const result = monitorTitleElements(elements,"Slide 4");
+    expect(result.title).toBe("Situação logística");
+    expect(result.promotedChartTitle).toBe(false);
+    expect(result.elements).toHaveLength(1);
+  });
+  it("exempts full slide images, including legacy assets, without exempting small pictures or structured data", () => {
+    const image: MonitorSlideElement = {kind:"image",assetId:"pasa-cover",x:0,y:0,w:1,h:1,z:1};
+    expect(monitorIntegralImage({layout:{version:2,width:16,height:9,elements:[image]}})).toBe(true);
+    expect(monitorIntegralImage({layout:{version:2,width:16,height:9,elements:[image,{kind:"text",text:"Subseção PASA",role:"title",x:.3,y:.1,w:.6,h:.2,z:2}]}})).toBe(true);
+    expect(monitorIntegralImage({assetIds:["pasa-cover"]})).toBe(true);
+    expect(monitorIntegralImage({assetIds:["pasa-cover"],bullets:["Informação adicional"]})).toBe(false);
+    expect(monitorIntegralImage({layout:{version:2,width:16,height:9,elements:[{...image,w:.1,h:.1}]}})).toBe(false);
+    expect(monitorIntegralImage({layout:{version:2,width:16,height:9,elements:[image,{kind:"table",x:.1,y:.1,w:.8,h:.8,z:2,columns:["OM"],rows:[["CMO"]]}]}})).toBe(false);
+  });
   it.each(["SEMPRE DESTA FORMA", "Sempre Desta Forma", "sempre desta forma", "SEMPRE DESTA forma", "Sempre desta-forma"])("uses sentence case for %s", input => {
     expect(normalizeMonitorTitle(input)).toBe("Sempre desta forma");
   });

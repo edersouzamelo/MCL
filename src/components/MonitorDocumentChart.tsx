@@ -8,7 +8,7 @@ import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStac
 import { estimatedChartLabelWidth, fitHorizontalCategoryLabel, fitVerticalCategoryAxis } from "@/modules/grupamento/monitor-content/chart-label-layout";
 import { pieArcPath, pieLabelPositions, pieSliceGeometry } from "@/modules/grupamento/monitor-content/pie-layout";
 
-export function MonitorDocumentChart({ chart, ccol = false, decorateOms = true }: { chart: Chart; ccol?: boolean; decorateOms?: boolean }) {
+export function MonitorDocumentChart({ chart, ccol = false, decorateOms = true, showTitle = true }: { chart: Chart; ccol?: boolean; decorateOms?: boolean; showTitle?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const clipId = useId().replaceAll(":", "");
   const [size, setSize] = useState({ width: 900, height: 480 });
@@ -86,7 +86,7 @@ export function MonitorDocumentChart({ chart, ccol = false, decorateOms = true }
   const title = chart.title?.trim();
   const chartAria = [title, `Gráfico ${horizontal ? "horizontal" : chart.type}`, chart.series.map((s) => s.name).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
   return <div className="flex h-full w-full min-h-0 flex-col">
-    {title && <div
+    {showTitle && title && <div
       className="shrink-0 px-2 pb-1 text-center font-black leading-tight"
       style={{ color: foreground, fontSize: "clamp(14px,1.6vw,24px)" }}
       data-chart-title

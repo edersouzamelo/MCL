@@ -2,7 +2,7 @@
 "use client";
 
 import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
-import { monitorTitleElements } from "@/modules/grupamento/monitor-content/presentation-title";
+import { monitorTitleElements, monitorIntegralImage } from "@/modules/grupamento/monitor-content/presentation-title";
 import { OmMentions } from "@/components/OmIdentity";
 import { useEffect, useRef } from "react";
 import { MonitorDocumentTable } from "@/components/MonitorDocumentTable";
@@ -77,9 +77,10 @@ function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPa
   const tablePages = useRef(new Map<number, number>());
   const layout = scene.payload.layout;
   if (!layout) return null;
-  const preserve = Boolean(scene.payload.correction?.preserveLayout);
+  const integralImage = monitorIntegralImage(scene.payload);
+  const preserve = integralImage || Boolean(scene.payload.correction?.preserveLayout);
   const prepared = monitorTitleElements(prepareMonitorElements(layout.elements).elements, scene.title);
-  const sorted = [...prepared.elements]
+  const sorted = [...(integralImage ? layout.elements : prepared.elements)]
     .sort((a,b) => a.z-b.z);
   return (
     <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden" style={{ containerType: "size" }}>
@@ -91,7 +92,7 @@ function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPa
           }
           if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} preserve={preserve} />;
           if (item.kind === "image") {
-            const framed = !briefing && item.w * item.h >= 0.005;
+            const framed = !integralImage && !briefing && item.w * item.h >= 0.005;
             return <div
               key={"image-" + String(index)}
               className={"absolute flex items-center justify-center overflow-hidden " + (framed ? "rounded-xl border border-slate-300/60 bg-white/95 p-[.3%] shadow-[0_8px_22px_rgba(2,6,23,.16)]" : "")}
@@ -101,7 +102,7 @@ function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPa
             </div>;
           }
           if (item.kind === "chart") {
-            return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} decorateOms={!preserve} /></div>;
+            return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} decorateOms={!preserve} showTitle={!prepared.promotedChartTitle} /></div>;
           }
           return <div key={"table-" + String(index)} className={"absolute overflow-hidden " + (briefing ? "" : "rounded-lg border border-white/10 bg-slate-950/20")} style={boxStyle(item)}>
             {!preserve ? <MonitorDocumentTable columns={item.columns} rows={item.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={count => {
@@ -138,6 +139,7 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
 
 export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
+  const integralImage = monitorIntegralImage(payload);
   const prepared = payload.layout ? monitorTitleElements(prepareMonitorElements(payload.layout.elements).elements, scene.title) : null;
   const title = prepared?.title ?? scene.title;
   const tableSlide = prepared && !payload.correction?.preserveLayout ? monitorTableSlide(prepared.elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
@@ -150,7 +152,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
     const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
     const text = (items: typeof before) => items.map((item, i) => <div key={i} className="whitespace-pre-line break-words" style={{ fontSize: item.role === 'title' || i === 0 && items === before ? 'clamp(24px, 2.4vw, 40px)' : 'clamp(16px, 1.3vw, 24px)', fontWeight: item.bold ? 800 : 600 }}><OmMentions text={item.text} header={items === before} /></div>);
-    return <MonitorTitleFrame title={title} light={ccol || briefing}><section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
+    return <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
       {before.length > 0 && <header className="shrink-0 space-y-2">{text(before)}</header>}
       <MonitorDocumentTable columns={tableSlide.table.columns} rows={tableSlide.table.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
       {after.length > 0 && <div className="shrink-0 space-y-1">{text(after)}</div>}
@@ -159,7 +161,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   }
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
-      <MonitorTitleFrame title={title} light={ccol || briefing}><section className="relative h-full min-h-0 overflow-hidden">
+      <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0 overflow-hidden">
         <LayoutScene scene={scene} ccol={ccol || briefing} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
         {!briefing && <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · fonte rastreável
@@ -169,9 +171,12 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   }
 
   const assets = payload.assetIds ?? [];
+  if (integralImage && assets.length === 1) return <div className="flex h-full w-full items-center justify-center" data-integral-image-slide>
+    <img src={"/api/grupamento/monitor-content/assets/" + assets[0]} alt={scene.title} className="h-full w-full object-contain" />
+  </div>;
   const bullets = payload.bullets ?? [];
   return (
-    <MonitorTitleFrame title={title} light={ccol || briefing}><section className="relative h-full min-h-0">
+    <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0">
       <div className="mb-5 flex items-start justify-between gap-5">
         <div>
           <div className={"flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] " + (ccol ? "text-sky-800" : "text-sky-300")}>

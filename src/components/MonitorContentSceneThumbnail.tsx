@@ -6,7 +6,7 @@ import type {
 } from "@/modules/grupamento/monitor-content/types";
 
 import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
-import { monitorTitleElements } from "@/modules/grupamento/monitor-content/presentation-title";
+import { monitorTitleElements, monitorIntegralImage } from "@/modules/grupamento/monitor-content/presentation-title";
 import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
 import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
 
@@ -38,10 +38,11 @@ export function MonitorContentSceneThumbnail({
 
   const presentation = prepareMonitorElements(layout.elements);
   const prepared = monitorTitleElements(presentation.elements, title);
-  const visibleElements = prepared.elements.sort((a, b) => a.z - b.z);
+  const integralImage = monitorIntegralImage(payload ?? {});
+  const visibleElements = (integralImage ? [...layout.elements] : prepared.elements).sort((a, b) => a.z - b.z);
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-slate-800 bg-[#07111f] shadow-inner"><MonitorTitleFrame title={prepared.title} light={false}><div className="relative h-full w-full" style={{ containerType: "inline-size" }}>
+    <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-slate-800 bg-[#07111f] shadow-inner"><MonitorTitleFrame title={prepared.title} light={false} omitTitle={integralImage}><div className="relative h-full w-full" style={{ containerType: "inline-size" }}>
       {presentation.omitted.length > 0 && <span className="absolute bottom-1 right-1 z-[1000] rounded bg-slate-950/90 px-1.5 py-1 text-[8px] text-amber-200" title={[...new Set(presentation.omitted.map((item) => item.reason))].join("; ")}>{presentation.omitted.length} adornos omitidos · original preservado</span>}
       {visibleElements.map((item, index) => {
         if (item.kind === "shape") {
@@ -64,7 +65,7 @@ export function MonitorContentSceneThumbnail({
           );
         }
         if (item.kind === "chart") {
-          return <div key={index} className="absolute overflow-hidden rounded-sm bg-white/[0.03]" style={elementStyle(item)}><MonitorDocumentChart chart={item.chart} /></div>;
+          return <div key={index} className="absolute overflow-hidden rounded-sm bg-white/[0.03]" style={elementStyle(item)}><MonitorDocumentChart chart={item.chart} showTitle={!prepared.promotedChartTitle} /></div>;
         }
         return (
           <div key={index} className="absolute overflow-hidden border border-white/10 bg-white/[0.03]" style={elementStyle(item)}>
