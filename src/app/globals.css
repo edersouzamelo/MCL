@@ -1921,3 +1921,15 @@ html[data-mcl-theme="military"] .ops-metric-popover { border-color:rgba(190,184,
 .mcl-budget-overview > .mcl-budget-heading { align-items: center; }
 .mcl-budget-overview h1 { font-size: clamp(32px, 7.2cqh, 76px); }
 .mcl-budget-unit:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* Resumido: full-class total stays visible on every PI page. */
+.mcl-class-summary-total { flex: 0 0 auto; }
+.mcl-class-summary-total > div { font-size: clamp(14px, 2cqh, 24px); }
+.mcl-class-summary-total > strong { display: block; font-size: clamp(32px, min(9cqh, 6.5cqw), 100px); line-height: 1.1; overflow-wrap: anywhere; }
+.mcl-class-summary-bars { flex: 1; min-height: 0; display: grid; gap: clamp(8px, 1.4cqh, 20px); }
+.mcl-class-summary-row { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: .6cqh; }
+.mcl-class-summary-label { display: flex; justify-content: space-between; align-items: baseline; gap: 1cqw; font-size: clamp(14px, min(2.8cqh, 1.65cqw), 30px); }
+.mcl-class-summary-label strong { overflow-wrap: anywhere; min-width: 0; }
+.mcl-class-summary-label > span { flex-shrink: 0; }
+.mcl-class-summary-track { height: clamp(8px, 1.9cqh, 28px); flex-shrink: 0; overflow: hidden; border-radius: 4px; }
+.mcl-class-summary-footer { display: flex; flex-wrap: wrap; gap: .4cqh 1cqw; flex: 0 0 auto; font-size: clamp(12px, 1.6cqh, 18px); opacity: .75; }

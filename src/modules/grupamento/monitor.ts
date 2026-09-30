@@ -37,6 +37,13 @@ export const CCO_SCREEN_CATALOG = [
   { id: "class-viii", label: "Classe VIII" },
   { id: "class-ix", label: "Classe IX" },
   { id: "class-diversas", label: "Finalidades diversas" },
+  { id: "class-i-summary", label: "Classe I - Resumido" },
+  { id: "class-ii-summary", label: "Classe II - Resumido" },
+  { id: "class-iii-summary", label: "Classe III - Resumido" },
+  { id: "class-v-summary", label: "Classe V - Resumido" },
+  { id: "class-viii-summary", label: "Classe VIII - Resumido" },
+  { id: "class-ix-summary", label: "Classe IX - Resumido" },
+  { id: "class-diversas-summary", label: "Finalidades diversas - Resumido" },
   { id: "briefing", label: "Resumo das Classes" },
   { id: "pis", label: "Planos Internos" },
   { id: "units-current-160", label: "OM · exercício · série 160" },
@@ -119,4 +126,22 @@ export function parseCcoMonitorConfig(value: unknown, monitorId: number): CcoMon
     responsibleSector: item.responsibleSector as CcoResponsibleSector | null | undefined ?? null,
     updatedOn: item.updatedOn as string | null | undefined ?? null,
   };
+}
+
+/** Descriptions refer to the actual financial view, including the imported scope. */
+export function ccoScreenDescription(screen: CcoScreenId): string {
+  if (screen.endsWith("-summary")) return "Visualização do total de recursos recebidos desta classe distribuído por PI";
+  if (screen.startsWith("class-")) return "Execução desta classe por finalidade: previsto na matriz, recebido, empenhado, liquidado, saldo disponível e créditos do exercício anterior.";
+  switch (screen) {
+    case "overview": return "Visão consolidada dos recursos importados: percentuais de empenho e liquidação, saldo disponível, créditos anteriores e OMs com maior volume recebido.";
+    case "execution": return "Execução do exercício corrente: crédito recebido, percentuais empenhado e liquidado e distribuição entre disponível, a liquidar, em liquidação, liquidado e pago.";
+    case "rpn": return "Créditos do exercício anterior: total inscrito, valores a liquidar, liquidados e cancelados, com seus percentuais.";
+    case "briefing": return "Comparação entre as classes: total recebido, percentuais empenhado e liquidado e liquidação dos créditos anteriores, conforme a matriz PI/Classe.";
+    case "pis": return "Execução por PI: valor recebido, proporção empenhada e disponível e percentual liquidado. Todos os PIs são exibidos em quadros sucessivos.";
+    case "units-current-160": return "Recursos do exercício corrente por OM da série 160: total recebido e percentuais empenhado e liquidado. Todas as OMs são exibidas em quadros sucessivos.";
+    case "units-current-167": return "Recursos do exercício corrente por OM da série 167: total recebido e percentuais empenhado e liquidado. Todas as OMs são exibidas em quadros sucessivos.";
+    case "units-rpn-160": return "Créditos do exercício anterior por OM da série 160: total inscrito e percentuais liquidado e cancelado. Todas as OMs são exibidas em quadros sucessivos.";
+    case "units-rpn-167": return "Créditos do exercício anterior por OM da série 167: total inscrito e percentuais liquidado e cancelado. Todas as OMs são exibidas em quadros sucessivos.";
+    default: return "Dados orçamentários da fonte SAG importada.";
+  }
 }
