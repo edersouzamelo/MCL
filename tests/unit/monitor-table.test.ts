@@ -20,3 +20,28 @@ describe('adaptive document tables', () => {
     expect(monitorTableSlide([...items, { kind: 'image', assetId: 'a', x: .2, y: .2, w: .2, h: .2, z: 4 }])).toBeNull();
   });
 });
+
+import { isMonitorNumber, monitorColumnMeasures, monitorColumnWidths, monitorDistributedHeights } from '@/modules/grupamento/monitor-content/table-fit';
+
+describe('lossless width distribution', () => {
+  it('distributes spare height without squeezing a taller row or overflowing a short page', () => {
+    expect(monitorDistributedHeights([234, 130], 394)).toEqual([249, 145]);
+    expect(monitorDistributedHeights([234], 394)).toEqual([394]);
+    expect(monitorDistributedHeights([234, 130], 300)).toEqual([234, 130]);
+  });
+  it('reserves the complete width of money and codes and wraps headers at words', () => {
+    const source = [['E6RVPLJMTOC', 'MEDIDAS PROFILÁTICAS SAÚDE CANINOS', 'R$ 30.687,87', '98.68%']];
+    const before = JSON.stringify(source);
+    const measured = monitorColumnMeasures(['Plano Interno', 'Descrição', 'Pago', 'Percentual empenhado'], source, text => text.length * 10);
+    expect(measured.minimum).toEqual([132, 142, 142, 122]);
+    expect(monitorColumnWidths(measured.minimum, measured.preferred, 450)).toBeNull();
+    const widths = monitorColumnWidths(measured.minimum, measured.preferred, 1000)!;
+    expect(widths.reduce((a, b) => a + b, 0)).toBeCloseTo(1000);
+    widths.forEach((width, i) => expect(width).toBeGreaterThanOrEqual(measured.minimum[i]));
+    expect(JSON.stringify(source)).toBe(before);
+  });
+  it('recognizes monetary formats without parsing or reformatting any values', () => {
+    ['R$ 1.234.567,89', '-10,35', '98.68%', '0,00'].forEach(value => expect(isMonitorNumber(value)).toBe(true));
+    ['E6RVPLJMTOC', 'OUTROS - planejado', '9º B Sup', ''].forEach(value => expect(isMonitorNumber(value)).toBe(false));
+  });
+});
