@@ -3,8 +3,13 @@ import catalog from "./om-crests.json";
 export const OM_CREST_CATALOG = catalog;
 export type OmCrest = (typeof catalog.units)[number];
 
+/** A leaked report column label is not part of an OM name. Source data remains unchanged. */
+export function omDisplayName(value: string): string {
+  return value.replace(/\s+NOME[_ ]UG\s*$/i, "").trim();
+}
+
 export function normalizeOmName(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+  return omDisplayName(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
     .replace(/[ºª°]/g, "").replace(/[^A-Z0-9]/g, "");
 }
 
