@@ -12,6 +12,7 @@ import { forgetMonitorSnapshot, prepareMonitorNavigation, readMonitorSnapshot, s
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
 import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 import { CCO_RULE_SOURCE } from "@/modules/grupamento/cco";
+import { formatMonitorSourceDate, sagMonitorProvenance } from "@/modules/grupamento/source-provenance";
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
 import {
@@ -26,13 +27,6 @@ import {
 
 const SCREEN_FADE_MS = 320;
 const DATA_REFRESH_MS = 30_000;
-
-function formatSourceDate(value?: string | null) {
-  if (!value) return "data não identificada";
-  const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value;
-  const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("pt-BR");
-}
 
 function pageSizeForScreen(screen: CcoScreenId) {
   if (screen === "pis") return CCO_PI_ROWS_PER_PAGE;
@@ -213,13 +207,10 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const dataProvenance = useMemo(() => {
     if (!activeItem) return "Sem fonte ativa";
     if (activeItem.kind === "document") {
-      return `Input: ${formatSourceDate(activeItem.scene.sourceImportedAt)} · ${activeItem.scene.sourceImportedByName ?? "responsável não identificado"}`;
+      return `Input: ${formatMonitorSourceDate(activeItem.scene.sourceImportedAt) ?? "data não identificada"} · ${activeItem.scene.sourceImportedByName ?? "responsável não identificado"}`;
     }
-    const currentDate = formatSourceDate(sag?.source.referenceDate);
-    const previousDate = formatSourceDate(rpn?.source.referenceDate);
-    if (currentDate === previousDate) return `Fonte: SAG · ${currentDate}`;
-    return `Fonte: SAG · EC ${currentDate} · RPNP ${previousDate}`;
-  }, [activeItem, rpn?.source.referenceDate, sag?.source.referenceDate]);
+    return sagMonitorProvenance(sag?.source, rpn?.source);
+  }, [activeItem, rpn?.source, sag?.source]);
   const effectiveLoop = monitor.mode === "loop" && playlist.length > 1;
   const autoAdvance = !captureMode && effectiveLoop && playbackState === "playing";
 
