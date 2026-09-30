@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronUp, Clock3, Database, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
+import { ChevronUp, Clock3, Database, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoClassSummaryScreen } from "@/components/GrupamentoClassSummaryScreen";
 import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from "@/modules/grupamento/class-summary";
@@ -54,7 +54,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const [screenIndex, setScreenIndex] = useState(0);
   const [screenCycleMs, setScreenCycleMs] = useState(CCO_DEFAULT_LOOP_DELAY_SECONDS * 1000);
   const [transitioning, setTransitioning] = useState(false);
-  const [playbackState, setPlaybackState] = useState<"playing" | "paused" | "stopped">("playing");
+  const [playbackState, setPlaybackState] = useState<"playing" | "stopped">("playing");
   const [connectionState, setConnectionState] = useState<"online" | "offline" | "syncing">("syncing");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cacheIssue, setCacheIssue] = useState<string | null>(null);
@@ -355,7 +355,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         <div className="mcl-monitor-scanline" />
       </div>
 
-      <header className={`mcl-monitor-header relative z-20 flex h-[76px] shrink-0 items-center justify-between gap-5 overflow-hidden border-b px-7 py-3 backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/80" : "border-white/10 bg-slate-950/72"}`}>
+      <header className={`mcl-monitor-header relative z-20 grid h-[76px] shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-5 overflow-hidden border-b px-7 py-3 backdrop-blur-xl ${ccol ? "border-slate-300/80 bg-white/80" : "border-white/10 bg-slate-950/72"}`}>
         <div aria-hidden className="mcl-monitor-header-glint" />
         <div className="flex min-w-0 items-center gap-4">
           <div className={`mcl-monitor-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${ccol ? "border-sky-800/20 bg-sky-900 text-white" : "border-sky-400/20 bg-sky-400/10 text-sky-300"}`}>
@@ -366,8 +366,29 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             <div className="mt-1 truncate text-lg font-black">{monitor.label} · {screenLabel}</div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-4 text-right">
-          <div className={`max-w-[360px] truncate text-[10px] font-bold uppercase tracking-[0.12em] ${ccol ? "text-slate-600" : "text-slate-300"}`} title={dataProvenance}>
+        {playlist.length > 1 && !captureMode ? (
+          <nav aria-label="Controles da apresentação" className={`relative z-10 flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 shadow-sm ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
+            <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
+            <button
+              type="button"
+              onClick={() => {
+                if (playbackState === "playing") stopPlayback();
+                else {
+                  setTransitioning(false);
+                  setPlaybackState("playing");
+                }
+              }}
+              className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300"
+              aria-label={playbackState === "playing" ? "Parar apresentação" : "Retomar apresentação"}
+              title={playbackState === "playing" ? "Parar e voltar ao primeiro quadro" : "Retomar"}
+            >
+              {playbackState === "playing" ? <Square className="h-3.5 w-3.5" /> : <Play className="h-4 w-4" />}
+            </button>
+            <button type="button" onClick={() => stepPlaylist(1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Avançar quadro" title="Avançar"><SkipForward className="h-4 w-4" /></button>
+          </nav>
+        ) : <div aria-hidden />}
+        <div className="flex min-w-0 items-center justify-end gap-4 text-right">
+          <div className={`min-w-0 max-w-[360px] truncate text-[10px] font-bold uppercase tracking-[0.12em] ${ccol ? "text-slate-600" : "text-slate-300"}`} title={dataProvenance}>
             {dataProvenance}
           </div>
           <MonitorClock ccol={ccol} />
@@ -411,27 +432,6 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         </div>
       </section>
 
-      {playlist.length > 1 && !captureMode ? (
-        <div className={`absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur-md transition-opacity ${ccol ? "border-slate-300/70 bg-white/72 text-slate-700" : "border-white/10 bg-slate-950/62 text-slate-300"}`}>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => stepPlaylist(-1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Voltar quadro" title="Voltar"><SkipBack className="h-4 w-4" /></button>
-            <button
-              type="button"
-              onClick={() => {
-                setTransitioning(false);
-                setPlaybackState((state) => state === "playing" ? "paused" : "playing");
-              }}
-              className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300"
-              aria-label={playbackState === "playing" ? "Pausar apresentação" : "Retomar apresentação"}
-              title={playbackState === "playing" ? "Pausar" : "Retomar"}
-            >
-              {playbackState === "playing" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </button>
-            <button type="button" onClick={stopPlayback} className="rounded-full p-2 transition hover:bg-rose-400/10 hover:text-rose-300" aria-label="Parar apresentação" title="Parar e voltar ao primeiro quadro"><Square className="h-3.5 w-3.5" /></button>
-            <button type="button" onClick={() => stepPlaylist(1)} className="rounded-full p-2 transition hover:bg-sky-400/10 hover:text-sky-300" aria-label="Avançar quadro" title="Avançar"><SkipForward className="h-4 w-4" /></button>
-          </div>
-        </div>
-      ) : null}
 
       {!captureMode ? <button type="button" className="mcl-monitor-footer-toggle absolute bottom-1 left-2 z-50 rounded bg-slate-800/80 p-2 text-white" aria-controls="monitor-technical-band" aria-expanded={drawerOpen} aria-label="Mostrar ou ocultar informações do monitor" onClick={() => setDrawerOpen((open) => !open)}><ChevronUp className="h-4 w-4" /></button> : null}
       {!captureMode ? <div className="mcl-monitor-footer-drawer absolute inset-x-0 bottom-0 z-50" data-open={drawerOpen} onKeyDown={(event) => { if (event.key === "Escape") setDrawerOpen(false); }}>
@@ -458,7 +458,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             {canEnroll && !deviceEnrolled ? <button type="button" onClick={() => void enrollNotebook()} className="rounded border border-sky-500 px-1.5 py-0.5 font-bold text-sky-400" title="Permitir que este navegador reabra o monitor sem novo login">Vincular notebook</button> : null}
             {deviceMessage ? <span className="max-w-64 truncate" title={deviceMessage}>{deviceMessage}</span> : null}
             <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
-            <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : playbackState === "paused" ? "pausado" : "parado"}` : "tela fixa"}</span>
+            <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : "parado"}` : "tela fixa"}</span>
             <span title={cacheIssue ?? undefined}>{cacheIssue ? "sincronização pendente" : "sync · 30s"}</span>
             <span>{connectionState === "offline" ? "cache local" : "online"}</span>
             <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
@@ -505,7 +505,7 @@ function MonitorClock({ ccol }: { ccol: boolean }) {
     return () => window.clearInterval(timer);
   }, []);
   return (
-    <div>
+    <div className="shrink-0">
       <div suppressHydrationWarning className="font-mono text-base font-bold">{now.toLocaleTimeString("pt-BR")}</div>
       <div suppressHydrationWarning className={ccol ? "text-[11px] text-slate-500" : "text-[11px] text-slate-400"}>{now.toLocaleDateString("pt-BR")}</div>
     </div>
