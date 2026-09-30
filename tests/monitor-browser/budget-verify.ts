@@ -6,6 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 import { parseSagWorkbook } from '../../src/modules/grupamento/sag';
 import { parseRpnWorkbook } from '../../src/modules/grupamento/rpn';
+import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from '../../src/modules/grupamento/class-summary';
 import { CCO_CLASS_GROUPS } from '../../src/modules/grupamento/cco';
 import { defaultCcoMonitorConfig, CCO_SCREEN_CATALOG } from '../../src/modules/grupamento/monitor';
 import type { MonitorDocumentSceneDto } from '../../src/modules/grupamento/monitor-content/types';
@@ -51,10 +52,19 @@ async function verify(){
     await expect(page.locator('[data-mcl-capture-ready="1"]')).toBeVisible();
     const info=await page.evaluate(()=>{
      const scene=document.querySelector<HTMLElement>('.mcl-budget-scene')!;const frame=scene.getBoundingClientRect();
-     const overflows=Array.from(scene.querySelectorAll<HTMLElement>('.mcl-broadcast-card,.mcl-budget-unit')).filter(n=>n.scrollHeight>n.clientHeight+3||n.scrollWidth>n.clientWidth+3).map(n=>({text:n.innerText.slice(0,100),height:n.clientHeight,scroll:n.scrollHeight,width:n.clientWidth,scrollWidth:n.scrollWidth}));
+     const overflows=Array.from(scene.querySelectorAll<HTMLElement>('.mcl-broadcast-card,.mcl-budget-unit,.mcl-class-summary-row,.mcl-class-summary-label,.mcl-class-summary-total')).filter(n=>n.scrollHeight>n.clientHeight+3||n.scrollWidth>n.clientWidth+3).map(n=>({text:n.innerText.slice(0,100),height:n.clientHeight,scroll:n.scrollHeight,width:n.clientWidth,scrollWidth:n.scrollWidth}));
      return {label:document.querySelector('main')!.getAttribute('data-mcl-frame-label'),frame:{height:frame.height,width:frame.width},overflows,scale:document.querySelector('[data-monitor-viewport]')!.getAttribute('data-scale'),pageCount:document.querySelector('[data-monitor-viewport]')!.getAttribute('data-page-count'),piCount:scene.querySelectorAll('.mcl-budget-pi').length,logos:scene.querySelectorAll('.mcl-om-identity img').length};
     });checks.push({mode,size,...info});
     expect(info.scale).toBe('1');expect(info.pageCount).toBe('1');expect(info.piCount).toBeLessThanOrEqual(20);
+    if(info.label?.includes(' - Resumido')){
+      const summaryId=summaryClassId(configs[8].screens.filter(s=>s.endsWith('-summary')).find(s=>info.label?.startsWith(CCO_SCREEN_CATALOG.find(d=>d.id===s)?.label??s))!);
+      expect(summaryId).toBeDefined();
+      const summary=buildCcoClassSummary(summaryId!,sag.rows);
+      await expect(page.locator('.mcl-class-summary-total strong .mcl-animated-value > span:not([aria-hidden])')).toHaveText(summary.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));
+      const pageIndex=Number(await page.locator('main').getAttribute('data-mcl-frame-label').then(label=>label?.match(/ · (\d+)\//)?.[1]??'1'))-1;
+      const expected=summary.byPi.slice(pageIndex*CCO_SUMMARY_ROWS_PER_PAGE,(pageIndex+1)*CCO_SUMMARY_ROWS_PER_PAGE);
+      await expect(page.locator('.mcl-class-summary-label > strong')).toHaveText(expected.map(item=>item.pi));
+    }
     if(mode==='ccol' && size.width===1535 && (i<3||info.label?.includes('Classe I')||info.label?.includes('Resumo')||info.piCount===20||info.label?.includes('série 160 · 1/')))await page.screenshot({path:`${output}/${i}-${size.width}.png`});
    }
   }
@@ -68,6 +78,13 @@ async function verify(){
   await expect(page.locator('svg image')).toHaveCount(3);await page.screenshot({path:output+'/om-chart.png'});
   await context.route('**/api/grupamento/monitor-content?*',r=>r.fulfill({json:{imports:[]}}));
   const command=await context.newPage();await command.goto(origin+'/grupamento');
+  await command.locator('summary').filter({hasText:'Conteúdo orçamentário do SAG'}).nth(8).click();
+  await command.getByRole('button',{name:'Classe I - Resumido',exact:true}).first().hover();
+  await expect(command.getByRole('tooltip')).toContainText('Visualização do total de recursos recebidos desta classe distribuído por PI');
+  await command.getByRole('button',{name:'Classe I - Resumido',exact:true}).first().focus();
+  await command.keyboard.press('Escape');
+  await expect(command.getByRole('tooltip')).toHaveCount(0);
+
   await expect(command.getByRole('button',{name:'Exportar para corrigir'}).nth(8)).toBeEnabled();
   const download=command.waitForEvent('download');await command.getByRole('button',{name:'Exportar para corrigir'}).nth(8).click();
   await (await download).saveAs(output+'/FIXTURE-OM-correction.pptx');

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronUp, Clock3, Database, Pause, Play, ShieldCheck, SkipBack, SkipForward, Square, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { GrupamentoClassSummaryScreen } from "@/components/GrupamentoClassSummaryScreen";
+import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from "@/modules/grupamento/class-summary";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
 import { activeMonitorCorrection } from "@/modules/grupamento/monitor-content/correction";
@@ -31,6 +33,7 @@ const SCREEN_FADE_MS = 320;
 const DATA_REFRESH_MS = 30_000;
 
 function pageSizeForScreen(screen: CcoScreenId) {
+  if (summaryClassId(screen)) return CCO_SUMMARY_ROWS_PER_PAGE;
   if (screen === "pis") return CCO_PI_ROWS_PER_PAGE;
   if (screen.startsWith("units-")) return CCO_UNIT_ROWS_PER_PAGE;
   return 0;
@@ -174,6 +177,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     const systemItems = (!correction && sag && rpn ? monitor.screens : []).flatMap((screen) => {
       const pageSize = pageSizeForScreen(screen);
       let rowCount = 0;
+      const summaryId = summaryClassId(screen);
+      if (summaryId && sag) rowCount = buildCcoClassSummary(summaryId, sag.rows).byPi.length;
       if (screen === "pis") rowCount = sag?.byPi.length ?? 0;
       if (screen === "units-current-160") rowCount = sag?.byUg.filter((item) => item.ug.startsWith("160")).length ?? 0;
       if (screen === "units-current-167") rowCount = sag?.byUg.filter((item) => item.ug.startsWith("167")).length ?? 0;
@@ -295,6 +300,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
 
   const briefing = monitor.layout === "briefing";
   const ccol = monitor.layout !== "mcl";
+  const activeSummaryClass = activeScreen ? summaryClassId(activeScreen) : undefined;
   const isRuleScreen = activeScreen ? activeScreen === "briefing" || activeScreen.startsWith("class-") : false;
 
   const screenContent = !monitor.enabled ? (
@@ -305,6 +311,8 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} briefing={briefing} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={onPageCount} />
   ) : !sag || !rpn ? (
     <MonitorBootScreen ccol={ccol} connectionState={connectionState} />
+  ) : activeSummaryClass ? (
+    <GrupamentoClassSummaryScreen classId={activeSummaryClass} sag={sag} layout={briefing ? "ccol" : monitor.layout} page={activeItem.page} />
   ) : isRuleScreen ? (
     <GrupamentoRuleMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={briefing ? "ccol" : monitor.layout} />
   ) : (
