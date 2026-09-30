@@ -128,6 +128,9 @@ async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number
         if (animation.effect?.getTiming().iterations !== Infinity) { try { animation.finish(); } catch {} }
       }
       await wait(350);
+      // Wait for measured table pagination, including record layouts, before
+      // exporting. A ready scene is not necessarily a ready content measurement.
+      if (Array.from(root.querySelectorAll<HTMLElement>("[data-monitor-document-table]")).some(table => table.dataset.tableReady !== "1")) continue;
       return root;
     }
     await wait(150);
@@ -181,7 +184,8 @@ async function captureMonitorFrames(
       }
       const root = await waitForCaptureFrame(iframe, index);
       const label = root.dataset.mclFrameLabel ?? `Quadro ${index + 1}`;
-      const table = root.querySelector<HTMLElement>("[data-monitor-document-table]");
+      const table = Array.from(root.querySelectorAll<HTMLElement>("[data-monitor-document-table]"))
+        .sort((a, b) => Number(b.dataset.capturePageCount ?? "1") - Number(a.dataset.capturePageCount ?? "1"))[0];
       const viewport = root.querySelector<HTMLElement>("[data-monitor-viewport]");
       const paginated = Number(table?.dataset.capturePageCount ?? "1") > 1 ? table : viewport;
       const pageCount = Math.max(1, Number(paginated === table ? table?.dataset.capturePageCount ?? "1" : viewport?.dataset.pageCount ?? "1"));

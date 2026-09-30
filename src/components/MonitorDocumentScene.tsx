@@ -2,7 +2,7 @@
 "use client";
 
 import { OmMentions } from "@/components/OmIdentity";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { MonitorDocumentTable } from "@/components/MonitorDocumentTable";
 import { monitorTableSlide } from "@/modules/grupamento/monitor-content/table-layout";
 import { BarChart3, FileText, Image as ImageIcon, Table2 } from "lucide-react";
@@ -71,7 +71,8 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
   );
 }
 
-function LayoutScene({ scene, ccol, briefing = false }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean }) {
+function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
+  const tablePages = useRef(new Map<number, number>());
   const layout = scene.payload.layout;
   if (!layout) return null;
   const preserve = Boolean(scene.payload.correction?.preserveLayout);
@@ -100,10 +101,13 @@ function LayoutScene({ scene, ccol, briefing = false }: { scene: MonitorDocument
             return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} decorateOms={!preserve} /></div>;
           }
           return <div key={"table-" + String(index)} className={"absolute overflow-hidden " + (briefing ? "" : "rounded-lg border border-white/10 bg-slate-950/20")} style={boxStyle(item)}>
-            <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
+            {!preserve ? <MonitorDocumentTable columns={item.columns} rows={item.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={count => {
+              tablePages.current.set(index, count);
+              onPageCount?.(Math.max(1, ...sorted.map((element, i) => element.kind === 'table' ? tablePages.current.get(i) ?? 1 : 1)));
+            }} /> : <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
               <thead className="bg-white/[0.08]"><tr>{item.columns.map((cell,cellIndex)=><th key={cellIndex} className="px-2 py-1 text-left font-black">{cell}</th>)}</tr></thead>
               <tbody>{item.rows.map((row,rowIndex)=><tr key={rowIndex} className="border-t border-white/[0.05]">{row.map((cell,cellIndex)=><td key={cellIndex} className="whitespace-normal break-words px-2 py-1 align-top">{preserve ? cell : <OmMentions text={cell} />}</td>)}</tr>)}</tbody>
-            </table>
+            </table>}
           </div>;
         })}
       </div>
@@ -131,8 +135,11 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
 
 export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
-  const tableSlide = payload.layout && !payload.correction?.preserveLayout ? monitorTableSlide(prepareMonitorElements(payload.layout.elements).elements) : null;
-  const hasTableSlide = Boolean(tableSlide);
+  const tableSlide = payload.layout && !payload.correction?.preserveLayout ? monitorTableSlide(prepareMonitorElements(payload.layout.elements).elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
+    table: { columns: payload.columns, rows: payload.rows, y: 1 },
+    texts: [scene.title, ...(payload.bullets ?? [])].map((text, index): MonitorSlideTextElement => ({kind:'text', text, role:index === 0 ? 'title' : 'body', bold:index === 0, x:0, y:0, w:1, h:.1, z:index})),
+  } : null;
+  const hasTableSlide = Boolean(tableSlide || (!payload.correction?.preserveLayout && payload.layout?.elements.some(item => item.kind === 'table')));
   useEffect(() => { if (!hasTableSlide) onPageCount?.(1); }, [hasTableSlide, onPageCount]);
   if (tableSlide) {
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
@@ -148,7 +155,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
       <section className="relative h-full min-h-0 overflow-hidden">
-        <LayoutScene scene={scene} ccol={ccol} briefing={briefing} />
+        <LayoutScene scene={scene} ccol={ccol} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
         {!briefing && <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · fonte rastreável
         </div>}
