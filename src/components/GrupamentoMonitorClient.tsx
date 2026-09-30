@@ -12,6 +12,7 @@ import { latestBriefingUpdate } from "@/modules/grupamento/briefing";
 import { BriefingFrame } from "@/components/BriefingFrame";
 import { MonitorViewport } from "@/components/MonitorViewport";
 import { forgetMonitorSnapshot, prepareMonitorNavigation, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
+import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
 import type { MonitorDocumentSceneDto } from "@/modules/grupamento/monitor-content/types";
 import { CCO_RULE_SOURCE } from "@/modules/grupamento/cco";
@@ -302,8 +303,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const ccol = monitor.layout !== "mcl";
   const activeSummaryClass = activeScreen ? summaryClassId(activeScreen) : undefined;
   const isRuleScreen = activeScreen ? activeScreen === "briefing" || activeScreen.startsWith("class-") : false;
-  const documentFillsFrame = activeItem?.kind === "document" && Boolean(activeItem.scene.payload.layout ||
-    (activeItem.scene.payload.columns && activeItem.scene.payload.rows && !activeItem.scene.payload.chart && !activeItem.scene.payload.assetIds?.length));
+  const documentFillsFrame = activeItem?.kind === "document";
 
   const screenContent = !monitor.enabled ? (
     <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
@@ -321,13 +321,11 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     <GrupamentoBaseMonitorScreen screen={activeItem.screen} sag={sag} rpn={rpn} layout={briefing ? "ccol" : monitor.layout} page={activeItem.page} pageSize={activeItem.pageSize || undefined} />
   );
 
-  if (monitor.enabled && activeItem?.kind === "document" && activeItem.scene.payload.correction?.fullFrame) return <main data-mcl-capture-root="1" data-mcl-capture-ready={captureMode && !transitioning ? "1" : "0"} data-mcl-playlist-count={playlist.length} data-mcl-frame-index={safeIndex} data-mcl-frame-label={screenLabel} className="fixed inset-0 overflow-hidden bg-black" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
-    <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} briefing />
-  </main>;
+  const titledContent = activeItem?.kind === "system" && sag && rpn ? <MonitorTitleFrame title={activeScreen === "overview" ? `${sag.totals.committedPercent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% empenhado` : activeScreen === "execution" ? "Execução orçamentária" : activeScreen === "rpn" ? "Execução dos créditos do exercício anterior" : activeScreen === "pis" ? "Execução por PI" : screenLabel} light={ccol || briefing} system>{screenContent}</MonitorTitleFrame> : screenContent;
 
   if (briefing) return <BriefingFrame monitorId={monitorId} responsibleSector={monitor.responsibleSector} captureReady={Boolean(captureMode && activeItem && !transitioning)} playlistCount={playlist.length} frameIndex={safeIndex} frameLabel={screenLabel} updatedAt={activeItem?.kind === "document" ? activeItem.scene.sourceImportedAt : activeScreen === "rpn" || activeScreen?.startsWith("units-rpn-") ? rpn?.source.importedAt : latestBriefingUpdate(sag?.source.importedAt, rpn?.source.importedAt)}>
     <div key={activeItem?.key ?? "empty"} className="h-full w-full" style={{ opacity: transitioning ? 0 : 1, transition: `opacity ${SCREEN_FADE_MS}ms` }}>
-      <MonitorViewport fillFrame={activeItem?.kind === "system" && Boolean(sag && rpn)} documentMode={!activeItem || documentFillsFrame || !sag || !rpn} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={activeItem?.kind === "system" ? onPageCount : undefined}>{screenContent}</MonitorViewport>
+      <MonitorViewport fillFrame={activeItem?.kind === "system" && Boolean(sag && rpn)} documentMode={!activeItem || documentFillsFrame || !sag || !rpn} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={activeItem?.kind === "system" ? onPageCount : undefined}>{titledContent}</MonitorViewport>
     </div>
   </BriefingFrame>;
 
@@ -426,7 +424,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
               paused={captureMode || playbackState !== "playing"}
               onPageCount={activeItem?.kind === "document" || !activeItem ? undefined : onPageCount}
             >
-              {screenContent}
+              {titledContent}
             </MonitorViewport>
           </div>
         </div>

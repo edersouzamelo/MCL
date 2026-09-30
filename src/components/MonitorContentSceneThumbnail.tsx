@@ -5,6 +5,8 @@ import type {
   MonitorDocumentScenePayload,
 } from "@/modules/grupamento/monitor-content/types";
 
+import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
+import { monitorTitleElements } from "@/modules/grupamento/monitor-content/presentation-title";
 import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
 import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
 
@@ -35,10 +37,11 @@ export function MonitorContentSceneThumbnail({
   }
 
   const presentation = prepareMonitorElements(layout.elements);
-  const visibleElements = presentation.elements.sort((a, b) => a.z - b.z);
+  const prepared = monitorTitleElements(presentation.elements, title);
+  const visibleElements = prepared.elements.sort((a, b) => a.z - b.z);
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-slate-800 bg-[#07111f] shadow-inner">
+    <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-slate-800 bg-[#07111f] shadow-inner"><MonitorTitleFrame title={prepared.title} light={false}><div className="relative h-full w-full" style={{ containerType: "inline-size" }}>
       {presentation.omitted.length > 0 && <span className="absolute bottom-1 right-1 z-[1000] rounded bg-slate-950/90 px-1.5 py-1 text-[8px] text-amber-200" title={[...new Set(presentation.omitted.map((item) => item.reason))].join("; ")}>{presentation.omitted.length} adornos omitidos · original preservado</span>}
       {visibleElements.map((item, index) => {
         if (item.kind === "shape") {
@@ -71,6 +74,6 @@ export function MonitorContentSceneThumbnail({
           </div>
         );
       })}
-    </div>
+    </div></MonitorTitleFrame></div>
   );
 }
