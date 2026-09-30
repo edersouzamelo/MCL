@@ -1,4 +1,4 @@
-import { findOmCrest, omMentionParts } from "@/modules/grupamento/om-crests";
+import { findOmCrest, omMentionParts, omDisplayName } from "@/modules/grupamento/om-crests";
 
 /** Exact catalog lookup. Unknown units keep their name without a guessed emblem. */
 export function OmIdentity({ name, className = "" }: { name: string; className?: string }) {
@@ -7,7 +7,7 @@ export function OmIdentity({ name, className = "" }: { name: string; className?:
     {/* Native image keeps the transparent official contour and works in offline captures. */}
     {/* eslint-disable-next-line @next/next/no-img-element */}
     {om && <img src={om.image} alt={`Escudo ${om.acronym}`} title={om.name} width={40} height={56} loading="eager" />}
-    <span>{name}</span>
+    <span>{omDisplayName(name)}</span>
   </span>;
 }
 
