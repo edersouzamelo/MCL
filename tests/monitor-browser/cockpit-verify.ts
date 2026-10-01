@@ -6,11 +6,12 @@ const origin = "http://127.0.0.1:3010";
 async function verify() {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.MONITOR_CHROMIUM_PATH, args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await page.clock.setFixedTime(new Date("2026-10-01T13:15:00Z"));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const token = await encode({ secret: "local-monitor-regression-test-secret-20260925", token: { sub: "local-test-only", name: "Operador de teste", roles: ["ADMIN"], organizationId: "fixture-org" } });
   await page.context().addCookies([{ name: "next-auth.session-token", value: token, url: origin }, { name: "mcl_onboarding_completed", value: "true", url: origin }]);
-  const configs = defaultCcoMonitorConfig().map((config) => ({ ...config, updatedByName: "Responsável de teste", updatedAt: "2026-10-01T04:23:00.000Z" }));
+  const configs = defaultCcoMonitorConfig().map((config) => ({ ...config, updatedByName: "Responsável de teste", updatedAt: config.id === 2 ? "2026-09-30T18:23:00Z" : config.id === 3 ? "2026-09-28T18:23:00Z" : config.id === 4 ? "2026-09-24T18:23:00Z" : config.id === 5 ? undefined : "2026-10-01T04:23:00.000Z" }));
   let writes = 0;
   await page.route("**/api/grupamento/**", async (route) => {
     const url = new URL(route.request().url());
@@ -47,6 +48,25 @@ async function verify() {
   await sagToggle.click();
   await expect(page.getByText('Situação orçamentária consolidada', { exact: true })).toBeHidden();
 
+  const counter = page.getByRole('button', { name: '10 monitores: ver placar de atualizações', exact: true });
+  await counter.click();
+  const scoreboard = page.locator('[popover=auto]:popover-open').filter({ has: page.getByRole('heading', {name:'Placar de atualização dos monitores'}) });
+  await expect(scoreboard).toBeVisible(); await expect(scoreboard.locator('li')).toHaveCount(10);
+  const scoreBox = await scoreboard.boundingBox(); expect(scoreBox!.x).toBeGreaterThan(100); expect(scoreBox!.y).toBeGreaterThan(12); expect(scoreBox!.y + scoreBox!.height).toBeLessThanOrEqual(1000);
+  await expect(scoreboard.locator('li').nth(0)).toHaveAttribute('data-monitor-freshness','0');
+  await expect(scoreboard.locator('li').nth(1)).toHaveAttribute('data-monitor-freshness','1');
+  await expect(scoreboard.locator('li').nth(3)).toHaveAttribute('data-monitor-freshness','7');
+  await expect(scoreboard.locator('li').nth(4)).toHaveAttribute('data-monitor-freshness','unknown');
+  await expect(scoreboard.locator('li').first()).toContainText('Responsável de teste');
+  await expect(scoreboard.locator('li').first()).toContainText('01/10/2026, 00:23:00');
+  await page.screenshot({path:'/workspace/scratch/55a592607734/scoreboard.png'});
+  await page.keyboard.press('Escape'); await expect(scoreboard).toBeHidden();
+  await page.getByRole('button',{name:'0/2 fontes ativas: ver explicação',exact:true}).hover();
+  await expect(page.locator('[popover=auto]:popover-open')).toContainText('duas fontes lógicas');
+  await page.mouse.move(0,0);
+  await page.getByRole('button',{name:'0 linhas válidas: ver explicação',exact:true}).hover();
+  await expect(page.locator('[popover=auto]:popover-open')).toContainText('registros válidos');
+  await page.mouse.move(0,0);
   await page.locator('.ccol-monitor-trigger').first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/workspace/scratch/55a592607734/panel.png", fullPage: true });
   await page.getByRole("button", { name: "Configurar Monitor 1", exact: true }).click();
@@ -58,7 +78,10 @@ async function verify() {
   await expect(dialog.getByRole("button", {name:"Guardar (extrair PPT)",exact:true})).toBeVisible();
   await expect(dialog.getByRole("link", {name:"Editar conteúdo online",exact:true})).toHaveAttribute("target", "_blank");
   const boxes = await dialog.locator('.ccol-command').evaluateAll((elements) => elements.map((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
-  expect(boxes[0].y).toBe(boxes[1].y); expect(boxes[1].y).toBe(boxes[2].y); expect(boxes[3].y).toBe(boxes[4].y); expect(boxes[4].y).toBe(boxes[5].y); expect(boxes[3].y).toBeGreaterThan(boxes[0].y);
+  expect(boxes[0].y).toBe(boxes[1].y); expect(boxes[1].y).toBe(boxes[2].y); expect(boxes[3].y).toBe(boxes[4].y); expect(boxes[4].y).toBe(boxes[5].y); expect(boxes[3].y).toBeGreaterThan(boxes[0].y); expect(boxes[6].y).toBeGreaterThan(boxes[5].y); expect(boxes[6].w).toBeGreaterThan(boxes[3].w * 2);
+  const commands = await dialog.locator(".ccol-command").allTextContents();
+  expect(commands.slice(3).map(text => text.trim())).toEqual(["Editar conteúdo online", "Guardar (extrair PPT)", "Exportar (extrair HTML)", "Exibir / Abrir"]);
+  expect(await dialog.locator(".ccol-command").nth(3).evaluate(el => getComputedStyle(el).backgroundColor)).toBe(await dialog.locator(".ccol-command").nth(4).evaluate(el => getComputedStyle(el).backgroundColor));
   await dialog.getByRole('button', { name: 'Configurar', exact: true }).click();
   await expect(dialog.getByLabel('Responsável pelo Monitor 1')).toBeVisible();
   await dialog.getByLabel('Responsável pelo Monitor 1').selectOption('Classe II');
@@ -66,6 +89,13 @@ async function verify() {
   await dialog.getByRole('button', { name: 'Incluir conteúdo orçamentário' }).click();
   await expect(dialog.getByLabel('Responsável pelo Monitor 1')).toBeHidden();
   await expect(dialog.locator('[aria-expanded=true]')).toContainText('Incluir conteúdo orçamentário');
+  await dialog.getByRole('button', { name: 'Visão executiva', exact: true }).hover();
+  const sagHelp = dialog.locator('[popover=manual]:popover-open');
+  await expect(sagHelp).toBeVisible(); await expect(sagHelp).toContainText('Visão executiva');
+  expect(await sagHelp.evaluate(el => el.closest('dialog')?.open)).toBe(true);
+  const helpBox = await sagHelp.boundingBox(); expect(helpBox!.x).toBeGreaterThanOrEqual(0); expect(helpBox!.y).toBeGreaterThanOrEqual(0);
+  await page.screenshot({path:'/workspace/scratch/55a592607734/sag-help.png'});
+  await page.mouse.move(0,0); await expect(sagHelp).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Incluir conteúdo documental' }).click();
   await expect(dialog.getByText('Cockpit de apresentação')).toBeVisible();
   await dialog.getByRole('button', { name: 'Incluir conteúdo documental' }).click();
@@ -77,8 +107,15 @@ async function verify() {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(dialog.locator('.ccol-command')).toHaveCount(7);
   await page.screenshot({ path: "/workspace/scratch/55a592607734/commands-mobile.png" });
+  await page.keyboard.press('Escape');
+  await counter.click();
+  await expect(scoreboard).toBeVisible();
+  const mobileScore = await scoreboard.boundingBox(); expect(mobileScore!.x).toBeGreaterThanOrEqual(0); expect(mobileScore!.x + mobileScore!.width).toBeLessThanOrEqual(390);
+  await scoreboard.locator('li').last().scrollIntoViewIfNeeded(); await expect(scoreboard.locator('li').last()).toBeVisible();
+  await page.screenshot({path:'/workspace/scratch/55a592607734/scoreboard-mobile.png'});
+  await page.keyboard.press('Escape');
   expect(errors).toEqual([]);
   await browser.close();
-  console.log('PASS: 10 monitores, capas, divisão central, modal, seis comandos em 3×2 e editor abaixo, Guardar, autoria, alteração persistida, expansão/recolhimento, Escape e largura móvel.');
+  console.log('PASS: 10 monitores, capas, divisão central, modal, ordem Editar/Guardar/Exportar e Abrir abaixo, popovers SAG no topo, placar e contadores, autoria, alteração persistida, expansão/recolhimento, Escape e largura móvel.');
 }
 verify().catch((error) => { console.error(error); process.exit(1); });

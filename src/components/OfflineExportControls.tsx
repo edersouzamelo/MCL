@@ -4,7 +4,7 @@ import { buildOfflineHtml } from "@/modules/grupamento/monitor-offline-html";
 
 import { useState } from "react";
 import { MonitorCommandHelp } from "@/components/CcolMonitorCard";
-import { Download, ExternalLink, Loader2 } from "lucide-react";
+import { Download, ExternalLink, Loader2, Presentation } from "lucide-react";
 
 type CapturedHtmlFrame = {
   html: string;
@@ -278,9 +278,10 @@ export function OfflineExportControls({
   }
 
   const controls = <>
-    <MonitorCommandHelp text="Guarda a apresentação em PowerPoint. Textos e formas são editáveis; gráficos são imagens. Reimporte e aprove após corrigir."><button type="button" disabled={running} onClick={() => void exportForCorrection()} className="ccol-command bg-emerald-800 text-white disabled:opacity-50"><Download className="h-4 w-4" /> Guardar (extrair PPT)</button></MonitorCommandHelp>
-    <MonitorCommandHelp text="Exporta a apresentação publicada como HTML portátil para exibição sem internet."><button type="button" disabled={running} onClick={() => void exportOffline()} className="ccol-command bg-sky-700 text-white disabled:opacity-50">{running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Exportar (extrair HTML)</button></MonitorCommandHelp>
-    <MonitorCommandHelp text="Abre a apresentação deste monitor em outra aba. Use F11 para ocupar a tela."><a href={`/grupamento/monitor/${monitorId}`} target="_blank" rel="noreferrer" className="ccol-command bg-black text-white"><ExternalLink className="h-4 w-4" /> Exibir / Abrir</a></MonitorCommandHelp>
+    <MonitorCommandHelp text="Ajusta textos, imagens, posição, tamanho e cores dos gráficos dos documentos publicados, mantendo o padrão do MCL."><a href={`/grupamento/monitor-editor/${monitorId}`} target="_blank" rel="noreferrer" className="ccol-command ccol-command-outline"><Presentation className="h-4 w-4" /> Editar conteúdo online</a></MonitorCommandHelp>
+    <MonitorCommandHelp text="Guarda a apresentação em PowerPoint. Textos e formas são editáveis; gráficos são imagens. Reimporte e aprove após corrigir."><button type="button" disabled={running} onClick={() => void exportForCorrection()} className="ccol-command ccol-command-outline disabled:opacity-50"><Download className="h-4 w-4" /> Guardar (extrair PPT)</button></MonitorCommandHelp>
+    <MonitorCommandHelp text="Exporta a apresentação publicada como HTML portátil para exibição sem internet."><button type="button" disabled={running} onClick={() => void exportOffline()} className="ccol-command ccol-command-outline disabled:opacity-50">{running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Exportar (extrair HTML)</button></MonitorCommandHelp>
+    <MonitorCommandHelp className="col-span-3" text="Abre a apresentação deste monitor em outra aba. Use F11 para ocupar a tela."><a href={`/grupamento/monitor/${monitorId}`} target="_blank" rel="noreferrer" className="ccol-command ccol-command-open"><ExternalLink className="h-4 w-4" /> Exibir / Abrir</a></MonitorCommandHelp>
   </>;
   return <div className={commandGrid ? "grid grid-cols-3 gap-2" : "mt-3 grid grid-cols-3 gap-2 rounded-xl border border-sky-200 p-3"}>
     {controls}

@@ -26,7 +26,7 @@
 .dark .ccol-command-outline{border-color:#075985;background:#082f49;color:#bae6fd}
 .dark .ccol-command-outline[aria-expanded=true]{background:#0c4a6e}
 .ccol-command-tooltip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:220px;max-width:70vw;padding:9px 11px;border-radius:8px;background:#18181b;color:white;font-size:11px;line-height:1.5;font-weight:400;z-index:20;pointer-events:none;visibility:hidden;opacity:0;transition:opacity .15s;box-shadow:0 3px 12px #0004}
-.ccol-command-help:hover .ccol-command-tooltip,.ccol-command-help:focus-within .ccol-command-tooltip{visibility:visible;opacity:1}
+.ccol-command-help:hover .ccol-command-tooltip,.ccol-command-help:has(:focus-visible) .ccol-command-tooltip{visibility:visible;opacity:1}
 .ccol-animated-section{display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;transition:grid-template-rows .3s ease,opacity .25s ease,visibility 0s .3s}
 .ccol-animated-section.is-open{grid-template-rows:1fr;opacity:1;visibility:visible;transition:grid-template-rows .3s ease,opacity .25s ease,visibility 0s}
 .ccol-animated-inner{min-height:0;overflow:hidden}
@@ -34,3 +34,7 @@
 .dark .ccol-subcommands{border-color:#3f3f46;background:#18181b}
 @media(max-width:540px){.ccol-monitor-dialog-panel{padding:16px}.ccol-command{flex-direction:column;min-height:82px;font-size:11px;padding:8px 5px}.ccol-command-tooltip{width:160px}}
 @media(prefers-reduced-motion:reduce){.ccol-animated-section,.ccol-monitor-trigger{transition:none}}
+
+.ccol-command-open,.dark .ccol-command-open{background:#7dd3fc;color:#082f49;border:1px solid #38bdf8;box-shadow:0 3px 10px #0ea5e926}
+
+.ccol-counter-popover{max-height:70dvh;overflow:auto}.ccol-counter-popover::backdrop{background:transparent}
