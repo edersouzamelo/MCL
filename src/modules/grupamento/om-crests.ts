@@ -45,3 +45,14 @@ export function omMentionParts(text: string): Array<{ text: string; om?: OmCrest
   if (cursor < text.length) parts.push({ text: text.slice(cursor) });
   return parts;
 }
+
+/** Only documentary prose opts into this rule; tables, charts and OM labels keep their emblems. */
+export function documentProseAllowsCrests(text: string) {
+  if (findOmCrest(text)) return true;
+  const parts = omMentionParts(text);
+  const mentions = parts.filter(part => part.om);
+  if (mentions.length !== 1) return false;
+  const surrounding = parts.filter(part => !part.om).map(part => part.text).join(" ");
+  return text.length <= 120 && (surrounding.match(/[\p{L}\p{N}]+/gu)?.length ?? 0) <= 5
+    && !/\b(?:rotas?|paradas|itiner[aá]rio)\b/i.test(surrounding);
+}

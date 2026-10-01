@@ -1,4 +1,5 @@
-import type { MonitorDocumentExtraction, MonitorDocumentSceneDto, MonitorDocumentScenePayload } from "./types";
+import type { MonitorDocumentExtraction, MonitorDocumentScenePayload } from "./types";
+import { TEXT_DOCUMENT_VERSION } from "./text-document";
 
 export const CURRENT_MONITOR_EXTRACTION_VERSION = 5;
 
@@ -15,6 +16,9 @@ export function stampMonitorExtraction(extraction: MonitorDocumentExtraction): M
   };
 }
 
-export function monitorSceneNeedsRefresh(scene: Pick<MonitorDocumentSceneDto, "payload"> | { payload: MonitorDocumentScenePayload }) {
-  return !scene.payload.onlineEditor && scene.payload.extractionVersion !== CURRENT_MONITOR_EXTRACTION_VERSION;
+export function monitorSceneNeedsRefresh(scene: { payload: MonitorDocumentScenePayload; sourceFileName?: string }) {
+  if (scene.payload.onlineEditor) return false;
+  const textSource = /\.(?:docx|pdf|txt)$/i.test(scene.sourceFileName ?? "");
+  return scene.payload.extractionVersion !== CURRENT_MONITOR_EXTRACTION_VERSION
+    || (textSource && scene.payload.textDocument?.version !== TEXT_DOCUMENT_VERSION);
 }

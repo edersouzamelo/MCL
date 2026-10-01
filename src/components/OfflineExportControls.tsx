@@ -133,7 +133,7 @@ async function waitForCaptureFrame(iframe: HTMLIFrameElement, frameIndex: number
       await wait(350);
       // Wait for measured table pagination, including record layouts, before
       // exporting. A ready scene is not necessarily a ready content measurement.
-      if (Array.from(root.querySelectorAll<HTMLElement>("[data-monitor-document-table]")).some(table => table.dataset.tableReady !== "1")) continue;
+      if (Array.from(root.querySelectorAll<HTMLElement>("[data-monitor-document-table], [data-monitor-document-text]")).some(node => (node.dataset.tableReady ?? node.dataset.textReady) !== "1")) continue;
       return root;
     }
     await wait(150);
@@ -187,14 +187,14 @@ async function captureMonitorFrames(
       }
       const root = await waitForCaptureFrame(iframe, index);
       const label = root.dataset.mclFrameLabel ?? `Quadro ${index + 1}`;
-      const table = Array.from(root.querySelectorAll<HTMLElement>("[data-monitor-document-table]"))
+      const table = Array.from(root.querySelectorAll<HTMLElement>("[data-monitor-document-table], [data-monitor-document-text]"))
         .sort((a, b) => Number(b.dataset.capturePageCount ?? "1") - Number(a.dataset.capturePageCount ?? "1"))[0];
       const viewport = root.querySelector<HTMLElement>("[data-monitor-viewport]");
       const paginated = Number(table?.dataset.capturePageCount ?? "1") > 1 ? table : viewport;
       const pageCount = Math.max(1, Number(paginated === table ? table?.dataset.capturePageCount ?? "1" : viewport?.dataset.pageCount ?? "1"));
       for (let page = 0; page < pageCount; page++) {
         if (page > 0) {
-          iframe.contentWindow?.postMessage({ type: paginated === table ? "MCL_CAPTURE_TABLE_PAGE" : "MCL_CAPTURE_VIEWPORT_PAGE", page }, window.location.origin);
+          iframe.contentWindow?.postMessage({ type: paginated === table ? table?.hasAttribute("data-monitor-document-text") ? "MCL_CAPTURE_TEXT_PAGE" : "MCL_CAPTURE_TABLE_PAGE" : "MCL_CAPTURE_VIEWPORT_PAGE", page }, window.location.origin);
           const deadline = Date.now() + 5000;
           while (Number(paginated?.dataset.capturePage) !== page && Date.now() < deadline) await wait(50);
           if (Number(paginated?.dataset.capturePage) !== page) throw new Error("Falha ao capturar página documental.");

@@ -1,4 +1,4 @@
-import { findOmCrest, omMentionParts, omDisplayName } from "@/modules/grupamento/om-crests";
+import { findOmCrest, omMentionParts, omDisplayName, documentProseAllowsCrests } from "@/modules/grupamento/om-crests";
 
 /** Exact catalog lookup. Unknown units keep their name without a guessed emblem. */
 export function OmIdentity({ name, className = "" }: { name: string; className?: string }) {
@@ -11,7 +11,8 @@ export function OmIdentity({ name, className = "" }: { name: string; className?:
   </span>;
 }
 
-export function OmMentions({ text, header = false }: { text: string; header?: boolean }) {
+export function OmMentions({ text, header = false, prose = false }: { text: string; header?: boolean; prose?: boolean }) {
+  if (prose && !documentProseAllowsCrests(text)) return <>{text}</>;
   return <>{omMentionParts(text).map((part, index) => part.om && !(header && part.om.id === "9-gpt-log")
     ? <OmIdentity key={index} name={part.text} className="mcl-om-mention" />
     : <span key={index}>{part.text}</span>)}</>;
