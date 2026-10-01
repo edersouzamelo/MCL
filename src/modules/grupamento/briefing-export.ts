@@ -10,6 +10,7 @@ import { CCO_SCREEN_CATALOG, CCO_PI_ROWS_PER_PAGE, CCO_UNIT_ROWS_PER_PAGE, type 
 import type { SagImportResult } from "./sag";
 import type { RpnImportResult } from "./rpn";
 import type { MonitorDocumentChart, MonitorDocumentSceneDto, MonitorSlideBox } from "./monitor-content/types";
+import { normalizeMonitorTitle, monitorIntegralImage } from "./monitor-content/presentation-title";
 import { prepareMonitorElements } from "./monitor-content/presentation-layout";
 import { presentationTextColor } from "./monitor-content/presentation-intelligence";
 import { monitorTableSlide } from "./monitor-content/table-layout";
@@ -150,8 +151,9 @@ export async function buildBriefingPowerPoint(input: BriefingExportInput) {
   async function documentScene(scene: MonitorDocumentSceneDto) {
     const layout = scene.payload.layout;
     if (!layout) throw new Error(`Documento ${scene.sourceFileName} sem layout estruturado. Reprocesse antes de exportar.`);
-    const elements = prepareMonitorElements(layout.elements).elements.sort((a, b) => a.z - b.z);
-    const adaptiveTable = monitorTableSlide(elements);
+    const online = Boolean(scene.payload.onlineEditor);
+    const elements = [...(online ? layout.elements : prepareMonitorElements(layout.elements).elements)].sort((a, b) => a.z - b.z);
+    const adaptiveTable = online ? null : monitorTableSlide(elements);
     if (adaptiveTable) {
       const title = adaptiveTable.texts.filter((t) => t.y < adaptiveTable.table.y).map((t) => t.text).join("\n") || scene.title;
       const after = adaptiveTable.texts.filter((t) => t.y >= adaptiveTable.table.y).map((t) => t.text).join("\n");
@@ -166,13 +168,16 @@ export async function buildBriefingPowerPoint(input: BriefingExportInput) {
     const slide = newSlide(scene.monitorId, scene.sourceImportedAt, `${scene.sourceFileName}, página ${scene.sourcePage}.`);
     // Letterbox source layout inside the model's available content area.
     const ratio = layout.width / layout.height;
-    const w = Math.min(CONTENT.w, CONTENT.h * ratio), h = w / ratio;
-    const area = { x: CONTENT.x + (CONTENT.w - w) / 2, y: CONTENT.y + (CONTENT.h - h) / 2, w, h };
+    const hasOnlineTitle = online && !monitorIntegralImage(scene.payload);
+    if (hasOnlineTitle) text(slide, normalizeMonitorTitle(scene.title), { ...CONTENT, h: .6 }, 22, true);
+    const available = hasOnlineTitle ? body : CONTENT;
+    const w = Math.min(available.w, available.h * ratio), h = w / ratio;
+    const area = { x: available.x + (available.w - w) / 2, y: available.y + (available.h - h) / 2, w, h };
     const box = (e: MonitorSlideBox): Box => ({ x: area.x + e.x * w, y: area.y + e.y * h, w: e.w * w, h: e.h * h });
     for (const e of elements) {
       if (e.w <= 0 || e.h <= 0) continue;
       const b = box(e);
-      if (e.kind === "text") slide.addText(e.text, { ...b, fontFace: "Arial", fontSize: (e.fontSizePt ?? 18) * w / (layout.width / 914400), bold: e.bold || e.role === "title" || e.role === "metric", align: e.align ?? "left", valign: e.verticalAlign === "middle" ? "middle" : e.verticalAlign === "bottom" ? "bottom" : "top", color: hex(presentationTextColor(e, elements, true), "172B24"), margin: 0, fit: "shrink" });
+      if (e.kind === "text") slide.addText(e.text, { ...b, fontFace: "Arial", fontSize: (e.fontSizePt ?? 18) * w / (layout.width / 914400), bold: e.bold || e.role === "title" || e.role === "metric", align: e.align ?? "left", valign: e.verticalAlign === "middle" ? "middle" : e.verticalAlign === "bottom" ? "bottom" : "top", color: hex(online ? e.color : presentationTextColor(e, elements, true), "172B24"), margin: 0, fit: "shrink" });
       else if (e.kind === "shape") slide.addShape(e.radius ? pptx.ShapeType.roundRect : pptx.ShapeType.rect, { ...b, fill: { color: hex(e.fill), transparency: e.fill ? 0 : 100 }, line: { color: hex(e.lineColor), transparency: e.lineColor ? 0 : 100 } });
       else if (e.kind === "chart") addChart(slide, e.chart, b);
       else if (e.kind === "table") table(slide, e.columns, e.rows, b);
@@ -252,8 +257,11 @@ async function applyOriginalBriefingFrame(buffer: Buffer, frames: Array<{ id: nu
     if (ext && !types.includes(`Extension="${ext}"`)) types = types.replace("</Types>", `${match[0]}</Types>`);
   }
   output.file("[Content_Types].xml", types);
+  // PptxGenJS assigns chart identifiers globally, including subsequent exports.
+  const chartPaths = Object.keys(output.files).filter(name => /^ppt\/charts\/chart\d+\.xml$/.test(name)).sort((a, b) => Number(a.match(/chart(\d+)/)![1]) - Number(b.match(/chart(\d+)/)![1]));
+  if (chartPaths.length !== charts.length) throw new Error("Quantidade de gráficos exportados divergente. Exportação interrompida.");
   for (const [i, chart] of charts.entries()) {
-    const chartPath = `ppt/charts/chart${i + 1}.xml`;
+    const chartPath = chartPaths[i];
     let chartXml = await output.file(chartPath)!.async("string");
     let seriesIndex = 0;
     chartXml = chartXml.replace(/<c:ser>[\s\S]*?<\/c:ser>/g, (node) => {

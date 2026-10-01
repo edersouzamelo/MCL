@@ -1,5 +1,7 @@
 "use client";
 
+import { buildOfflineHtml } from "@/modules/grupamento/monitor-offline-html";
+
 import { useState } from "react";
 import { MonitorCommandHelp } from "@/components/CcolMonitorCard";
 import { Download, ExternalLink, Loader2 } from "lucide-react";
@@ -220,85 +222,6 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-function buildOfflineHtml(monitorId: number, frames: CapturedHtmlFrame[], delaySeconds: number) {
-  const generatedAt = new Date().toISOString();
-  const safeFrames = JSON.stringify(frames).replace(/</g, "\\u003c");
-  return `<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>MCL Monitor ${String(monitorId).padStart(2, "0")} Offline</title>
-<style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020617}
-body{font-family:Arial,sans-serif}
-#stage{position:fixed;inset:0;overflow:hidden;background:#020617}
-#surface{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center center;opacity:1;transition:opacity 320ms cubic-bezier(.22,1,.36,1);will-change:transform,opacity}
-#surface>main{width:1920px!important;height:1080px!important;max-width:none!important;max-height:none!important}
-@keyframes mclMonitorBarReveal{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-#surface .mcl-broadcast-bar{animation:mclMonitorBarReveal 1.2s cubic-bezier(.16,1,.3,1) both}
-#controls{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:8px;z-index:12;padding:6px 8px;border:1px solid rgba(125,211,252,.18);border-radius:999px;background:rgba(2,6,23,.72);backdrop-filter:blur(8px)}
-#controls button{width:38px;height:32px;border:0;border-radius:999px;background:rgba(255,255,255,.06);color:#dbeafe;font:700 14px Arial,sans-serif;cursor:pointer}
-#controls button:hover{background:rgba(56,189,248,.14)}
-#badge{position:fixed;right:10px;bottom:8px;padding:4px 7px;border-radius:5px;background:rgba(2,6,23,.68);color:rgba(255,255,255,.72);font:10px Arial,sans-serif;letter-spacing:.05em;z-index:10}
-</style>
-</head>
-<body>
-<div id="stage" aria-label="Exibição offline do MCL"><div id="surface"></div></div>
-<div id="controls" aria-label="Controles da apresentação">
-  <button id="prev" type="button" title="Quadro anterior">◀</button>
-  <button id="toggle" type="button" title="Pausar apresentação">Ⅱ</button>
-  <button id="nextBtn" type="button" title="Próximo quadro">▶</button>
-</div>
-<div id="badge">MCL OFFLINE · Monitor ${String(monitorId).padStart(2, "0")} · gerado ${generatedAt}</div>
-<script>
-const frames=${safeFrames};
-const delay=${Math.max(5, delaySeconds) * 1000};
-const stage=document.getElementById("stage");
-const surface=document.getElementById("surface");
-const prevButton=document.getElementById("prev");
-const toggleButton=document.getElementById("toggle");
-const nextButton=document.getElementById("nextBtn");
-let index=0;
-let playing=true;
-let timer=null;
-function fit(){
-  const scale=Math.min(window.innerWidth/1920,window.innerHeight/1080);
-  surface.style.transform="translate(-50%,-50%) scale("+scale+")";
-}
-function mount(frame){
-  surface.innerHTML=frame.html;
-  stage.setAttribute("aria-label",frame.label||"MCL");
-}
-function show(target){
-  if(!frames.length)return;
-  surface.style.opacity="0";
-  setTimeout(()=>{
-    index=(target+frames.length)%frames.length;
-    mount(frames[index]);
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{surface.style.opacity="1"}));
-  },320);
-}
-function schedule(){
-  if(timer)clearInterval(timer);
-  if(playing&&frames.length>1)timer=setInterval(()=>show(index+1),delay);
-}
-prevButton.addEventListener("click",()=>{show(index-1);schedule()});
-nextButton.addEventListener("click",()=>{show(index+1);schedule()});
-toggleButton.addEventListener("click",()=>{
-  playing=!playing;
-  toggleButton.textContent=playing?"Ⅱ":"▶";
-  toggleButton.title=playing?"Pausar apresentação":"Retomar apresentação";
-  schedule();
-});
-mount(frames[0]);
-fit();
-window.addEventListener("resize",fit);
-schedule();
-</script>
-</body>
-</html>`;
-}
 
 export function OfflineExportControls({
   monitorId,
@@ -355,7 +278,7 @@ export function OfflineExportControls({
   }
 
   const controls = <>
-    <MonitorCommandHelp text="Extrai um PowerPoint para correção. Textos e formas são editáveis; gráficos são imagens. Reimporte e aprove após corrigir."><button type="button" disabled={running} onClick={() => void exportForCorrection()} className="ccol-command bg-emerald-800 text-white disabled:opacity-50"><Download className="h-4 w-4" /> Corrigir (extrair PPT)</button></MonitorCommandHelp>
+    <MonitorCommandHelp text="Guarda a apresentação em PowerPoint. Textos e formas são editáveis; gráficos são imagens. Reimporte e aprove após corrigir."><button type="button" disabled={running} onClick={() => void exportForCorrection()} className="ccol-command bg-emerald-800 text-white disabled:opacity-50"><Download className="h-4 w-4" /> Guardar (extrair PPT)</button></MonitorCommandHelp>
     <MonitorCommandHelp text="Exporta a apresentação publicada como HTML portátil para exibição sem internet."><button type="button" disabled={running} onClick={() => void exportOffline()} className="ccol-command bg-sky-700 text-white disabled:opacity-50">{running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Exportar (extrair HTML)</button></MonitorCommandHelp>
     <MonitorCommandHelp text="Abre a apresentação deste monitor em outra aba. Use F11 para ocupar a tela."><a href={`/grupamento/monitor/${monitorId}`} target="_blank" rel="noreferrer" className="ccol-command bg-black text-white"><ExternalLink className="h-4 w-4" /> Exibir / Abrir</a></MonitorCommandHelp>
   </>;

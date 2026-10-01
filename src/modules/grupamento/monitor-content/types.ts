@@ -99,6 +99,7 @@ export type MonitorSlideLayout = {
 };
 
 export type MonitorDocumentScenePayload = {
+  onlineEditor?: { version: 1; revision: number; updatedAt?: string; updatedByName?: string };
   correction?: { version: 1; preserveLayout: true; fullFrame: true };
   extractionVersion?: number;
   layoutVersion?: number;

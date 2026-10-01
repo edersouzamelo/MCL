@@ -16,5 +16,5 @@ export function stampMonitorExtraction(extraction: MonitorDocumentExtraction): M
 }
 
 export function monitorSceneNeedsRefresh(scene: Pick<MonitorDocumentSceneDto, "payload"> | { payload: MonitorDocumentScenePayload }) {
-  return scene.payload.extractionVersion !== CURRENT_MONITOR_EXTRACTION_VERSION;
+  return !scene.payload.onlineEditor && scene.payload.extractionVersion !== CURRENT_MONITOR_EXTRACTION_VERSION;
 }

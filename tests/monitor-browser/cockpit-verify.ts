@@ -54,7 +54,9 @@ async function verify() {
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Responsável de teste");
   await expect(dialog).toContainText("01/10/2026, 00:23:00");
-  await expect(dialog.locator('.ccol-command')).toHaveCount(6);
+  await expect(dialog.locator('.ccol-command')).toHaveCount(7);
+  await expect(dialog.getByRole("button", {name:"Guardar (extrair PPT)",exact:true})).toBeVisible();
+  await expect(dialog.getByRole("link", {name:"Editar conteúdo online",exact:true})).toHaveAttribute("target", "_blank");
   const boxes = await dialog.locator('.ccol-command').evaluateAll((elements) => elements.map((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
   expect(boxes[0].y).toBe(boxes[1].y); expect(boxes[1].y).toBe(boxes[2].y); expect(boxes[3].y).toBe(boxes[4].y); expect(boxes[4].y).toBe(boxes[5].y); expect(boxes[3].y).toBeGreaterThan(boxes[0].y);
   await dialog.getByRole('button', { name: 'Configurar', exact: true }).click();
@@ -73,10 +75,10 @@ async function verify() {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Configurar Monitor 1', exact: true }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await expect(dialog.locator('.ccol-command')).toHaveCount(6);
+  await expect(dialog.locator('.ccol-command')).toHaveCount(7);
   await page.screenshot({ path: "/workspace/scratch/55a592607734/commands-mobile.png" });
   expect(errors).toEqual([]);
   await browser.close();
-  console.log('PASS: 10 monitores, capas, divisão central, modal, seis comandos em 3×2, autoria, alteração persistida, expansão/recolhimento, Escape e largura móvel.');
+  console.log('PASS: 10 monitores, capas, divisão central, modal, seis comandos em 3×2 e editor abaixo, Guardar, autoria, alteração persistida, expansão/recolhimento, Escape e largura móvel.');
 }
 verify().catch((error) => { console.error(error); process.exit(1); });
