@@ -46,7 +46,7 @@ function layout(title: string, paragraphs: string[]): MonitorSlideElement[] {
   })];
 }
 
-export function composeTextDocument(blocks: DocumentBlock[], fallback = "Documento"): MonitorDocumentSceneDraft[] {
+export function composeTextDocument(blocks: DocumentBlock[], fallback = "Documento", maxUnits = 17): MonitorDocumentSceneDraft[] {
   const scenes: MonitorDocumentSceneDraft[] = [];
   let title = fallback, body: string[] = [], units = 0, page: number | undefined, part = 0;
   let pendingHeading = false;
@@ -68,7 +68,7 @@ export function composeTextDocument(blocks: DocumentBlock[], fallback = "Documen
     } else if (block.kind === "paragraph") {
       for (const text of splitDocumentParagraph(block.text)) {
         const cost = Math.max(1, Math.ceil(text.length / 74)) + 1.5;
-        if (body.length && units + cost > 17) flush();
+        if (body.length && units + cost > maxUnits) flush();
         body.push(text); units += cost;
       }
     } else {

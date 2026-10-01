@@ -11,7 +11,7 @@ import { persistMonitorContentImport, replaceMonitorContentExtraction, replaceAp
 import type { MonitorDocumentExtraction } from "@/modules/grupamento/monitor-content/types";
 
 const extraction: MonitorDocumentExtraction = {
-  scenes: [{ sceneType: "IMAGE", title: "Capa", sourcePage: 1, payload: { layoutVersion: 2, assetKeys: ["cover"] } }],
+  scenes: [{ sceneType: "FIGURE", title: "Capa", sourcePage: 1, payload: { layoutVersion: 2, assetKeys: ["cover"] } }],
   assets: [{ key: "cover", fileName: "cover.png", mimeType: "image/png", width: 100, height: 100, data: Buffer.from("media fixture") }],
   warnings: [],
 };

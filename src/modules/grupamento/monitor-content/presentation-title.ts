@@ -32,6 +32,19 @@ export function monitorSceneTitle(elements: MonitorSlideElement[], fallback: str
 }
 
 export function monitorTitleElements(elements: MonitorSlideElement[], fallback: string) {
+  // A single PowerPoint text box can contain a heading and an entire report.
+  // Promote only the heading. Keep every subsequent paragraph as body content.
+  elements = elements.flatMap(item => {
+    if (item.kind !== "text" || item.chartAnnotation) return [item];
+    const paragraphs = item.text.split("\n").map(text => text.trim()).filter(Boolean);
+    const fields = paragraphs.slice(1).filter(text => /^[^:\n]{2,60}\s*:\s*\S/u.test(text)).length;
+    if (paragraphs.length < 3 || fields < 2) return [item];
+    const lineHeight = Math.min(.065, Math.max(.025, (item.fontSizePt ?? 18) / 540));
+    return [
+      { ...item, text: paragraphs[0], h: Math.min(item.h, lineHeight), role: "title" as const },
+      { ...item, text: paragraphs.slice(1).join("\n"), y: item.y + lineHeight, h: Math.min(Math.max(lineHeight, item.h - lineHeight), lineHeight * (paragraphs.length - 1)), role: "body" as const },
+    ];
+  });
   const texts = elements.filter((item): item is MonitorSlideTextElement => item.kind === "text");
   const candidates = texts.filter(item => !item.chartAnnotation && item.role === "title" && item.y < .3);
   const normalizedFallback = normalizeMonitorTitle(fallback);

@@ -109,8 +109,10 @@ function paragraphs(xml: string) {
 
 function slideSize(entries: Map<string, Buffer>) {
   const xml = entries.get("ppt/presentation.xml")?.toString("utf8") ?? "";
-  const m = xml.match(/<p:sldSz\b[^>]*\bcx="(\d+)"[^>]*\bcy="(\d+)"/);
-  return { width: Number(m?.[1] ?? 12192000), height: Number(m?.[2] ?? 6858000) };
+  const tag = xml.match(/<p:sldSz\b[^>]*\/?\s*>/)?.[0] ?? "";
+  const width = Number(attribute(tag, "cx"));
+  const height = Number(attribute(tag, "cy"));
+  return { width: width > 0 ? width : 12192000, height: height > 0 ? height : 6858000 };
 }
 
 function themeColors(entries: Map<string, Buffer>) {
