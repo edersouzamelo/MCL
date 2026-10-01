@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { OmMentions } from "./OmIdentity";
 import { tableRowPages } from "@/modules/grupamento/monitor-content/table-layout";
 import { splitDocumentParagraph } from "@/modules/grupamento/monitor-content/text-document";
+import { documentProseAllowsCrests } from "@/modules/grupamento/om-crests";
 
 /** Size from the frame, measure natural paragraphs, then paginate at readable sizes. */
 export function MonitorDocumentText({ paragraphs, source, sourcePage, light, cycleSeconds = 15, paused = false, onPageCount }: {
@@ -12,7 +13,10 @@ export function MonitorDocumentText({ paragraphs, source, sourcePage, light, cyc
   const [geometry, setGeometry] = useState({ font: 24, limit: 420, capacity: 0 });
   const [fit, setFit] = useState({ pages: [[]] as number[][], heights: [] as number[], ready: false });
   const [page, setPage] = useState(0);
-  const chunks = paragraphs.flatMap(text => splitDocumentParagraph(text, geometry.limit));
+  // Decide on the complete paragraph, before narrow screens split a route or
+  // sentence into fragments that can look like an isolated OM label.
+  const fragments = paragraphs.flatMap(text => splitDocumentParagraph(text, geometry.limit).map(chunk => ({text:chunk,crests:documentProseAllowsCrests(text)})));
+  const chunks = fragments.map(fragment => fragment.text);
   const contentKey = chunks.join("\u0000");
   useLayoutEffect(() => {
     const node = frame.current; if (!node) return;
@@ -55,7 +59,7 @@ export function MonitorDocumentText({ paragraphs, source, sourcePage, light, cyc
   const card = (text: string, index: number, measuring = false) => <article key={index} data-text-paragraph={measuring ? undefined : index}
     className={`rounded-xl border px-5 py-3 ${light ? "border-slate-300 bg-white/80 text-slate-900" : "border-sky-300/15 bg-sky-400/[.04] text-slate-100"}`}
     style={{ fontSize: geometry.font, lineHeight: 1.35, fontWeight: 600, whiteSpace: "pre-wrap", overflowWrap: "anywhere", flex: measuring ? undefined : `${fit.heights[index] ?? 1} 0 auto` }}>
-    <OmMentions text={text} prose />
+    {fragments[index]?.crests ? <OmMentions text={text} prose /> : text}
   </article>;
   return <section ref={frame} className="relative h-full min-h-0 w-full" data-monitor-document-text data-text-ready={fit.ready ? "1" : "0"} data-capture-page-count={fit.pages.length} data-capture-page={page}>
     <div ref={probe} aria-hidden className="pointer-events-none invisible absolute left-0 top-0 w-full space-y-2.5">{chunks.map((text,index) => card(text,index,true))}</div>
