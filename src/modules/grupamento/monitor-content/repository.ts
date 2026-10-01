@@ -7,6 +7,20 @@ import type {
   MonitorDocumentScenePayload,
 } from "@/modules/grupamento/monitor-content/types";
 
+// Large documents write the original and extracted media atomically. Keep the
+// timeout bounded, but allow more than Prisma's five-second interactive default.
+export const MONITOR_DOCUMENT_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
+
+// Preview responses never need the original binary. Reading it back while the
+// transaction is open adds another full document transfer and holds the connection.
+const MONITOR_IMPORT_PREVIEW_SELECT = {
+  id: true, organizationId: true, monitorId: true, fileName: true, mimeType: true,
+  fileSize: true, checksum: true, status: true, sceneCount: true, warnings: true,
+  importedBy: true, importedByName: true, importedAt: true,
+  approvedBy: true, approvedAt: true, archivedBy: true, archivedAt: true,
+  scenes: { orderBy: { sceneOrder: "asc" } },
+} satisfies Prisma.MonitorContentImportSelect;
+
 export function monitorContentChecksum(buffer: Buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
@@ -149,7 +163,7 @@ export async function persistMonitorContentImport(input: {
         checksum,
       },
     },
-    include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+    select: MONITOR_IMPORT_PREVIEW_SELECT,
   });
   if (existing) {
     if (existing.status === "ARCHIVED" || existing.status === "REJECTED") {
@@ -165,7 +179,7 @@ export async function persistMonitorContentImport(input: {
           importedByName: input.importedByName ?? existing.importedByName,
           importedAt: new Date(),
         },
-        include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+        select: MONITOR_IMPORT_PREVIEW_SELECT,
       });
       return { importRecord: reactivated, deduplicated: true };
     }
@@ -190,6 +204,7 @@ export async function persistMonitorContentImport(input: {
 
   const sceneRows = sceneRowsForImport(importId, input.extraction, assetIds);
 
+  const rawFile = bytes(input.buffer);
   const importRecord = await prisma.$transaction(async (tx) => {
     await tx.monitorContentImport.create({
       data: {
@@ -203,18 +218,19 @@ export async function persistMonitorContentImport(input: {
         status: "PREVIEW",
         sceneCount: sceneRows.length,
         warnings: json(input.extraction.warnings),
-        rawFile: bytes(input.buffer),
+        rawFile,
         importedBy: input.importedBy,
         importedByName: input.importedByName ?? null,
       },
+      select: { id: true },
     });
     if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });
     if (sceneRows.length) await tx.monitorContentScene.createMany({ data: sceneRows });
     return tx.monitorContentImport.findUniqueOrThrow({
       where: { id: importId },
-      include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+      select: MONITOR_IMPORT_PREVIEW_SELECT,
     });
-  });
+  }, MONITOR_DOCUMENT_TRANSACTION_OPTIONS);
 
   return { importRecord, deduplicated: false };
 }
@@ -271,9 +287,9 @@ export async function replaceMonitorContentExtraction(input: {
         archivedBy: null,
         archivedAt: null,
       },
-      include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+      select: MONITOR_IMPORT_PREVIEW_SELECT,
     });
-  });
+  }, MONITOR_DOCUMENT_TRANSACTION_OPTIONS);
 }
 
 export async function replaceApprovedMonitorContentExtraction(input: {
@@ -327,9 +343,9 @@ export async function replaceApprovedMonitorContentExtraction(input: {
         sceneCount: sceneRows.length,
         warnings: json(input.extraction.warnings),
       },
-      include: { scenes: { orderBy: { sceneOrder: "asc" } } },
+      select: MONITOR_IMPORT_PREVIEW_SELECT,
     });
-  }, { isolationLevel: "Serializable" });
+  }, { ...MONITOR_DOCUMENT_TRANSACTION_OPTIONS, isolationLevel: "Serializable" });
 }
 
 export async function getMonitorContentForReprocess(id: string, organizationId: string) {
