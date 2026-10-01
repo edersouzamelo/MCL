@@ -101,6 +101,7 @@ export type MonitorSlideLayout = {
 };
 
 export type MonitorDocumentScenePayload = {
+  inputCompiler?: import("./compiler/contracts").CompilerDiagnostic;
   textDocument?: { version: number };
   onlineEditor?: { version: 1; revision: number; updatedAt?: string; updatedByName?: string };
   correction?: { version: 1; preserveLayout: true; fullFrame: true };

@@ -17,6 +17,7 @@ import type {
 } from "@/modules/grupamento/monitor-content/types";
 
 import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
+import { MonitorCompiledScene } from "@/components/MonitorCompiledScene";
 import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
 import { presentationTextColor } from "@/modules/grupamento/monitor-content/presentation-intelligence";
 
@@ -56,7 +57,7 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
   const justify = item.verticalAlign === "middle" ? "center" : item.verticalAlign === "bottom" ? "flex-end" : "flex-start";
   const area = item.w * item.h;
   return (
-    <div className="absolute flex overflow-hidden whitespace-pre-line px-[.15%] py-[.1%]" style={{
+    <div data-compiler-text className="absolute flex overflow-hidden whitespace-pre-line px-[.15%] py-[.1%]" style={{
       ...boxStyle(item),
       alignItems: justify,
       justifyContent: item.align === "center" ? "center" : item.align === "right" ? "flex-end" : "flex-start",
@@ -82,7 +83,7 @@ export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeco
   const integralImage = monitorIntegralImage(scene.payload);
   const online = Boolean(scene.payload.onlineEditor);
   const preserve = online || integralImage || Boolean(scene.payload.correction?.preserveLayout);
-  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements(prepareMonitorElements(layout.elements).elements, scene.title);
+  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements(scene.payload.inputCompiler ? layout.elements : prepareMonitorElements(layout.elements).elements, scene.title);
   const sorted = [...(integralImage ? layout.elements : prepared.elements)]
     .sort((a,b) => a.z-b.z);
   return (
@@ -154,6 +155,9 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   const textDocument = Boolean(textReport || (payload.textDocument && scene.sceneType === "TEXT" && !payload.onlineEditor && !payload.correction?.preserveLayout));
   const hasTableSlide = Boolean(tableSlide || (!payload.correction?.preserveLayout && payload.layout?.elements.some(item => item.kind === 'table')));
   useEffect(() => { if (!hasTableSlide && !textDocument) onPageCount?.(1); }, [hasTableSlide, textDocument, onPageCount]);
+  if (payload.inputCompiler && !payload.onlineEditor) return <MonitorCompiledScene scene={scene} light={ccol || briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount}>
+    <MonitorDocumentLayout scene={scene} ccol={ccol || briefing} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
+  </MonitorCompiledScene>;
   if (textDocument) return <MonitorTitleFrame title={textReport?.title ?? scene.title} light={ccol || briefing}>
     <MonitorDocumentText paragraphs={textReport?.paragraphs ?? payload.bullets ?? []} source={scene.sourceFileName} sourcePage={scene.sourcePage} light={ccol || briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
   </MonitorTitleFrame>;

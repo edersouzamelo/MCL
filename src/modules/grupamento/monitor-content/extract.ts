@@ -4,6 +4,8 @@ import { extractImages, extractTextItems, getDocumentProxy } from "unpdf";
 import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
 import { composeTextDocument, isDocumentHeading, plainTextBlocks, pdfTextBlocks, type DocumentBlock } from "./text-document";
 import { monitorTextSlide } from "./text-slide";
+import { finalizeCompilation } from "./compiler/pipeline";
+import { classifyAmbiguity, type SemanticClassifier } from "./compiler/semantic-classifier";
 import { stampMonitorExtraction } from "@/modules/grupamento/monitor-content/version";
 import type {
   MonitorDocumentAssetDraft,
@@ -411,12 +413,13 @@ async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
   return { scenes, assets, warnings };
 }
 
-export async function extractMonitorDocument(buffer: Buffer, fileName: string): Promise<MonitorDocumentExtraction> {
+export async function extractMonitorDocument(buffer: Buffer, fileName: string, classifier?: SemanticClassifier): Promise<MonitorDocumentExtraction> {
   const extension = fileName.toLowerCase().split(".").pop() ?? "";
   let extraction: MonitorDocumentExtraction;
   if (extension === "pptx") {
     extraction = extractPptxLayout(buffer);
     extraction.scenes = extraction.scenes.flatMap(scene => {
+      if (scene.payload.inputCompiler) return [scene];
       const report = monitorTextSlide(scene.payload, scene.title);
       return report ? composeTextDocument([
         { kind: "heading", text: report.title, page: scene.sourcePage },
@@ -441,5 +444,6 @@ export async function extractMonitorDocument(buffer: Buffer, fileName: string): 
   } else {
     throw new Error("Formato não suportado. Use PDF, PPTX, DOCX ou TXT.");
   }
-  return stampMonitorExtraction(extraction);
+  for (const scene of extraction.scenes) if (scene.payload.inputCompiler) await classifyAmbiguity(scene.payload.inputCompiler, classifier);
+  return stampMonitorExtraction(await finalizeCompilation(buffer, extension, extraction));
 }

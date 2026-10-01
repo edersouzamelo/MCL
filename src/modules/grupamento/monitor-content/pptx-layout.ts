@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
+import { compileSlide, compilerHash, missingTokens, elementStrings } from "./compiler/scene-graph";
+import type { CompilerIssue, CompilerNode } from "./compiler/contracts";
 import { monitorSceneTitle } from "./presentation-title";
 import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
 import { chartValueLabel } from "./chart-geometry";
 import { MONITOR_CORRECTION_MARKER } from "./correction";
-import { prepareMonitorElements, preserveChartAnnotations } from "./presentation-layout";
+
 import type {
   MonitorDocumentAssetDraft,
   MonitorDocumentChart,
@@ -89,7 +92,8 @@ function relationships(entries: Map<string, Buffer>, slidePath: string) {
   for (const match of xml.matchAll(/<Relationship\b([^>]*)\/?\s*>/g)) {
     const id = attribute(match[1], "Id");
     const type = attribute(match[1], "Type");
-    const target = posix.normalize(posix.join(base, attribute(match[1], "Target")));
+    const rawTarget = attribute(match[1], "Target");
+    const target = posix.normalize(rawTarget.startsWith("/") ? rawTarget.slice(1) : posix.join(base, rawTarget));
     if (id && target && !target.startsWith("../")) result.set(id, { id, type, target });
   }
   return result;
@@ -147,13 +151,12 @@ function line(xml: string, theme: Theme) {
 
 function box(xml: string, width: number, height: number) {
   const xfrm = xml.match(/<(?:a|p):xfrm\b[^>]*>([\s\S]*?)<\/(?:a|p):xfrm>/)?.[1] ?? "";
-  const off = xfrm.match(/<a:off\b[^>]*\bx="(-?\d+)"[^>]*\by="(-?\d+)"/);
-  const ext = xfrm.match(/<a:ext\b[^>]*\bcx="(\d+)"[^>]*\bcy="(\d+)"/);
-  if (!off || !ext) return null;
-  return {
-    x: Number(off[1]) / width, y: Number(off[2]) / height,
-    w: Number(ext[1]) / width, h: Number(ext[2]) / height,
-  };
+  const off = xfrm.match(/<a:off\b[^>]*\/?\s*>/)?.[0] ?? "";
+  const ext = xfrm.match(/<a:ext\b[^>]*\/?\s*>/)?.[0] ?? "";
+  const x = Number(attribute(off, "x")), y = Number(attribute(off, "y"));
+  const w = Number(attribute(ext, "cx")), h = Number(attribute(ext, "cy"));
+  if (!off || !ext || ![x,y,w,h].every(Number.isFinite) || w <= 0 || h <= 0) return null;
+  return { x: x / width, y: y / height, w: w / width, h: h / height };
 }
 
 function fontSize(xml: string) {
@@ -369,7 +372,7 @@ function blocks(xml: string) {
 
 function slideTitle(elements: MonitorSlideElement[], page: number) {
   const texts = elements.filter((item): item is MonitorSlideTextElement => item.kind === "text");
-  const best = [...texts].filter((item) => !item.chartAnnotation && item.y < 0.28).sort((a,b) => (b.fontSizePt ?? 0)-(a.fontSizePt ?? 0) || a.y-b.y)[0];
+  const best = [...texts].filter((item) => !item.chartAnnotation && item.y < 0.28).sort((a,b) => Number(b.y < .15) - Number(a.y < .15) || (b.fontSizePt ?? 0)-(a.fontSizePt ?? 0) || a.y-b.y)[0];
   const value = clean(best?.text.split("\n")[0] ?? "");
   return monitorSceneTitle(elements, value || "Slide " + page);
 }
@@ -383,8 +386,12 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
   const scenes: MonitorDocumentSceneDraft[] = [];
   const warnings: string[] = [];
   const registry = new Map<string,string>();
-  const slides = [...entries.keys()].filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+  const numberedSlides = [...entries.keys()].filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
     .sort((a,b) => Number(a.match(/(\d+)/)?.[1])-Number(b.match(/(\d+)/)?.[1]));
+  const presentationXml = entries.get("ppt/presentation.xml")?.toString("utf8") ?? "";
+  const presentationRels = relationships(entries, "ppt/presentation.xml");
+  const orderedSlides = [...presentationXml.matchAll(/<p:sldId\b[^>]*\br:id="([^"]+)"/g)].map(match => presentationRels.get(match[1])?.target).filter((path): path is string => Boolean(path && entries.has(path)));
+  const slides = orderedSlides.length ? orderedSlides : numberedSlides;
 
   slides.forEach((slidePath,index) => {
     const page = index + 1;
@@ -392,10 +399,50 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     const rels = relationships(entries, slidePath);
     let elements: MonitorSlideElement[] = [];
     const searchable: string[] = [];
+    const groupStack: Array<{ id: string; start: number; parentId?: string; children: string[]; nativeTransform: string; end: number }> = [];
+    const groups: typeof groupStack = [];
+    for (const match of xml.matchAll(/<p:grpSp\b[^>]*>|<\/p:grpSp>/g)) {
+      if (match[0].startsWith("</")) { const group = groupStack.pop(); if (group) group.end = match.index!; }
+      else {
+        const head = xml.slice(match.index!, xml.indexOf("</p:grpSpPr>", match.index!) + 16);
+        const id = `s${page}:g${head.match(/<p:cNvPr\b[^>]*\bid="([^"]+)"/)?.[1] ?? groups.length}`;
+        const group = { id, start: match.index!, end: xml.length, parentId: groupStack.at(-1)?.id, children: [] as string[], nativeTransform: head.match(/<a:xfrm\b[\s\S]*?<\/a:xfrm>/)?.[0] ?? "" };
+        if (groupStack.length) groupStack.at(-1)!.children.push(id);
+        groups.push(group); groupStack.push(group);
+      }
+    }
+    const issues: CompilerIssue[] = [];
+    const native: Array<Partial<CompilerNode>> = [];
+    const issue = (code: string, message: string) => issues.push({ code, message, nodeIds: [], severity: "error" });
+    if (/<p:grpSp\b/.test(xml)) issue("GROUP_TRANSFORM", "Grupo nativo exige renderização fiel com transformações hierárquicas.");
+    if (/<(?:p:cxnSp|p:oleObj|dgm:relIds|mc:AlternateContent)\b/.test(xml)) issue("UNSUPPORTED_OBJECT", "Conector, objeto incorporado, diagrama ou representação alternativa nativa.");
+    for (const layoutRel of [...rels.values()].filter(rel => rel.type.endsWith("/slideLayout"))) {
+      const layoutXml = entries.get(layoutRel.target)?.toString("utf8") ?? "";
+      const master = [...relationships(entries, layoutRel.target).values()].find(rel => rel.type.endsWith("/slideMaster"));
+      const inherited = layoutXml + (master ? entries.get(master.target)?.toString("utf8") ?? "" : "");
+      const inheritedObjects = blocks(inherited).filter(item => {
+        if (item.kind === "picture" || item.kind === "frame") return true;
+        const placeholder = item.xml.match(/<p:ph\b[^>]*\/?\s*>/)?.[0];
+        if (!placeholder) return textNodes(item.xml).some(text => clean(text)) || /<a:(?:solidFill|blipFill|custGeom)\b/.test(item.xml);
+        // Master title/body strings are editing prompts, not inherited slide
+        // content. Dynamic headers/footers are information only when enabled.
+        const type = attribute(placeholder, "type");
+        return ["dt", "ftr", "sldNum", "hdr"].includes(type) && new RegExp(`<p:hf\\b[^>]*\\b${type}="(?:1|true)"`).test(xml + inherited);
+      });
+      if (inheritedObjects.length) issue("INHERITED_CONTENT", "Layout/master contém elementos visuais herdados; usar renderização nativa.");
+    }
     let z = 0;
     for (const item of blocks(xml)) {
       const b = box(item.xml,size.width,size.height);
-      if (!b) continue;
+      if (!b) { issue("UNRESOLVED_GEOMETRY", "Objeto com geometria não resolvida; conteúdo original permanece protegido."); continue; }
+      const start = elements.length;
+      const nativeId = item.xml.match(/<p:cNvPr\b[^>]*\bid="([^"]+)"/)?.[1];
+      const parent = [...groups].reverse().find(group => item.index > group.start && item.index < group.end);
+      let nativeMetadata: Record<string, unknown> | undefined;
+      const rotation = Number(item.xml.match(/<(?:a|p):xfrm\b[^>]*\brot="([^"]+)"/)?.[1] ?? 0) / 60000;
+      if (rotation || /<(?:a|p):xfrm\b[^>]*\bflip[HV]="(?:1|true)"/.test(item.xml) || /<a:srcRect\b/.test(item.xml)) issue("NATIVE_TRANSFORM", "Recorte, rotação ou espelhamento exige renderização nativa.");
+      const nativeGeometry = item.xml.match(/<a:prstGeom\b[^>]*\bprst="([^"]+)"/)?.[1];
+      if (nativeGeometry && !["rect", "roundRect"].includes(nativeGeometry) || /<a:custGeom\b/.test(item.xml)) issue("NATIVE_SHAPE", "Forma não retangular precisa manter a composição nativa.");
       if (item.kind === "shape") {
         const text = clean(paragraphs(item.xml).join("\n"));
         const sp = item.xml.match(/<p:spPr\b[^>]*>([\s\S]*?)<\/p:spPr>/)?.[1] ?? "";
@@ -417,6 +464,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const imageLabel = clean(attribute(meta, "descr") || attribute(meta, "title") || attribute(meta, "name"));
         if (imageLabel) searchable.push(imageLabel);
         if (correction && !assetKey) throw new Error(`Slide ${page}: figura de correção indisponível. Nenhuma cena publicada.`);
+        if (!assetKey) issue("MISSING_IMAGE", "Figura não extraída: usar o original nativo.");
         if (assetKey) elements.push({kind:"image",...b,assetKey,z:z*10+1});
       } else {
         const rid = item.xml.match(/<c:chart\b[^>]*\br:id="([^"]+)"/)?.[1];
@@ -424,6 +472,11 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         if (target) {
           const labelWarnings: string[] = [];
           const parsed = chart(entries.get(target)?.toString("utf8") ?? "",theme,labelWarnings);
+          if (labelWarnings.length) issue("CHART_LABELS", labelWarnings.join(" "));
+          const chartXml = entries.get(target)?.toString("utf8") ?? "";
+          nativeMetadata = { allSeries: series(chartXml, theme, []), sourcePart: target };
+          const chartKinds = [...chartXml.matchAll(/<c:(?:bar|line|pie|doughnut|area|scatter|radar|bubble|surface|stock)(?:3D)?Chart\b/g)];
+          if (chartKinds.length !== 1) issue("COMPLEX_CHART", "Gráfico combinado ou tipo nativo não reconstruível com confiança.");
           warnings.push(...labelWarnings.map(warning => `Slide ${page}: ${warning}`));
           if (["unknown", "area", "scatter"].includes(parsed.type)) warnings.push("Slide " + page + ": gráfico " + parsed.type + " requer consulta ao original; renderização fiel ainda não disponível.");
           if (parsed.series.length) {
@@ -437,38 +490,23 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const rows = tableRows(item.xml);
         if (rows.length) { searchable.push(...rows.flat()); elements.push({kind:"table",...b,columns:rows[0]??[],rows:rows.slice(1),z:z*10+1}); }
       }
+      for (let i = start; i < elements.length; i++) native[i] = { nativeId, nativeType: item.kind, origin: slidePath, rotation, nativeMetadata, parentId: parent?.id };
       z += 1;
     }
-    const chartBoxes = elements.filter((element) => element.kind === "chart");
-    const neutralFills = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
-    elements = correction ? elements : elements.filter((element) => {
-      if (element.kind !== "shape" || !element.fill || !neutralFills.has(element.fill.toUpperCase())) return true;
-      const area = element.w * element.h;
-      if (area < 0.04) return true;
-      const overlapsChart = chartBoxes.some((chartElement) => {
-        const overlapW = Math.max(0, Math.min(element.x + element.w, chartElement.x + chartElement.w) - Math.max(element.x, chartElement.x));
-        const overlapH = Math.max(0, Math.min(element.y + element.h, chartElement.y + chartElement.h) - Math.max(element.y, chartElement.y));
-        const overlapArea = overlapW * overlapH;
-        return overlapArea / Math.max(area, 0.0001) >= 0.25;
-      });
-      return !overlapsChart;
-    });
-
-    if (!correction) elements = preserveChartAnnotations(elements);
-    const presentation = correction ? { elements, omitted: [], adjustments: [] } : prepareMonitorElements(elements);
-    for (const reason of new Set(presentation.omitted.map((item) => item.reason))) {
-      warnings.push("Slide " + page + ": " + reason + ". Omitido na exibição institucional; original preservado.");
-    }
-    for (const adjustment of presentation.adjustments) {
-      warnings.push("Slide " + page + ": " + adjustment + " Original preservado.");
-    }
-    if (/p:grpSp\b/.test(xml)) warnings.push("Slide " + page + ": grupo de objetos detectado; revisar prévia.");
+    const rawStrings = paragraphs(xml);
+    const lost = missingTokens(rawStrings, elements.flatMap(elementStrings));
+    if (lost.length) issue("UNEXTRACTED_TEXT", `${lost.length} tokens XML não correspondem aos objetos extraídos.`);
+    const compiled = compileSlide({ elements, title: slideTitle(elements, page), page, rawHash: createHash("sha256").update(buffer).digest("hex"), structuralHash: compilerHash({ xml, relationships: [...rels.values()], rawHash: createHash("sha256").update(buffer).digest("hex") }), native, issues });
+    for (const node of compiled.parsedInput.nodes) if (node.parentId) groups.find(group => group.id === node.parentId)?.children.push(node.id);
+    compiled.parsedInput.groups = groups.map(({ id, parentId, children, nativeTransform }) => ({ id, parentId, children, nativeTransform }));
+    if (!correction) elements = compiled.normalizedContent.elements;
     scenes.push({
       sceneType:"TEXT",
-      title:slideTitle(elements,page),
+      title:compiled.normalizedContent.title,
       sourcePage:page,
       payload:{
         ...(correction ? { correction: { version: 1 as const, preserveLayout: true as const, fullFrame: true as const } } : {}),
+        inputCompiler: compiled,
         layoutVersion:2,
         layout:{version:2,width:size.width,height:size.height,elements},
         searchableText:[...new Set(searchable.map(clean).filter(Boolean))],

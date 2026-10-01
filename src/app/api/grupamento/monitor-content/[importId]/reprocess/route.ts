@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
+import { createSemanticClassifier } from "@/modules/grupamento/monitor-content/compiler/semantic-provider";
 import { extractMonitorDocument } from "@/modules/grupamento/monitor-content/extract";
 import {
   getMonitorContentForReprocess,
@@ -12,7 +13,8 @@ import { prisma } from "@/server/db";
 export const runtime = "nodejs";
 
 const ALLOWED_ROLES = new Set(["ADMIN", "LOGISTICS_MANAGER"]);
-const PROCESS_TIMEOUT_MS = 45_000;
+export const maxDuration = 300;
+const PROCESS_TIMEOUT_MS = 280_000;
 
 async function withTimeout<T>(promise: Promise<T>) {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -20,7 +22,7 @@ async function withTimeout<T>(promise: Promise<T>) {
     return await Promise.race([
       promise,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Reprocessamento documental excedeu 45 segundos.")), PROCESS_TIMEOUT_MS);
+        timer = setTimeout(() => reject(new Error("Reprocessamento documental excedeu 280 segundos.")), PROCESS_TIMEOUT_MS);
       }),
     ]);
   } finally {
@@ -41,7 +43,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ im
     if (!source) return NextResponse.json({ error: "Documento não encontrado." }, { status: 404 });
 
     const buffer = Buffer.from(source.rawFile);
-    const extraction = await withTimeout(extractMonitorDocument(buffer, source.fileName));
+    const extraction = await withTimeout(extractMonitorDocument(buffer, source.fileName, createSemanticClassifier(session.user.organizationId)));
     if (!extraction.scenes.length) return NextResponse.json({ error: "O reprocessamento não gerou cenas válidas." }, { status: 422 });
 
     const updated = await replaceMonitorContentExtraction({

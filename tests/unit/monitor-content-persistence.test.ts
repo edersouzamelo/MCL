@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   $transaction: vi.fn(),
   monitorContentImport: { findUnique: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+  monitorContentRevision: { create: vi.fn() },
   monitorContentAsset: { createMany: vi.fn(), deleteMany: vi.fn() },
   monitorContentScene: { createMany: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
 }));
