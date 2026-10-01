@@ -45,3 +45,6 @@ server-start.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Reconstructed from verified presentation parts during build
+/public/downloads/mcl-salvador-13-set-26-final.pptx

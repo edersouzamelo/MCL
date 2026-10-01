@@ -38,6 +38,11 @@ export default function TechnicalGuidePage() {
               <li key={stage.id}><Link className="block rounded-lg border border-zinc-200 px-3 py-2 text-sm font-semibold text-zinc-800 hover:border-sky-400 dark:border-zinc-800 dark:text-zinc-200" href={stage.href}>{stage.number} · {stage.title}</Link></li>
             ))}
           </ol>
+          <section aria-labelledby="entenda-mcl-title" className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/20">
+            <h3 id="entenda-mcl-title" className="text-lg font-bold text-zinc-950 dark:text-zinc-50">Entenda o MCL</h3>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Apresentação do Modelo de Continuidade Logística em Salvador, em 13 SET 26.</p>
+            <a className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 dark:bg-sky-600 dark:hover:bg-sky-500" href="/downloads/mcl-salvador-13-set-26-final.pptx" download="MCL Salvador - 13 SET 26 final.pptx">Baixar apresentação (PPTX)</a>
+          </section>
         </Card>
 
         <Card className="border-t-4 border-t-emerald-500">
