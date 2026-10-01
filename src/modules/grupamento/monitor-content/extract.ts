@@ -2,6 +2,7 @@ import { inflateRawSync, deflateSync } from "node:zlib";
 import { posix } from "node:path";
 import { extractImages, extractTextItems, getDocumentProxy } from "unpdf";
 import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
+import { composeTextDocument, isDocumentHeading, plainTextBlocks, pdfTextBlocks, type DocumentBlock } from "./text-document";
 import { stampMonitorExtraction } from "@/modules/grupamento/monitor-content/version";
 import type {
   MonitorDocumentAssetDraft,
@@ -273,33 +274,34 @@ function extractDocx(buffer: Buffer): MonitorDocumentExtraction {
   const warnings: string[] = [];
   const registry = new Map<string, string>();
 
-  const paragraphs = [...xml.matchAll(/<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g)]
-    .map((match) => textNodes(match[1]).join(" "))
-    .map(cleanText)
-    .filter(Boolean);
-
-  for (let index = 0; index < paragraphs.length; index += 6) {
-    const group = paragraphs.slice(index, index + 6);
-    const candidate = group[0] ?? "";
-    const title = candidate.length <= 120 ? candidate : `Documento · trecho ${Math.floor(index / 6) + 1}`;
-    const bullets = candidate === title ? group.slice(1) : group;
-    scenes.push({ sceneType: "TEXT", title, sourcePage: Math.floor(index / 6) + 1, payload: { layoutVersion: 2, bullets: bullets.slice(0, 7), searchableText: group } });
+  const blocks: DocumentBlock[] = [];
+  const rels = relationshipTargets(entries, "word/document.xml", "word/_rels/document.xml.rels");
+  // Read tables and paragraphs in document order. Table paragraphs must not
+  // appear a second time as prose, and adjacent runs must keep their spelling.
+  const paragraphText = (xml: string) => [...xml.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:(tab|br)\b[^>]*\/?\s*>/g)]
+    .map(match => match[2] ? " " : decodeXml(match[1])).join("").replace(/\s+/g, " ").trim();
+  for (const match of xml.matchAll(/<w:tbl\b[^>]*>[\s\S]*?<\/w:tbl>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)) {
+    const block = match[0];
+    if (block.startsWith("<w:tbl")) {
+      const rows = [...block.matchAll(/<w:tr\b[^>]*>([\s\S]*?)<\/w:tr>/g)].map(row =>
+        [...row[1].matchAll(/<w:tc\b[^>]*>([\s\S]*?)<\/w:tc>/g)].map(cell =>
+          [...cell[1].matchAll(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g)].map(p => paragraphText(p[0])).join(" ")));
+      if (rows.length) blocks.push({ kind: "table", rows });
+    } else {
+      const text = paragraphText(block);
+      const styledHeading = /<w:pStyle\b[^>]*w:val="(?:Heading|T[ií]tulo|Title|Titulo)[^"]*"/i.test(block) || /<w:outlineLvl\b/.test(block);
+      if (text) blocks.push({ kind: styledHeading || isDocumentHeading(text) ? "heading" : "paragraph", text });
+    }
+    const keys = [...block.matchAll(/<a:blip\b[^>]*r:embed="([^"]+)"/g)]
+      .map(match => rels.find(rel => rel.id === match[1] && rel.type.endsWith("/image")))
+      .filter(rel => rel !== undefined)
+      .map(rel => registerAsset(entries, rel.target, assets, registry, warnings))
+      .filter((key): key is string => Boolean(key));
+    for (let index = 0; index < keys.length; index += 2) blocks.push({ kind: "figure", assetKeys: keys.slice(index, index + 2) });
   }
+  scenes.push(...composeTextDocument(blocks, "Documento Word"));
 
-  const tables = [...xml.matchAll(/<w:tbl\b[^>]*>([\s\S]*?)<\/w:tbl>/g)].map((table) =>
-    [...table[1].matchAll(/<w:tr\b[^>]*>([\s\S]*?)<\/w:tr>/g)].map((row) =>
-      [...row[1].matchAll(/<w:tc\b[^>]*>([\s\S]*?)<\/w:tc>/g)].map((cell) => textNodes(cell[1]).join(" ")),
-    ).filter((row) => row.some(Boolean)),
-  ).filter((rows) => rows.length);
-
-  tables.forEach((rows, index) => scenes.push({
-    sceneType: "TABLE",
-    title: `Tabela ${index + 1} do documento`,
-    sourcePage: index + 1,
-    payload: { layoutVersion: 2, columns: rows[0] ?? [], rows: rows.slice(1, 10), searchableText: rows.flat() },
-  }));
-
-  const media = [...entries.keys()].filter((name) => name.startsWith("word/media/"));
+  const media = [...entries.keys()].filter((name) => name.startsWith("word/media/") && !registry.has(name));
   const imageKeys = media
     .map((path) => registerAsset(entries, path, assets, registry, warnings))
     .filter((key): key is string => Boolean(key));
@@ -308,12 +310,13 @@ function extractDocx(buffer: Buffer): MonitorDocumentExtraction {
     scenes.push({
       sceneType: "FIGURE",
       title: `Figura do documento · ${Math.floor(index / 2) + 1}`,
-      payload: { layoutVersion: 2, assetKeys: imageKeys.slice(index, index + 2) },
+      payload: { textDocument: { version: 1 }, layoutVersion: 2, assetKeys: imageKeys.slice(index, index + 2) },
     });
   }
 
   if (!scenes.length) warnings.push("Nenhuma cena estruturada pôde ser extraída do Word.");
-  return { scenes: scenes.slice(0, 80), assets, warnings };
+  if (scenes.length > 80) throw new Error("O documento gera mais de 80 telas. Divida o arquivo em partes.");
+  return { scenes, assets, warnings };
 }
 
 function crc32(data: Buffer) {
@@ -352,27 +355,6 @@ function rawImageToPng(data: Uint8ClampedArray, width: number, height: number, c
   return Buffer.concat([signature, pngChunk("IHDR", ihdr), pngChunk("IDAT", deflateSync(raw)), pngChunk("IEND", Buffer.alloc(0))]);
 }
 
-function pageText(items: Array<{ str: string; x: number; y: number }>) {
-  const ordered = [...items].sort((a, b) => Math.abs(a.y - b.y) > 2 ? b.y - a.y : a.x - b.x);
-  const lines: string[] = [];
-  let currentY: number | null = null;
-  let line: string[] = [];
-  for (const item of ordered) {
-    if (currentY === null || Math.abs(item.y - currentY) <= 2) {
-      line.push(item.str);
-      currentY ??= item.y;
-    } else {
-      const text = cleanText(line.join(" "));
-      if (text) lines.push(text);
-      line = [item.str];
-      currentY = item.y;
-    }
-  }
-  const last = cleanText(line.join(" "));
-  if (last) lines.push(last);
-  return uniqueText(lines);
-}
-
 async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
   const warnings: string[] = [
     "PDF: gráficos vetoriais e elementos desenhados podem não ser decompostos como figura isolada; o arquivo original permanece preservado para conferência.",
@@ -387,8 +369,8 @@ async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
   let imageCount = 0;
   for (let index = 0; index < items.length; index += 1) {
     const pageNumber = index + 1;
-    const lines = pageText(items[index] as Array<{ str: string; x: number; y: number }>);
-    const title = shortTitle(lines[0] ?? "", `Página ${pageNumber}`);
+    const blocks = pdfTextBlocks(items[index], pageNumber);
+    const title = blocks.find(block => block.kind === "heading")?.text ?? `Página ${pageNumber}`;
     const assetKeys: string[] = [];
 
     if (imageCount < MAX_PDF_IMAGES) {
@@ -408,21 +390,20 @@ async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
           });
           assetKeys.push(key);
           imageCount += 1;
-          if (assetKeys.length >= 2) break;
+          if (assetKeys.length >= 2) {
+            if (images.length > 2) warnings.push(`Página ${pageNumber}: há mais de duas figuras. Confira as figuras adicionais no arquivo original.`);
+            break;
+          }
         }
       } catch {
         warnings.push(`Página ${pageNumber}: figuras não puderam ser decompostas; o texto permaneceu disponível.`);
       }
-    }
+    } else warnings.push(`Página ${pageNumber}: limite de figuras extraídas atingido; confira o arquivo original.`);
 
-    scenes.push({
-      sceneType: lines.length ? "TEXT" : "FIGURE",
-      title,
-      sourcePage: pageNumber,
-      payload: lines.length
-        ? { layoutVersion: 2, bullets: lines.slice(1, 9), assetKeys, searchableText: lines, note: "Página do PDF reinterpretada como cena MCL; o arquivo original permanece preservado." }
-        : { layoutVersion: 2, assetKeys },
-    });
+    if (blocks.length) scenes.push(...composeTextDocument(blocks, title));
+    if (assetKeys.length) scenes.push(...composeTextDocument([{ kind: "figure", assetKeys, page: pageNumber }], title));
+    if (!blocks.length) warnings.push(`Página ${pageNumber}: sem texto selecionável. Figuras extraídas foram preservadas; o MCL não inventa texto nem faz OCR desta página.`);
+    if (scenes.length > 80) throw new Error("O PDF gera mais de 80 telas. Divida o arquivo em partes; nenhum conteúdo foi publicado parcialmente.");
   }
 
   if (!items.length) warnings.push("PDF sem camada textual reconhecível.");
@@ -435,10 +416,19 @@ export async function extractMonitorDocument(buffer: Buffer, fileName: string): 
   if (extension === "pptx") extraction = extractPptxLayout(buffer);
   else if (extension === "docx") extraction = extractDocx(buffer);
   else if (extension === "pdf") extraction = await extractPdf(buffer);
+  else if (extension === "txt") {
+    let text: string;
+    if (buffer[0] === 0xff && buffer[1] === 0xfe) text = buffer.subarray(2).toString("utf16le");
+    else {
+      try { text = new TextDecoder("utf-8", { fatal: true }).decode(buffer); }
+      catch { text = new TextDecoder("windows-1252").decode(buffer); }
+    }
+    extraction = { scenes: composeTextDocument(plainTextBlocks(text), "Documento de texto"), assets: [], warnings: [] };
+  }
   else if (extension === "ppt" || extension === "doc") {
     throw new Error("Formato legado .ppt/.doc não suportado. Salve como .pptx/.docx ou PDF antes da importação.");
   } else {
-    throw new Error("Formato não suportado. Use PDF, PPTX ou DOCX.");
+    throw new Error("Formato não suportado. Use PDF, PPTX, DOCX ou TXT.");
   }
   return stampMonitorExtraction(extraction);
 }

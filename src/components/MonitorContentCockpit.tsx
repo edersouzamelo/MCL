@@ -92,8 +92,8 @@ export function MonitorContentCockpit({
       }
     }
     const extension = file.name.toLowerCase().split(".").pop() ?? "";
-    if (!["pdf", "pptx", "docx"].includes(extension)) {
-      setError("Use PDF, PPTX ou DOCX. Arquivos .ppt/.doc antigos devem ser salvos no formato atual.");
+    if (!["pdf", "pptx", "docx", "txt"].includes(extension)) {
+      setError("Use PDF, PPTX, DOCX ou TXT. Arquivos .ppt/.doc antigos devem ser salvos no formato atual.");
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
@@ -242,12 +242,12 @@ export function MonitorContentCockpit({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black">Cockpit de apresentação</div>
-              <p className="mt-1 max-w-2xl text-[11px] leading-5 text-zinc-500">PDF, PowerPoint (.pptx) ou Word (.docx). O MCL preserva o original, extrai cenas e só coloca o conteúdo na TV depois da sua aprovação.</p>
+              <p className="mt-1 max-w-2xl text-[11px] leading-5 text-zinc-500">PDF, PowerPoint (.pptx), Word (.docx) ou texto (.txt). O MCL preserva o original, extrai cenas e só coloca o conteúdo na TV depois da sua aprovação.</p>
             </div>
             <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-zinc-950 ${busy ? "pointer-events-none opacity-50" : ""}`}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               {busy ? (progress || "Processando…") : "Importar documento"}
-              <input type="file" className="sr-only" accept=".pdf,.pptx,.docx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.currentTarget.value = ""; }} />
+              <input type="file" className="sr-only" accept=".pdf,.pptx,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); event.currentTarget.value = ""; }} />
             </label>
           </div>
 

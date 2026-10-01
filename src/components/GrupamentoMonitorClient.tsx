@@ -215,7 +215,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const safeIndex = captureMode ? Math.min(captureFrame, Math.max(0, playlist.length - 1)) : Math.min(screenIndex, Math.max(0, playlist.length - 1));
   const activeItem = playlist[safeIndex] ?? null;
   const activeScreen = activeItem?.kind === "system" ? activeItem.screen : null;
-  const screenLabel = activeItem?.label ?? "Sem conteúdo selecionado";
+  const screenLabel = activeItem?.label ?? "Aguardando apresentação";
   const dataProvenance = useMemo(() => {
     if (!activeItem) return "Sem fonte ativa";
     if (activeItem.kind === "document") {
@@ -303,7 +303,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   const screenContent = !monitor.enabled ? (
     <Empty ccol={ccol} title="Monitor desativado" description="Ative esta saída na matriz do CCOL para voltar a exibir conteúdo." />
   ) : !activeItem ? (
-    <Empty ccol={ccol} title="Sem conteúdo selecionado" description="Selecione uma tela SAG ou aprove conteúdo documental para esta saída." />
+    <MonitorBootScreen ccol={ccol} connectionState={connectionState} waiting />
   ) : activeItem.kind === "document" ? (
     <MonitorDocumentScene scene={activeItem.scene} ccol={ccol} briefing={briefing} cycleSeconds={Math.max(5, monitor.delaySeconds)} paused={captureMode || playbackState !== "playing"} onPageCount={onPageCount} />
   ) : !sag || !rpn ? (
@@ -448,16 +448,16 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
   );
 }
 
-function MonitorBootScreen({ ccol, connectionState }: { ccol: boolean; connectionState: "online" | "offline" | "syncing" }) {
+function MonitorBootScreen({ ccol, connectionState, waiting = false }: { ccol: boolean; connectionState: "online" | "offline" | "syncing"; waiting?: boolean }) {
   return (
-    <div className="flex h-full min-h-[55vh] items-center justify-center">
+    <div className="flex h-full min-h-0 items-center justify-center" data-monitor-standby>
       <div className="mcl-monitor-boot text-center">
-        <div className={`mx-auto flex h-40 w-40 items-center justify-center rounded-[2rem] border backdrop-blur-xl ${ccol ? "border-sky-900/10 bg-white/55 shadow-[0_24px_70px_rgba(15,23,42,.10)]" : "border-sky-400/12 bg-slate-950/28 shadow-[0_24px_80px_rgba(14,165,233,.08)]"}`}>
-          <BrandLogo className="h-28 w-28" tone={ccol ? "green" : "sky"} sizes="112px" />
+        <div className={`mx-auto flex items-center justify-center rounded-[2rem] border backdrop-blur-xl ${ccol ? "border-sky-900/10 bg-white/55 shadow-[0_24px_70px_rgba(15,23,42,.10)]" : "border-sky-400/12 bg-slate-950/28 shadow-[0_24px_80px_rgba(14,165,233,.08)]"}`} style={{ width: "min(38vw, 44vh)", height: "min(38vw, 44vh)" }}>
+          <BrandLogo className="h-4/5 w-4/5" tone={ccol ? "green" : "sky"} sizes="40vw" priority />
         </div>
         <div className={`mt-7 text-[11px] font-black uppercase tracking-[0.34em] ${ccol ? "text-sky-900" : "text-sky-300"}`}>Modelo de Continuidade Logística</div>
         <div className={`mt-3 text-sm font-semibold ${ccol ? "text-slate-500" : "text-slate-500"}`}>
-          {connectionState === "offline" ? "Aguardando fonte local validada" : "Inicializando quadro logístico"}
+          {waiting ? "Aguardando apresentação" : connectionState === "offline" ? "Aguardando fonte local validada" : "Inicializando quadro logístico"}
         </div>
       </div>
     </div>

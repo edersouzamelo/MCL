@@ -2,6 +2,7 @@
 "use client";
 
 import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
+import { MonitorDocumentText } from "@/components/MonitorDocumentText";
 import { monitorTitleElements, monitorIntegralImage } from "@/modules/grupamento/monitor-content/presentation-title";
 import { OmMentions } from "@/components/OmIdentity";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -68,7 +69,7 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
       letterSpacing: item.role === "label" ? ".02em" : undefined,
       opacity: area < 0.002 ? 0.94 : 1,
     }}>
-      {preserve ? item.text : <OmMentions text={item.text} header={item.role === "title" || item.y < .15} />}
+      {preserve ? item.text : <OmMentions text={item.text} prose={item.role !== "title"} header={item.role === "title" || item.y < .15} />}
     </div>
   );
 }
@@ -148,8 +149,12 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
     table: { columns: payload.columns, rows: payload.rows, y: 1 },
     texts: (payload.bullets ?? []).map((text, index): MonitorSlideTextElement => ({kind:'text', text, role:'body', bold:false, x:0, y:0, w:1, h:.1, z:index})),
   } : null;
+  const textDocument = Boolean(payload.textDocument && scene.sceneType === "TEXT" && !payload.onlineEditor && !payload.correction?.preserveLayout);
   const hasTableSlide = Boolean(tableSlide || (!payload.correction?.preserveLayout && payload.layout?.elements.some(item => item.kind === 'table')));
-  useEffect(() => { if (!hasTableSlide) onPageCount?.(1); }, [hasTableSlide, onPageCount]);
+  useEffect(() => { if (!hasTableSlide && !textDocument) onPageCount?.(1); }, [hasTableSlide, textDocument, onPageCount]);
+  if (textDocument) return <MonitorTitleFrame title={scene.title} light={ccol || briefing}>
+    <MonitorDocumentText paragraphs={payload.bullets ?? []} source={scene.sourceFileName} sourcePage={scene.sourcePage} light={ccol || briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
+  </MonitorTitleFrame>;
   if (tableSlide) {
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
     const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
@@ -192,7 +197,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
           {bullets.map((bullet, index) => (
             <div key={index} className={"mcl-broadcast-card flex items-start gap-3 rounded-2xl border px-5 py-4 text-lg font-semibold leading-7 " + (ccol ? "border-slate-300 bg-white/80" : "border-white/10 bg-white/[0.03]")}>
               <span className={"mt-2 h-2 w-2 shrink-0 rounded-full " + (ccol ? "bg-sky-700" : "bg-sky-400")} />
-              <span><OmMentions text={bullet} /></span>
+              <span><OmMentions text={bullet} prose /></span>
             </div>
           ))}
         </div>
