@@ -29,6 +29,24 @@ async function verify() {
   expect(await page.locator('.ccol-monitor-screen img').evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
   expect(await page.locator('.ccol-monitor-screen img').nth(3).getAttribute('src')).toBe(await page.locator('.ccol-monitor-screen img').nth(4).getAttribute('src'));
   await expect(page.locator('.ccol-monitor-divider')).toHaveCount(2);
+  await expect(page.locator('.ccol-monitor-screen img').nth(5)).toHaveAttribute('src', '/ccol-covers/class-ix.webp');
+  await expect(page.locator('.ccol-monitor-screen img').nth(6)).toHaveAttribute('src', '/ccol-covers/class-viii.webp');
+  await expect(page.locator('.ccol-monitor-screen img').nth(7)).toHaveAttribute('src', '/ccol-covers/transport.webp');
+  const sagToggle = page.getByRole('button', { name: 'Inserir carga do SAG', exact: true });
+  await expect(page.getByText('Situação orçamentária consolidada', { exact: true })).toBeHidden();
+  await expect(sagToggle).toHaveAttribute('aria-expanded', 'false');
+  const actionPositions = await page.getByRole('button', { name: /Inserir carga do SAG|Exportar Briefing Logístico atual/ }).evaluateAll((buttons) => buttons.map((button) => { const box = button.getBoundingClientRect(); return { x: box.x, y: box.y, height: box.height }; }));
+  expect(actionPositions[0].x).toBeLessThan(actionPositions[1].x);
+  expect(actionPositions[0].y).toBe(actionPositions[1].y);
+  expect(actionPositions[0].height).toBe(actionPositions[1].height);
+  await sagToggle.click();
+  await expect(page.getByText('Situação orçamentária consolidada', { exact: true })).toBeVisible();
+  await expect(page.getByText('Carga SAG: arquitetura híbrida', { exact: true })).toBeVisible();
+  await expect(page.locator('#ccol-sag-load')).toHaveAttribute('aria-hidden', 'false');
+  expect(await page.locator('#ccol-sag-load').evaluate((el) => el.getBoundingClientRect().y)).toBeGreaterThan(await sagToggle.evaluate((el) => el.getBoundingClientRect().y));
+  await sagToggle.click();
+  await expect(page.getByText('Situação orçamentária consolidada', { exact: true })).toBeHidden();
+
   await page.locator('.ccol-monitor-trigger').first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/workspace/scratch/55a592607734/panel.png", fullPage: true });
   await page.getByRole("button", { name: "Configurar Monitor 1", exact: true }).click();
