@@ -28,6 +28,8 @@ export function MonitorContentSceneThumbnail({
   title: string;
 }) {
   const layout = payload?.layout;
+  const native = payload?.inputCompiler?.nativeReference?.assetId;
+  if (native && ["NATIVE_FALLBACK", "BLOCKED"].includes(payload?.inputCompiler?.strategy ?? "")) return <div className="aspect-video w-full overflow-hidden rounded-lg bg-slate-950"><img src={"/api/grupamento/monitor-content/assets/" + native} alt={title} className="h-full w-full object-contain" /></div>;
   if (!layout) {
     return (
       <div className="flex aspect-video items-center justify-center rounded-lg bg-slate-950 p-4 text-center text-[11px] font-bold text-slate-200">
@@ -36,7 +38,7 @@ export function MonitorContentSceneThumbnail({
     );
   }
 
-  const presentation = prepareMonitorElements(layout.elements);
+  const presentation = payload?.inputCompiler ? { elements: layout.elements, omitted: [] } : prepareMonitorElements(layout.elements);
   const prepared = payload?.onlineEditor ? { elements: layout.elements, title, promotedChartTitle: layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements(presentation.elements, title);
   const integralImage = monitorIntegralImage(payload ?? {});
   const visibleElements = (integralImage ? [...layout.elements] : prepared.elements).sort((a, b) => a.z - b.z);

@@ -22,9 +22,14 @@ export function editorRevision(scene: Pick<EditorScene, "payload">) { return sce
 /** Convert once to the same body coordinates used by the presentation. */
 export function prepareEditorScene(scene: EditorScene): EditorScene {
   scene = structuredClone(scene);
-  if (scene.payload.onlineEditor || !scene.payload.layout) return scene;
+  if (scene.payload.onlineEditor) return scene;
+  const reference = scene.payload.inputCompiler?.nativeReference;
+  if (scene.payload.inputCompiler?.strategy === "NATIVE_FALLBACK" && reference?.assetId) return {
+    ...scene, payload: { ...scene.payload, onlineEditor: { version: 1, revision: 0 }, layout: { version: 2, width: reference.width, height: reference.height, ...scene.payload.layout, elements: [{ kind: "image", assetId: reference.assetId, x: 0, y: 0, w: 1, h: 1, z: 1 }] } },
+  };
+  if (!scene.payload.layout) return scene;
   const integral = monitorIntegralImage(scene.payload);
-  const prepared = monitorTitleElements(prepareMonitorElements(scene.payload.layout.elements).elements, scene.title);
+  const prepared = monitorTitleElements(scene.payload.inputCompiler ? scene.payload.layout.elements : prepareMonitorElements(scene.payload.layout.elements).elements, scene.title);
   const elements = (integral ? scene.payload.layout.elements : prepared.elements).map(item => item.kind === "text" ? {
     ...item, fontFace: "Arial", fontSizePt: Math.max(10, Math.min(72, item.fontSizePt ?? 18)), role: item.role === "title" ? "body" as const : item.role,
     color: /^#[0-9a-f]{6}$/i.test(item.color ?? "") ? item.color : "#111827",

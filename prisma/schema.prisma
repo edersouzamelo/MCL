@@ -246,9 +246,35 @@ model MonitorContentImport {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   scenes         MonitorContentScene[]
   assets         MonitorContentAsset[]
+  revisions      MonitorContentRevision[]
 
   @@unique([organizationId, monitorId, checksum])
   @@index([organizationId, monitorId, status, importedAt])
+}
+
+// Append-only derivations; assets referenced by revisions are retained.
+model MonitorContentRevision {
+  id              String @id @default(uuid())
+  importId        String
+  sourceHash      String
+  compilerVersion Int
+  createdAt       DateTime @default(now())
+  actorId         String
+  kind            String
+  scenes          Json
+  import          MonitorContentImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId, createdAt])
+}
+
+model MonitorCompilerDecision {
+  id             String @id @default(uuid())
+  organizationId String
+  cacheKey       String
+  model          String
+  decision       Json
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, cacheKey])
 }
 
 model CcoMonitorConfiguration {

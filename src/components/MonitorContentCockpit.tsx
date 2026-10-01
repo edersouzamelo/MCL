@@ -5,6 +5,8 @@ import { Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, FileTe
 import { AnimatedMonitorSection } from "@/components/CcolMonitorCard";
 import { MonitorContentSceneThumbnail } from "@/components/MonitorContentSceneThumbnail";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
+import { MonitorCompilerDiagnostics } from "@/components/MonitorCompilerDiagnostics";
+import { compilerBlocked } from "@/modules/grupamento/monitor-content/compiler/contracts";
 import type { MonitorDocumentSceneDto, MonitorDocumentScenePayload } from "@/modules/grupamento/monitor-content/types";
 
 type ScenePreview = {
@@ -266,7 +268,7 @@ export function MonitorContentCockpit({
                 </div>
                 <div className="flex gap-2">
                   <a href={`/api/grupamento/monitor-content/${preview.id}/source`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-[10px] font-bold dark:border-zinc-700 dark:bg-zinc-950"><Download className="h-3.5 w-3.5" /> Original</a>
-                  <button type="button" disabled={busy} onClick={() => void setStatus(preview.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-2 text-[10px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" /> Aprovar para exibição</button>
+                  <button type="button" disabled={busy || preview.scenes.some(scene => compilerBlocked(scene.payload ?? {}))} onClick={() => void setStatus(preview.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-2 text-[10px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" /> Aprovar para exibição</button>
                   <button type="button" disabled={busy} onClick={() => void setStatus(preview.id, "REJECTED")} className="rounded-lg border border-amber-500 px-2.5 py-2 text-[10px] font-bold text-amber-800 disabled:opacity-50 dark:text-amber-300">Rejeitar</button>
                   <button type="button" disabled={busy} onClick={() => void deleteImport(preview.id, preview.fileName)} className="inline-flex items-center gap-1 rounded-lg border border-red-400 px-2.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50 dark:text-red-300"><Trash2 className="h-3.5 w-3.5" /> Excluir</button>
                 </div>
@@ -292,6 +294,8 @@ export function MonitorContentCockpit({
                 ))}
               </div>
               {preview.warnings?.length ? <div className="mt-3 text-[10px] leading-4 text-amber-800 dark:text-amber-300">Lacunas declaradas: {preview.warnings.slice(0, 3).join(" · ")}</div> : null}
+              {preview.scenes.some(scene => compilerBlocked(scene.payload ?? {})) && <p className="mt-3 text-xs font-semibold text-amber-800 dark:text-amber-300">A referência original ou a validação ainda está pendente. A sequência atual continua em exibição.</p>}
+              {selectedScene && <MonitorCompilerDiagnostics importId={preview.id} sceneId={selectedScene.id} diagnostic={selectedScene.payload?.inputCompiler} onReview={() => void refresh()} />}
             </div>
           ) : null}
 

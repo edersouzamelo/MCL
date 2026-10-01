@@ -29,8 +29,9 @@ describe("text-panel PowerPoint reports", () => {
     zip.file("ppt/presentation.xml", '<p:presentation><p:sldSz cx="12192000" cy="6858000"/></p:presentation>');
     zip.file("ppt/slides/slide1.xml", '<p:sld><p:spTree>'+body.map((text,i) => `<p:sp><p:spPr><a:xfrm><a:off x="300000" y="${i*400000}"/><a:ext cx="11000000" cy="350000"/></a:xfrm></p:spPr><p:txBody><a:p><a:r><a:rPr sz="2400"/><a:t>${text}</a:t></a:r></a:p></p:txBody></p:sp>`).join("")+"</p:spTree></p:sld>");
     const result = await extractMonitorDocument(await zip.generateAsync({type:"nodebuffer"}),"missoes.pptx");
-    expect(result.scenes.length).toBeGreaterThan(2);
-    expect(result.scenes.flatMap(scene => scene.payload.bullets ?? []).join(" ")).toBe(body.slice(1).join(" "));
-    expect(result.scenes.every(scene => scene.sourcePage === 1 && scene.payload.textDocument?.version === 1)).toBe(true);
+    expect(result.scenes).toHaveLength(1);
+    expect(result.scenes[0].payload.inputCompiler?.strategy).toBe("DOCUMENT_REFLOW");
+    expect(result.scenes.flatMap(scene => scene.payload.inputCompiler?.normalizedContent.paragraphs ?? []).join(" ")).toBe(body.slice(1).join(" "));
+    expect(result.scenes.every(scene => scene.sourcePage === 1 && scene.payload.inputCompiler?.preflight.status === "PASS")).toBe(true);
   });
 });

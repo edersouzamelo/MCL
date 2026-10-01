@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { compilerBlocked, COMPILER_VERSION } from "./compiler/contracts";
 import type {
   MonitorDocumentExtraction,
   MonitorDocumentSceneDto,
@@ -23,6 +24,14 @@ const MONITOR_IMPORT_PREVIEW_SELECT = {
 
 export function monitorContentChecksum(buffer: Buffer) {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+function assertPublishable(extraction: MonitorDocumentExtraction) {
+  if (extraction.scenes.some(scene => compilerBlocked(scene.payload))) throw new Error("Há conteúdo sem fidelidade validada. A versão publicada foi preservada; conclua a conversão nativa antes de aprovar.");
+}
+
+async function appendRevision(tx: Prisma.TransactionClient, input: { importId: string; sourceHash: string; actorId: string; kind: string; scenes: unknown }) {
+  return tx.monitorContentRevision.create({ data: { id: randomUUID(), importId: input.importId, sourceHash: input.sourceHash, compilerVersion: COMPILER_VERSION, actorId: input.actorId, kind: input.kind, scenes: json(input.scenes) } });
 }
 
 function json(value: unknown) {
@@ -226,6 +235,7 @@ export async function persistMonitorContentImport(input: {
     });
     if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });
     if (sceneRows.length) await tx.monitorContentScene.createMany({ data: sceneRows });
+    await appendRevision(tx, { importId, sourceHash: checksum, actorId: input.importedBy, kind: "COMPILED", scenes: sceneRows });
     return tx.monitorContentImport.findUniqueOrThrow({
       where: { id: importId },
       select: MONITOR_IMPORT_PREVIEW_SELECT,
@@ -242,12 +252,16 @@ export async function replaceMonitorContentExtraction(input: {
   actorId: string;
   extraction: MonitorDocumentExtraction;
 }) {
+  // A failed manual recompile must preserve the currently published sequence.
+  // New uploads may remain blocked previews, but replacement requires fidelity.
+  assertPublishable(input.extraction);
   const existing = await prisma.monitorContentImport.findFirst({
     where: { id: input.id, organizationId: input.organizationId },
     select: {
       id: true,
       fileName: true,
       mimeType: true,
+      checksum: true,
       rawFile: true,
       monitorId: true,
       importedBy: true,
@@ -272,8 +286,10 @@ export async function replaceMonitorContentExtraction(input: {
   const sceneRows = sceneRowsForImport(existing.id, input.extraction, assetIds);
 
   return prisma.$transaction(async (tx) => {
+    const previous = await tx.monitorContentScene.findMany({ where: { importId: existing.id }, orderBy: { sceneOrder: "asc" } });
+    await appendRevision(tx, { importId: existing.id, sourceHash: existing.checksum, actorId: "actorId" in input && typeof input.actorId === "string" ? input.actorId : "system:monitor-extractor", kind: "BEFORE_REPROCESS", scenes: previous });
+    await appendRevision(tx, { importId: existing.id, sourceHash: existing.checksum, actorId: "actorId" in input && typeof input.actorId === "string" ? input.actorId : "system:monitor-extractor", kind: "COMPILED", scenes: sceneRows });
     await tx.monitorContentScene.deleteMany({ where: { importId: existing.id } });
-    await tx.monitorContentAsset.deleteMany({ where: { importId: existing.id } });
     if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });
     if (sceneRows.length) await tx.monitorContentScene.createMany({ data: sceneRows });
     return tx.monitorContentImport.update({
@@ -297,12 +313,14 @@ export async function replaceApprovedMonitorContentExtraction(input: {
   organizationId: string;
   extraction: MonitorDocumentExtraction;
 }) {
+  assertPublishable(input.extraction);
   const existing = await prisma.monitorContentImport.findFirst({
     where: { id: input.id, organizationId: input.organizationId, status: "APPROVED" },
     select: {
       id: true,
       fileName: true,
       monitorId: true,
+      checksum: true,
       status: true,
     },
   });
@@ -333,8 +351,10 @@ export async function replaceApprovedMonitorContentExtraction(input: {
 
     const publishedScenes = await tx.monitorContentScene.findMany({ where: { importId: existing.id }, select: { payload: true } });
     if (publishedScenes.some(scene => Boolean((scene.payload as MonitorDocumentScenePayload).onlineEditor))) throw new Error("Edição online preservada; atualização automática do original cancelada.");
+    const previous = await tx.monitorContentScene.findMany({ where: { importId: existing.id }, orderBy: { sceneOrder: "asc" } });
+    await appendRevision(tx, { importId: existing.id, sourceHash: existing.checksum, actorId: "actorId" in input && typeof input.actorId === "string" ? input.actorId : "system:monitor-extractor", kind: "BEFORE_REPROCESS", scenes: previous });
+    await appendRevision(tx, { importId: existing.id, sourceHash: existing.checksum, actorId: "actorId" in input && typeof input.actorId === "string" ? input.actorId : "system:monitor-extractor", kind: "COMPILED", scenes: sceneRows });
     await tx.monitorContentScene.deleteMany({ where: { importId: existing.id } });
-    await tx.monitorContentAsset.deleteMany({ where: { importId: existing.id } });
     if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });
     if (sceneRows.length) await tx.monitorContentScene.createMany({ data: sceneRows });
     return tx.monitorContentImport.update({
@@ -403,26 +423,23 @@ export async function setMonitorContentStatus(input: {
   actorId: string;
   status: "APPROVED" | "ARCHIVED" | "REJECTED";
 }) {
-  const existing = await prisma.monitorContentImport.findFirst({
-    where: { id: input.id, organizationId: input.organizationId },
-  });
-  if (!existing) throw new Error("Importação documental não encontrada.");
-  if (input.status === "APPROVED" && existing.status !== "PREVIEW") throw new Error("Somente uma prévia pendente pode ser aprovada.");
-  if (input.status === "REJECTED" && existing.status !== "PREVIEW") throw new Error("Somente uma prévia pendente pode ser rejeitada.");
-  if (input.status === "ARCHIVED" && existing.status !== "APPROVED") throw new Error("Somente conteúdo publicado pode ser retirado.");
-
-  const changed = await prisma.monitorContentImport.updateMany({
-    where: { id: input.id, organizationId: input.organizationId, status: existing.status },
-    data: input.status === "APPROVED" ? {
-      status: "APPROVED", approvedBy: input.actorId, approvedAt: new Date(), archivedBy: null, archivedAt: null,
-    } : {
-      status: input.status, approvedBy: input.status === "REJECTED" ? null : existing.approvedBy,
-      approvedAt: input.status === "REJECTED" ? null : existing.approvedAt,
-      archivedBy: input.actorId, archivedAt: new Date(),
-    },
-  });
-  if (changed.count !== 1) throw new Error("O arquivo mudou de estado. Atualize a lista.");
-  return prisma.monitorContentImport.findUniqueOrThrow({ where: { id: input.id } });
+  return prisma.$transaction(async tx => {
+    const existing = await tx.monitorContentImport.findFirst({ where: { id: input.id, organizationId: input.organizationId }, include: { scenes: true } });
+    if (!existing) throw new Error("Importação documental não encontrada.");
+    if (input.status === "APPROVED" && existing.status !== "PREVIEW") throw new Error("Somente uma prévia pendente pode ser aprovada.");
+    if (input.status === "REJECTED" && existing.status !== "PREVIEW") throw new Error("Somente uma prévia pendente pode ser rejeitada.");
+    if (input.status === "ARCHIVED" && existing.status !== "APPROVED") throw new Error("Somente conteúdo publicado pode ser retirado.");
+    if (input.status === "APPROVED" && existing.scenes.some(scene => compilerBlocked(scene.payload as MonitorDocumentScenePayload))) throw new Error("A conversão ainda tem perdas ou depende da referência nativa. O original e a sequência anterior foram preservados.");
+    const changed = await tx.monitorContentImport.updateMany({
+      where: { id: input.id, organizationId: input.organizationId, status: existing.status },
+      data: input.status === "APPROVED" ? { status: "APPROVED", approvedBy: input.actorId, approvedAt: new Date(), archivedBy: null, archivedAt: null } : {
+        status: input.status, approvedBy: input.status === "REJECTED" ? null : existing.approvedBy,
+        approvedAt: input.status === "REJECTED" ? null : existing.approvedAt, archivedBy: input.actorId, archivedAt: new Date(),
+      },
+    });
+    if (changed.count !== 1) throw new Error("O arquivo mudou de estado. Atualize a lista.");
+    return tx.monitorContentImport.findUniqueOrThrow({ where: { id: input.id } });
+  }, { ...MONITOR_DOCUMENT_TRANSACTION_OPTIONS, isolationLevel: "Serializable" });
 }
 
 export async function deletePendingMonitorContentImport(input: { id: string; organizationId: string; actorId: string; userAgent: string }) {

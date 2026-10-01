@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/modules/auth/options";
+import { createSemanticClassifier } from "@/modules/grupamento/monitor-content/compiler/semantic-provider";
 import { extractMonitorDocument } from "@/modules/grupamento/monitor-content/extract";
 import {
   assembleMonitorUpload,
@@ -13,7 +14,8 @@ import { prisma } from "@/server/db";
 export const runtime = "nodejs";
 
 const ALLOWED_ROLES = new Set(["ADMIN", "LOGISTICS_MANAGER"]);
-const PROCESS_TIMEOUT_MS = 45_000;
+export const maxDuration = 300;
+const PROCESS_TIMEOUT_MS = 280_000;
 
 function validUploadId(value: string) {
   return /^[a-zA-Z0-9-]{12,80}$/.test(value);
@@ -25,7 +27,7 @@ async function withTimeout<T>(promise: Promise<T>) {
     return await Promise.race([
       promise,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Processamento documental excedeu 45 segundos.")), PROCESS_TIMEOUT_MS);
+        timer = setTimeout(() => reject(new Error("Processamento documental excedeu 280 segundos.")), PROCESS_TIMEOUT_MS);
       }),
     ]);
   } finally {
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Formato não suportado. Use PDF, PPTX, DOCX ou TXT." }, { status: 415 });
     }
 
-    const extraction = await withTimeout(extractMonitorDocument(assembled.buffer, assembled.fileName));
+    const extraction = await withTimeout(extractMonitorDocument(assembled.buffer, assembled.fileName, createSemanticClassifier(session.user.organizationId)));
     if (!extraction.scenes.length) {
       return NextResponse.json({ error: "O arquivo foi lido, mas nenhuma cena útil foi extraída. Nada foi publicado." }, { status: 422 });
     }
