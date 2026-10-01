@@ -1,6 +1,6 @@
 import type { MonitorDocumentScenePayload, MonitorSlideElement, MonitorSlideTextElement } from "./types";
 
-const ACRONYMS = new Set("MCL CMO CCOL OM OMDS UG UGS UASG PI PIS MEM QDMP PEEX SISCOFIS PRDU IRDU PCA PNCP CATMAT DFD SAG RPN RP ARP SISFRON EB PASA I II III IV V VI VII VIII IX X XI XII XIII XIV XV XVI XVII XVIII XIX XX".split(" "));
+const ACRONYMS = new Set("B MNT BI BIM BDA INF MTZ CMEC C MEC BSUP SUP LOG RM AAAE FRON ADM AP CATSER MCL CMO CCOL OM OMDS UG UGS UASG PI PIS MEM QDMP PEEX SISCOFIS PRDU IRDU PCA PNCP CATMAT DFD SAG RPN RP ARP SISFRON EB PASA I II III IV V VI VII VIII IX X XI XII XIII XIV XV XVI XVII XVIII XIX XX".split(" "));
 
 /** Sentence case, preserving institutional acronyms, Roman numerals and identifiers. */
 export function normalizeMonitorTitle(value: string) {

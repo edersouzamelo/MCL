@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
+import { compileMonitorInput } from "./input-compiler";
 import { monitorSceneTitle } from "./presentation-title";
 import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
 import { chartValueLabel } from "./chart-geometry";
 import { MONITOR_CORRECTION_MARKER } from "./correction";
-import { prepareMonitorElements, preserveChartAnnotations } from "./presentation-layout";
 import type {
   MonitorDocumentAssetDraft,
   MonitorDocumentChart,
@@ -374,6 +375,7 @@ function slideTitle(elements: MonitorSlideElement[], page: number) {
 
 export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
   const entries = zipEntries(buffer);
+  const rawHash = createHash("sha256").update(buffer).digest("hex");
   const correction = (entries.get("docProps/core.xml")?.toString("utf8") ?? "").includes(MONITOR_CORRECTION_MARKER);
   const size = slideSize(entries);
   const theme = themeColors(entries);
@@ -390,10 +392,16 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     const rels = relationships(entries, slidePath);
     let elements: MonitorSlideElement[] = [];
     const searchable: string[] = [];
+    const parserIssues: string[] = [];
+    if (/<p:grpSp\b/.test(xml)) parserIssues.push("Grupo com transformação ainda não suportada; requer renderização do original.");
+    if (/<(?:p:cxnSp|a:graphicData)[^>]*(?:diagram|oleObj)|<p:cxnSp\b|<p:oleObj\b/.test(xml)) parserIssues.push("Conector, diagrama ou objeto incorporado não suportado.");
+    if (/<a:srcRect\b/.test(xml)) parserIssues.push("Recorte de imagem sem renderização fiel disponível.");
+    if (/<(?:a|p):xfrm\b[^>]*(?:rot="(?!0")|flip[HV]="(?:1|true)")/.test(xml)) parserIssues.push("Rotação ou espelhamento requer renderização do original.");
+    if (/<a:graphicData\b[^>]*uri="[^"]*(?:diagram|chartEx)/.test(xml)) parserIssues.push("Diagrama ou gráfico estendido requer renderização do original.");
     let z = 0;
     for (const item of blocks(xml)) {
       const b = box(item.xml,size.width,size.height);
-      if (!b) continue;
+      if (!b) { parserIssues.push("Objeto sem geometria resolvida, inclusive placeholder herdado."); continue; }
       if (item.kind === "shape") {
         const text = clean(paragraphs(item.xml).join("\n"));
         const sp = item.xml.match(/<p:spPr\b[^>]*>([\s\S]*?)<\/p:spPr>/)?.[1] ?? "";
@@ -415,15 +423,20 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const imageLabel = clean(attribute(meta, "descr") || attribute(meta, "title") || attribute(meta, "name"));
         if (imageLabel) searchable.push(imageLabel);
         if (correction && !assetKey) throw new Error(`Slide ${page}: figura de correção indisponível. Nenhuma cena publicada.`);
+        if (!assetKey) parserIssues.push("Imagem ausente ou não renderizável.");
         if (assetKey) elements.push({kind:"image",...b,assetKey,z:z*10+1});
       } else {
         const rid = item.xml.match(/<c:chart\b[^>]*\br:id="([^"]+)"/)?.[1];
         const target = rid ? rels.get(rid)?.target : undefined;
         if (target) {
           const labelWarnings: string[] = [];
-          const parsed = chart(entries.get(target)?.toString("utf8") ?? "",theme,labelWarnings);
+          const chartXml = entries.get(target)?.toString("utf8") ?? "";
+          if ([...chartXml.matchAll(/<c:(?:barChart|lineChart|pieChart|doughnutChart|areaChart|scatterChart)\b/g)].length > 1) parserIssues.push("Gráfico combinado requer renderização do original.");
+          const parsed = chart(chartXml,theme,labelWarnings);
+          if (labelWarnings.length) parserIssues.push("Metadados ou rótulos do gráfico incompletos; consultar avisos da extração.");
           warnings.push(...labelWarnings.map(warning => `Slide ${page}: ${warning}`));
           if (["unknown", "area", "scatter"].includes(parsed.type)) warnings.push("Slide " + page + ": gráfico " + parsed.type + " requer consulta ao original; renderização fiel ainda não disponível.");
+          if (["unknown", "area", "scatter"].includes(parsed.type) || !parsed.series.length) parserIssues.push("Gráfico sem reconstrução fiel disponível.");
           if (parsed.series.length) {
             parsed.series.forEach((s) => searchable.push(s.name,...s.categories,...s.values.map(String),...(s.dataLabels ?? []).filter((text): text is string => Boolean(text))));
             if (parsed.title) searchable.push(parsed.title);
@@ -433,40 +446,27 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
           }
         }
         const rows = tableRows(item.xml);
+        if (!target && !rows.length) parserIssues.push("Objeto gráfico não classificado.");
         if (rows.length) { searchable.push(...rows.flat()); elements.push({kind:"table",...b,columns:rows[0]??[],rows:rows.slice(1),z:z*10+1}); }
       }
       z += 1;
     }
-    const chartBoxes = elements.filter((element) => element.kind === "chart");
-    const neutralFills = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
-    elements = correction ? elements : elements.filter((element) => {
-      if (element.kind !== "shape" || !element.fill || !neutralFills.has(element.fill.toUpperCase())) return true;
-      const area = element.w * element.h;
-      if (area < 0.04) return true;
-      const overlapsChart = chartBoxes.some((chartElement) => {
-        const overlapW = Math.max(0, Math.min(element.x + element.w, chartElement.x + chartElement.w) - Math.max(element.x, chartElement.x));
-        const overlapH = Math.max(0, Math.min(element.y + element.h, chartElement.y + chartElement.h) - Math.max(element.y, chartElement.y));
-        const overlapArea = overlapW * overlapH;
-        return overlapArea / Math.max(area, 0.0001) >= 0.25;
-      });
-      return !overlapsChart;
-    });
-
-    if (!correction) elements = preserveChartAnnotations(elements);
-    const presentation = correction ? { elements, omitted: [], adjustments: [] } : prepareMonitorElements(elements);
-    for (const reason of new Set(presentation.omitted.map((item) => item.reason))) {
-      warnings.push("Slide " + page + ": " + reason + ". Omitido na exibição institucional; original preservado.");
-    }
-    for (const adjustment of presentation.adjustments) {
-      warnings.push("Slide " + page + ": " + adjustment + " Original preservado.");
-    }
-    if (/p:grpSp\b/.test(xml)) warnings.push("Slide " + page + ": grupo de objetos detectado; revisar prévia.");
+    const extractedText = elements.flatMap(item => item.kind === "text" ? [item.text] : item.kind === "table" ? [...item.columns, ...item.rows.flat()] : []).join(" ").replace(/\s+/g, " ");
+    for (const value of textNodes(xml).map(clean).filter(Boolean)) if (!extractedText.includes(value.replace(/\s+/g, " "))) parserIssues.push("Texto do XML sem correspondência no conteúdo extraído.");
+    const compiled = compileMonitorInput(elements, {
+      page,
+      slideHash: createHash("sha256").update(xml).digest("hex"),
+      rawHash,
+    }, parserIssues);
+    elements = compiled.elements;
+    warnings.push(...compiled.diagnostic.preflight.issues.map(issue => `Slide ${page}: ${issue}`));
     scenes.push({
       sceneType:"TEXT",
       title:slideTitle(elements,page),
       sourcePage:page,
       payload:{
         ...(correction ? { correction: { version: 1 as const, preserveLayout: true as const, fullFrame: true as const } } : {}),
+        inputCompiler: compiled.diagnostic,
         layoutVersion:2,
         layout:{version:2,width:size.width,height:size.height,elements},
         searchableText:[...new Set(searchable.map(clean).filter(Boolean))],

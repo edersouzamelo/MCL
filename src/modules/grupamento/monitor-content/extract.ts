@@ -417,11 +417,12 @@ export async function extractMonitorDocument(buffer: Buffer, fileName: string): 
   if (extension === "pptx") {
     extraction = extractPptxLayout(buffer);
     extraction.scenes = extraction.scenes.flatMap(scene => {
+      if (scene.payload.inputCompiler?.preflight.status === "BLOCKED") return [scene];
       const report = monitorTextSlide(scene.payload, scene.title);
       return report ? composeTextDocument([
         { kind: "heading", text: report.title, page: scene.sourcePage },
         ...report.paragraphs.map(text => ({ kind: "paragraph" as const, text, page: scene.sourcePage })),
-      ], report.title) : [scene];
+      ], report.title).map(output => ({ ...output, payload: { ...output.payload, inputCompiler: scene.payload.inputCompiler } })) : [scene];
     });
     if (extraction.scenes.length > 80) throw new Error("O documento gera mais de 80 telas. Divida o arquivo em partes; nenhum conteúdo foi publicado parcialmente.");
   }
