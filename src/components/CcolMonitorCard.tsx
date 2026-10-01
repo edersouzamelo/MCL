@@ -7,9 +7,9 @@ import "./ccol-monitor-card.css";
 
 const covers: Record<number, string> = { 1: "class-i", 2: "class-ii", 3: "class-iii", 4: "class-v", 5: "class-v", 6: "class-ix", 7: "class-viii", 8: "transport", 10: "planning" };
 
-export function MonitorCommandHelp({ text, children }: { text: string; children: ReactNode }) {
+export function MonitorCommandHelp({ text, children, className = "" }: { text: string; children: ReactNode; className?: string }) {
   const id = useId();
-  return <div className="ccol-command-help" aria-describedby={id}>{children}<span id={id} role="tooltip" className="ccol-command-tooltip">{text}</span></div>;
+  return <div className={`ccol-command-help ${className}`} aria-describedby={id}>{children}<span id={id} role="tooltip" className="ccol-command-tooltip">{text}</span></div>;
 }
 
 export function AnimatedMonitorSection({ open, children, id }: { open: boolean; children: ReactNode; id?: string }) {
@@ -57,7 +57,7 @@ export function CcolMonitorCard({ monitor, configuration, budget, documents, exp
           <MonitorCommandHelp text="Importa PDF, PowerPoint ou Word, permite revisar e aprovar o conteúdo para exibição."><button type="button" className="ccol-command ccol-command-outline" aria-expanded={section === "documents"} aria-controls={`${sectionId}-documents`} onClick={() => toggle("documents")}><Presentation className="h-4 w-4" /> Incluir conteúdo documental</button></MonitorCommandHelp>
         </div>
         <div className="mt-2">{exports}</div>
-        <div className="mt-3"><MonitorCommandHelp text="Ajusta textos, imagens, posição, tamanho e cores dos gráficos dos documentos publicados, mantendo o padrão do MCL."><a href={`/grupamento/monitor-editor/${monitor.id}`} target="_blank" rel="noreferrer" className="ccol-command ccol-command-outline w-full"><Presentation className="h-4 w-4" /> Editar conteúdo online</a></MonitorCommandHelp></div>
+
         <AnimatedMonitorSection open={section === "configuration"} id={`${sectionId}-configuration`}><div className="ccol-subcommands">{configuration}{devices}</div></AnimatedMonitorSection>
         <AnimatedMonitorSection open={section === "budget"} id={`${sectionId}-budget`}><div className="ccol-subcommands">{budget}</div></AnimatedMonitorSection>
         <div id={`${sectionId}-documents`}>{opened ? documents(section === "documents") : null}</div>

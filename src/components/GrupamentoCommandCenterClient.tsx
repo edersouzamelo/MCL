@@ -15,6 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import { AnimatedMonitorSection, CcolMonitorCard } from "@/components/CcolMonitorCard";
+import { CcolPanelCounters } from "@/components/CcolPanelCounters";
 import { SagScreenSelection } from "@/components/SagScreenSelection";
 import { MonitorContentCockpit } from "@/components/MonitorContentCockpit";
 import { BriefingExportButton } from "@/components/BriefingExportButton";
@@ -344,17 +345,13 @@ export function GrupamentoCommandCenterClient({
               <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300">CCOL</span>
             </div>
             <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Centro de Coordenação de Operações Logísticas</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">Cockpit do escalão para consolidar o SAG, classificar por PI/Classe e distribuir quadros executivos em até oito monitores.</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">Cockpit do escalão para consolidar o SAG, classificar por PI/Classe e distribuir quadros executivos nos {CCO_MONITOR_COUNT} monitores, incluindo Teste e Central.</p>
             <div className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-white/70 px-3 py-2 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
               <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
               Matriz PI/Classe incorporada: <strong className="text-slate-950 dark:text-white">{CCO_RULE_SOURCE.fileName}</strong> · {CCO_RULE_SOURCE.referenceDate} · {CCO_CLASS_SLIDES.length} quadros de Classe/finalidade
             </div>
           </div>
-          <div className="grid min-w-[320px] grid-cols-3 gap-2 text-center text-xs">
-            <Counter value="8" label="monitores" />
-            <Counter value={`${sourceCount}/2`} label="fontes ativas" />
-            <Counter value={String(validRows)} label="linhas válidas" />
-          </div>
+          <CcolPanelCounters monitors={monitors} sourceCount={sourceCount} validRows={validRows} ready={monitorsReady} />
         </div>
       </section>
 
@@ -657,10 +654,6 @@ function SourcePicker({ id, step, title, description, file, onFile }: { id: stri
       <input id={id} type="file" accept={SOURCE_ACCEPT} className="sr-only" onChange={(event) => onFile(event.target.files?.[0] ?? null)} />
     </div>
   );
-}
-
-function Counter({ value, label }: { value: string; label: string }) {
-  return <div className="rounded-xl border border-sky-200 bg-white/70 p-3 dark:border-white/10 dark:bg-white/5"><div className="text-2xl font-black">{value}</div><div className="text-slate-500 dark:text-slate-400">{label}</div></div>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
