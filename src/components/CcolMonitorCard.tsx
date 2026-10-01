@@ -5,7 +5,7 @@ import { FileSpreadsheet, Presentation, Settings, X } from "lucide-react";
 import type { CcoMonitorConfig } from "@/modules/grupamento/monitor";
 import "./ccol-monitor-card.css";
 
-const covers: Record<number, string> = { 1: "class-i", 2: "class-ii", 3: "class-iii", 4: "class-v", 5: "class-v", 6: "class-vii", 7: "class-viii", 8: "class-ix", 10: "planning" };
+const covers: Record<number, string> = { 1: "class-i", 2: "class-ii", 3: "class-iii", 4: "class-v", 5: "class-v", 6: "class-ix", 7: "class-viii", 8: "transport", 10: "planning" };
 
 export function MonitorCommandHelp({ text, children }: { text: string; children: ReactNode }) {
   const id = useId();

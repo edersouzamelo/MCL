@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
-import { CcolMonitorCard } from "@/components/CcolMonitorCard";
+import { AnimatedMonitorSection, CcolMonitorCard } from "@/components/CcolMonitorCard";
 import { SagScreenSelection } from "@/components/SagScreenSelection";
 import { MonitorContentCockpit } from "@/components/MonitorContentCockpit";
 import { BriefingExportButton } from "@/components/BriefingExportButton";
@@ -108,6 +108,7 @@ export function GrupamentoCommandCenterClient({
   const writeQueue = useRef<Record<number, Promise<void>>>({});
   const pendingWrites = useRef(0);
   const failedWrites = useRef<Record<number, string>>({});
+  const [sagExpanded, setSagExpanded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [recovering, setRecovering] = useState(false);
@@ -357,11 +358,47 @@ export function GrupamentoCommandCenterClient({
         </div>
       </section>
 
+
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><div className="flex items-center gap-2 text-sm font-bold"><MonitorCog className="h-4 w-4" /> Matriz de distribuição · 8 monitores, Teste e Central</div><p className="mt-1 text-xs text-zinc-500">Cada saída escolhe telas SAG, conteúdo documental, loop, intervalo e layout. É permitido deixar todas as telas SAG desmarcadas e exibir somente documentos aprovados.</p></div>
+        </div>
+
+        {!monitorsReady ? <p className="mt-3 text-xs text-zinc-500">Sincronizando a configuração compartilhada dos monitores…</p> : null}
+        {monitorError ? <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300">{monitorError}</p> : null}
+        <div className={`mt-5 grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 ${!monitorsReady ? "pointer-events-none opacity-50" : ""}`}>
+          {monitors.map((monitor) => (
+            <CcolMonitorCard key={monitor.id} monitor={monitor}
+              configuration={<div>                    <Field label="Classe / seção responsável"><select aria-label={`Responsável pelo ${monitor.label}`} value={monitor.responsibleSector ?? ""} onChange={(e) => updateMonitor(monitor.id, { responsibleSector: e.target.value ? e.target.value as CcoResponsibleSector : null })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="">Não definido</option>{CCO_RESPONSIBLE_SECTORS.map(sector => <option key={sector}>{sector}</option>)}</select></Field>
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                <Field label="Estado"><select value={monitor.enabled ? "on" : "off"} onChange={(e) => updateMonitor(monitor.id, { enabled: e.target.value === "on" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="on">Ativo</option><option value="off">Desativado</option></select></Field>
+                <Field label="Modo"><select value={monitor.mode} onChange={(e) => updateMonitor(monitor.id, { mode: e.target.value as "single" | "loop" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="single">Tela fixa</option><option value="loop">Loop</option></select></Field>
+                <Field label="Delay"><input type="number" min={5} max={300} value={monitor.delaySeconds} onChange={(e) => updateMonitor(monitor.id, { delaySeconds: Math.max(5, Number(e.target.value) || CCO_DEFAULT_LOOP_DELAY_SECONDS) })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800" /></Field>
+                <Field label="Layout"><select value={monitor.layout} onChange={(e) => updateMonitor(monitor.id, { layout: e.target.value as "mcl" | "ccol" | "briefing" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="mcl">Modo escuro</option><option value="ccol">Modo claro</option><option value="briefing">Modo Briefing</option></select></Field>
+              </div>
+</div>}
+              budget={<div className="flex flex-wrap gap-2">{CCO_SCREEN_CATALOG.map((screen) => <SagScreenSelection key={screen.id} screen={screen} selected={monitor.screens.includes(screen.id)} onToggle={() => toggleScreen(monitor.id, screen.id)} />)}</div>}
+              documents={(open) => <MonitorContentCockpit monitorId={monitor.id} currentUserName={currentUserName} requiresOperatorIdentification={requiresOperatorIdentification} expanded={open} />}
+              exports={<OfflineExportControls monitorId={monitor.id} delaySeconds={monitor.delaySeconds} commandGrid beforeExport={async () => { await Promise.all(Object.values(writeQueue.current)); if (failedWrites.current[monitor.id]) throw new Error(failedWrites.current[monitor.id]); }} />}
+              devices={canManageDevices ? <MonitorDeviceControls monitorId={monitor.id} /> : null}
+            />
+          ))}
+        </div>
+      </section>
+      <div>
+        <div className="flex flex-wrap items-start justify-end gap-3">
+          <button type="button" aria-expanded={sagExpanded} aria-controls="ccol-sag-load" onClick={() => setSagExpanded((expanded) => !expanded)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-800 px-5 py-3 text-sm font-bold text-white">
+            <Upload className="h-4 w-4" /> Inserir carga do SAG
+          </button>
+          <BriefingExportButton ready={monitorsReady && !monitorError} beforeExport={async () => { await Promise.all(Object.values(writeQueue.current)); if (pendingWrites.current) throw new Error("Aguarde o salvamento dos monitores."); }} />
+        </div>
+        <AnimatedMonitorSection open={sagExpanded} id="ccol-sag-load">
+          <div className="pt-4">
       <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-sm font-bold"><Upload className="h-4 w-4" /> Carga SAG — arquitetura híbrida</div>
+              <div className="flex items-center gap-2 text-sm font-bold"><Upload className="h-4 w-4" /> Carga SAG: arquitetura híbrida</div>
               <p className="mt-1 text-xs leading-5 text-zinc-500">Cada fonte pode entrar como 1 PDF integral ou 4 PDFs separados por E5, E6, E7 e D8. Use o fracionamento somente quando o SAG ou o tamanho do arquivo exigirem.</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -494,33 +531,9 @@ export function GrupamentoCommandCenterClient({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><div className="flex items-center gap-2 text-sm font-bold"><MonitorCog className="h-4 w-4" /> Matriz de distribuição · 8 monitores, Teste e Central</div><p className="mt-1 text-xs text-zinc-500">Cada saída escolhe telas SAG, conteúdo documental, loop, intervalo e layout. É permitido deixar todas as telas SAG desmarcadas e exibir somente documentos aprovados.</p></div>
-        </div>
-
-        {!monitorsReady ? <p className="mt-3 text-xs text-zinc-500">Sincronizando a configuração compartilhada dos monitores…</p> : null}
-        {monitorError ? <p className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-300">{monitorError}</p> : null}
-        <div className={`mt-5 grid gap-x-6 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 ${!monitorsReady ? "pointer-events-none opacity-50" : ""}`}>
-          {monitors.map((monitor) => (
-            <CcolMonitorCard key={monitor.id} monitor={monitor}
-              configuration={<div>                    <Field label="Classe / seção responsável"><select aria-label={`Responsável pelo ${monitor.label}`} value={monitor.responsibleSector ?? ""} onChange={(e) => updateMonitor(monitor.id, { responsibleSector: e.target.value ? e.target.value as CcoResponsibleSector : null })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="">Não definido</option>{CCO_RESPONSIBLE_SECTORS.map(sector => <option key={sector}>{sector}</option>)}</select></Field>
-              <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                <Field label="Estado"><select value={monitor.enabled ? "on" : "off"} onChange={(e) => updateMonitor(monitor.id, { enabled: e.target.value === "on" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="on">Ativo</option><option value="off">Desativado</option></select></Field>
-                <Field label="Modo"><select value={monitor.mode} onChange={(e) => updateMonitor(monitor.id, { mode: e.target.value as "single" | "loop" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="single">Tela fixa</option><option value="loop">Loop</option></select></Field>
-                <Field label="Delay"><input type="number" min={5} max={300} value={monitor.delaySeconds} onChange={(e) => updateMonitor(monitor.id, { delaySeconds: Math.max(5, Number(e.target.value) || CCO_DEFAULT_LOOP_DELAY_SECONDS) })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800" /></Field>
-                <Field label="Layout"><select value={monitor.layout} onChange={(e) => updateMonitor(monitor.id, { layout: e.target.value as "mcl" | "ccol" | "briefing" })} className="w-full rounded-lg border border-zinc-200 bg-transparent px-2 py-2 text-xs dark:border-zinc-800"><option value="mcl">Modo escuro</option><option value="ccol">Modo claro</option><option value="briefing">Modo Briefing</option></select></Field>
-              </div>
-</div>}
-              budget={<div className="flex flex-wrap gap-2">{CCO_SCREEN_CATALOG.map((screen) => <SagScreenSelection key={screen.id} screen={screen} selected={monitor.screens.includes(screen.id)} onToggle={() => toggleScreen(monitor.id, screen.id)} />)}</div>}
-              documents={(open) => <MonitorContentCockpit monitorId={monitor.id} currentUserName={currentUserName} requiresOperatorIdentification={requiresOperatorIdentification} expanded={open} />}
-              exports={<OfflineExportControls monitorId={monitor.id} delaySeconds={monitor.delaySeconds} commandGrid beforeExport={async () => { await Promise.all(Object.values(writeQueue.current)); if (failedWrites.current[monitor.id]) throw new Error(failedWrites.current[monitor.id]); }} />}
-              devices={canManageDevices ? <MonitorDeviceControls monitorId={monitor.id} /> : null}
-            />
-          ))}
-        </div>
-      </section>
-      <BriefingExportButton ready={monitorsReady && !monitorError} beforeExport={async () => { await Promise.all(Object.values(writeQueue.current)); if (pendingWrites.current) throw new Error("Aguarde o salvamento dos monitores."); }} />
+          </div>
+        </AnimatedMonitorSection>
+      </div>
     </div>
   );
 }
