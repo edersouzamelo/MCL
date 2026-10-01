@@ -37,7 +37,7 @@ export function MonitorContentSceneThumbnail({
   }
 
   const presentation = prepareMonitorElements(layout.elements);
-  const prepared = monitorTitleElements(presentation.elements, title);
+  const prepared = payload?.onlineEditor ? { elements: layout.elements, title, promotedChartTitle: layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements(presentation.elements, title);
   const integralImage = monitorIntegralImage(payload ?? {});
   const visibleElements = (integralImage ? [...layout.elements] : prepared.elements).sort((a, b) => a.z - b.z);
 

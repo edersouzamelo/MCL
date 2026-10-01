@@ -44,6 +44,17 @@ describe("Briefing editável", () => {
     await mkdir("/tmp/mcl-briefing-test", { recursive: true });
     await writeFile("/tmp/mcl-briefing-test/TESTE-briefing.pptx", result.buffer);
   });
+  it("exporta a edição online com título normalizado, cores e imagens adicionadas", async () => {
+    const online: MonitorDocumentSceneDto = { ...scene, title: "TÍTULO CORRIGIDO", payload: { ...scene.payload, onlineEditor: { version: 1, revision: 1 }, layout: { ...scene.payload.layout!, elements: [
+      scene.payload.layout!.elements[1],
+      { kind: "text", text: "Nota online", x: .1, y: .85, w: .6, h: .1, z: 4, color: "#ff0000", fontSizePt: 18 },
+      { kind: "image", assetId: "online-image", x: .02, y: .02, w: .08, h: .08, z: 3 },
+    ] } } };
+    let assetsLoaded = 0;
+    const result = await buildBriefingPowerPoint({ monitors: [{ ...defaultCcoMonitorConfig()[0], screens: [] }], sag: null, rpn: null, scenes: { 1: [online] }, loadAsset: async () => { assetsLoaded++; return { mimeType: "image/png", data: new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64")) }; } });
+    const zip = await JSZip.loadAsync(result.buffer), xml = await zip.file("ppt/slides/slide1.xml")!.async("string");
+    expect(xml).toContain("Título corrigido"); expect(xml).toContain("Nota online"); expect(xml).toContain("FF0000"); expect(assetsLoaded).toBe(1);
+  });
   it("recusa SAG incompleto e imagem inacessível sem entregar exportação parcial", async () => {
     const input = { monitors: defaultCcoMonitorConfig(), sag: null, rpn: null, scenes: {}, loadAsset: async () => null };
     await expect(buildBriefingPowerPoint(input)).rejects.toThrow("par SAG incompleto");

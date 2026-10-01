@@ -7,7 +7,7 @@ export async function listCcoMonitorConfigs(organizationId: string): Promise<Cco
   const [rows, documents, contentEvents] = await Promise.all([
     prisma.ccoMonitorConfiguration.findMany({ where: { organizationId } }),
     prisma.monitorContentImport.findMany({ where: { organizationId }, select: { monitorId: true, importedAt: true, importedBy: true, importedByName: true, approvedAt: true, approvedBy: true, archivedAt: true, archivedBy: true } }),
-    prisma.auditLog.findMany({ where: { organizationId, action: { in: ["MONITOR_CONTENT_DELETE", "MONITOR_CONTENT_REPROCESS"] }, outcome: "SUCESSO" }, select: { occurredAt: true, actorId: true, metadata: true } }),
+    prisma.auditLog.findMany({ where: { organizationId, action: { in: ["MONITOR_CONTENT_DELETE", "MONITOR_CONTENT_REPROCESS", "MONITOR_CONTENT_ONLINE_EDIT"] }, outcome: "SUCESSO" }, select: { occurredAt: true, actorId: true, metadata: true } }),
   ]);
   const updates = new Map<number, { at: Date; actorId: string; name?: string | null }>();
   for (const row of rows) {

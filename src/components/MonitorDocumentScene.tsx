@@ -4,7 +4,7 @@
 import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
 import { monitorTitleElements, monitorIntegralImage } from "@/modules/grupamento/monitor-content/presentation-title";
 import { OmMentions } from "@/components/OmIdentity";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { MonitorDocumentTable } from "@/components/MonitorDocumentTable";
 import { monitorTableSlide } from "@/modules/grupamento/monitor-content/table-layout";
 import { BarChart3, FileText, Image as ImageIcon, Table2 } from "lucide-react";
@@ -73,13 +73,14 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
   );
 }
 
-function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
+export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount, overlay }: { overlay?: ReactNode; scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const tablePages = useRef(new Map<number, number>());
   const layout = scene.payload.layout;
   if (!layout) return null;
   const integralImage = monitorIntegralImage(scene.payload);
-  const preserve = integralImage || Boolean(scene.payload.correction?.preserveLayout);
-  const prepared = monitorTitleElements(prepareMonitorElements(layout.elements).elements, scene.title);
+  const online = Boolean(scene.payload.onlineEditor);
+  const preserve = online || integralImage || Boolean(scene.payload.correction?.preserveLayout);
+  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements(prepareMonitorElements(layout.elements).elements, scene.title);
   const sorted = [...(integralImage ? layout.elements : prepared.elements)]
     .sort((a,b) => a.z-b.z);
   return (
@@ -105,7 +106,7 @@ function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPa
             return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} decorateOms={!preserve} showTitle={!prepared.promotedChartTitle} /></div>;
           }
           return <div key={"table-" + String(index)} className={"absolute overflow-hidden " + (briefing ? "" : "rounded-lg border border-white/10 bg-slate-950/20")} style={boxStyle(item)}>
-            {!preserve ? <MonitorDocumentTable columns={item.columns} rows={item.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={count => {
+            {(!preserve || online) ? <MonitorDocumentTable columns={item.columns} rows={item.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={count => {
               tablePages.current.set(index, count);
               onPageCount?.(Math.max(1, ...sorted.map((element, i) => element.kind === 'table' ? tablePages.current.get(i) ?? 1 : 1)));
             }} /> : <table className="h-full w-full table-fixed text-[clamp(12px,.78vw,15px)]">
@@ -114,6 +115,7 @@ function LayoutScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPa
             </table>}
           </div>;
         })}
+        {overlay}
       </div>
       {!briefing && <div className={"pointer-events-none absolute right-2 top-2 rounded-lg border px-2.5 py-1.5 text-right text-[8px] leading-3 backdrop-blur " + (ccol ? "border-slate-300/70 bg-white/70 text-slate-600" : "border-white/10 bg-slate-950/55 text-slate-400")}>
         <div className="font-black uppercase tracking-wider">Fonte</div>
@@ -140,9 +142,9 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
 export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
   const integralImage = monitorIntegralImage(payload);
-  const prepared = payload.layout ? monitorTitleElements(prepareMonitorElements(payload.layout.elements).elements, scene.title) : null;
+  const prepared = payload.onlineEditor && payload.layout ? { elements: payload.layout.elements, title: scene.title, promotedChartTitle: false } : payload.layout ? monitorTitleElements(prepareMonitorElements(payload.layout.elements).elements, scene.title) : null;
   const title = prepared?.title ?? scene.title;
-  const tableSlide = prepared && !payload.correction?.preserveLayout ? monitorTableSlide(prepared.elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
+  const tableSlide = prepared && !payload.onlineEditor && !payload.correction?.preserveLayout ? monitorTableSlide(prepared.elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
     table: { columns: payload.columns, rows: payload.rows, y: 1 },
     texts: (payload.bullets ?? []).map((text, index): MonitorSlideTextElement => ({kind:'text', text, role:'body', bold:false, x:0, y:0, w:1, h:.1, z:index})),
   } : null;
@@ -162,7 +164,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
       <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0 overflow-hidden">
-        <LayoutScene scene={scene} ccol={ccol || briefing} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
+        <MonitorDocumentLayout scene={scene} ccol={ccol || briefing} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
         {!briefing && <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · fonte rastreável
         </div>}

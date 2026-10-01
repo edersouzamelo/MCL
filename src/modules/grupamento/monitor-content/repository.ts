@@ -315,6 +315,8 @@ export async function replaceApprovedMonitorContentExtraction(input: {
     });
     if (!current) throw new Error("O conteúdo deixou de estar aprovado durante a atualização automática.");
 
+    const publishedScenes = await tx.monitorContentScene.findMany({ where: { importId: existing.id }, select: { payload: true } });
+    if (publishedScenes.some(scene => Boolean((scene.payload as MonitorDocumentScenePayload).onlineEditor))) throw new Error("Edição online preservada; atualização automática do original cancelada.");
     await tx.monitorContentScene.deleteMany({ where: { importId: existing.id } });
     await tx.monitorContentAsset.deleteMany({ where: { importId: existing.id } });
     if (assetRows.length) await tx.monitorContentAsset.createMany({ data: assetRows });

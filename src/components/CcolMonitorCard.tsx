@@ -57,6 +57,7 @@ export function CcolMonitorCard({ monitor, configuration, budget, documents, exp
           <MonitorCommandHelp text="Importa PDF, PowerPoint ou Word, permite revisar e aprovar o conteúdo para exibição."><button type="button" className="ccol-command ccol-command-outline" aria-expanded={section === "documents"} aria-controls={`${sectionId}-documents`} onClick={() => toggle("documents")}><Presentation className="h-4 w-4" /> Incluir conteúdo documental</button></MonitorCommandHelp>
         </div>
         <div className="mt-2">{exports}</div>
+        <div className="mt-3"><MonitorCommandHelp text="Ajusta textos, imagens, posição, tamanho e cores dos gráficos dos documentos publicados, mantendo o padrão do MCL."><a href={`/grupamento/monitor-editor/${monitor.id}`} target="_blank" rel="noreferrer" className="ccol-command ccol-command-outline w-full"><Presentation className="h-4 w-4" /> Editar conteúdo online</a></MonitorCommandHelp></div>
         <AnimatedMonitorSection open={section === "configuration"} id={`${sectionId}-configuration`}><div className="ccol-subcommands">{configuration}{devices}</div></AnimatedMonitorSection>
         <AnimatedMonitorSection open={section === "budget"} id={`${sectionId}-budget`}><div className="ccol-subcommands">{budget}</div></AnimatedMonitorSection>
         <div id={`${sectionId}-documents`}>{opened ? documents(section === "documents") : null}</div>
