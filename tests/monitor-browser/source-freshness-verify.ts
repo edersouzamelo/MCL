@@ -39,6 +39,7 @@ async function verify() {
     expect(await sources.evaluate(node => getComputedStyle(node).borderColor)).not.toBe(red);
     await page.setViewportSize({width:390,height:844}); await sources.scrollIntoViewIfNeeded(); await sources.hover(); await expect(popup).toBeVisible(); await page.waitForTimeout(500);
     const bounds = await popup.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(390); expect(bounds!.y+bounds!.height).toBeLessThanOrEqual(844);
+    await expect.poll(() => popup.evaluate(node => { const rect = node.getBoundingClientRect(); return node.contains(document.elementFromPoint(rect.x+40,rect.y+40)); })).toBe(true);
     await page.screenshot({path:"/workspace/scratch/55a592607734/sag-source-freshness-mobile.png"});
     includeRpn = false; await page.mouse.move(0,0); await page.reload();
     const partial = page.getByRole("button",{name:"1/2 fontes ativas: ver explicação",exact:true}); await expect(partial).toHaveAttribute("data-source-freshness","unknown"); await expect(partial).toContainText("Carga incompleta");
