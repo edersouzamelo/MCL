@@ -24,7 +24,7 @@ export function prepareEditorScene(scene: EditorScene): EditorScene {
   scene = structuredClone(scene);
   if (scene.payload.onlineEditor || !scene.payload.layout) return scene;
   const integral = monitorIntegralImage(scene.payload);
-  const prepared = scene.payload.inputCompiler?.strategy === "PRESERVE_COMPOSITION" ? { elements: scene.payload.layout.elements, title: scene.title } : monitorTitleElements(scene.payload.inputCompiler ? scene.payload.layout.elements : prepareMonitorElements(scene.payload.layout.elements).elements, scene.title);
+  const prepared = monitorTitleElements(prepareMonitorElements(scene.payload.layout.elements).elements, scene.title);
   const elements = (integral ? scene.payload.layout.elements : prepared.elements).map(item => item.kind === "text" ? {
     ...item, fontFace: "Arial", fontSizePt: Math.max(10, Math.min(72, item.fontSizePt ?? 18)), role: item.role === "title" ? "body" as const : item.role,
     color: /^#[0-9a-f]{6}$/i.test(item.color ?? "") ? item.color : "#111827",

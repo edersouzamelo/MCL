@@ -1,4 +1,3 @@
-import type { CompilerDiagnostic } from "./input-compiler";
 export type MonitorDocumentSceneType = "TEXT" | "TABLE" | "CHART" | "FIGURE";
 
 export type MonitorDocumentSeries = {
@@ -102,7 +101,6 @@ export type MonitorSlideLayout = {
 };
 
 export type MonitorDocumentScenePayload = {
-  inputCompiler?: CompilerDiagnostic;
   textDocument?: { version: number };
   onlineEditor?: { version: 1; revision: number; updatedAt?: string; updatedByName?: string };
   correction?: { version: 1; preserveLayout: true; fullFrame: true };

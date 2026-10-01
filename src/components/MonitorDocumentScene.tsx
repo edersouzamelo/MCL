@@ -81,9 +81,8 @@ export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeco
   if (!layout) return null;
   const integralImage = monitorIntegralImage(scene.payload);
   const online = Boolean(scene.payload.onlineEditor);
-  const atomic = scene.payload.inputCompiler?.strategy === "PRESERVE_COMPOSITION";
-  const preserve = atomic || online || integralImage || Boolean(scene.payload.correction?.preserveLayout);
-  const prepared = online || atomic ? { elements: layout.elements, title: scene.title, promotedChartTitle: !atomic && layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements((scene.payload.inputCompiler ? layout.elements : prepareMonitorElements(layout.elements).elements), scene.title);
+  const preserve = online || integralImage || Boolean(scene.payload.correction?.preserveLayout);
+  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements(prepareMonitorElements(layout.elements).elements, scene.title);
   const sorted = [...(integralImage ? layout.elements : prepared.elements)]
     .sort((a,b) => a.z-b.z);
   return (
@@ -96,7 +95,7 @@ export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeco
           }
           if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} preserve={preserve} />;
           if (item.kind === "image") {
-            const framed = !preserve && !integralImage && !briefing && item.w * item.h >= 0.005;
+            const framed = !integralImage && !briefing && item.w * item.h >= 0.005;
             return <div
               key={"image-" + String(index)}
               className={"absolute flex items-center justify-center overflow-hidden " + (framed ? "rounded-xl border border-slate-300/60 bg-white/95 p-[.3%] shadow-[0_8px_22px_rgba(2,6,23,.16)]" : "")}
@@ -145,9 +144,9 @@ function AssetGrid({ assetIds, title }: { assetIds: string[]; title: string }) {
 export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSeconds, paused, onPageCount }: { scene: MonitorDocumentSceneDto; ccol: boolean; briefing?: boolean; cycleSeconds?: number; paused?: boolean; onPageCount?: (count: number) => void }) {
   const payload = scene.payload ?? {};
   const integralImage = monitorIntegralImage(payload);
-  const prepared = payload.onlineEditor && payload.layout ? { elements: payload.layout.elements, title: scene.title, promotedChartTitle: false } : payload.layout ? monitorTitleElements((payload.inputCompiler ? payload.layout.elements : prepareMonitorElements(payload.layout.elements).elements), scene.title) : null;
+  const prepared = payload.onlineEditor && payload.layout ? { elements: payload.layout.elements, title: scene.title, promotedChartTitle: false } : payload.layout ? monitorTitleElements(prepareMonitorElements(payload.layout.elements).elements, scene.title) : null;
   const title = prepared?.title ?? scene.title;
-  const tableSlide = prepared && payload.inputCompiler?.strategy !== "PRESERVE_COMPOSITION" && !payload.onlineEditor && !payload.correction?.preserveLayout ? monitorTableSlide(prepared.elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
+  const tableSlide = prepared && !payload.onlineEditor && !payload.correction?.preserveLayout ? monitorTableSlide(prepared.elements) : !payload.layout && payload.columns && payload.rows && !payload.chart && !payload.assetIds?.length ? {
     table: { columns: payload.columns, rows: payload.rows, y: 1 },
     texts: (payload.bullets ?? []).map((text, index): MonitorSlideTextElement => ({kind:'text', text, role:'body', bold:false, x:0, y:0, w:1, h:.1, z:index})),
   } : null;
@@ -162,7 +161,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
     const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
     const text = (items: typeof before) => items.map((item, i) => <div key={i} className="whitespace-pre-line break-words" style={{ fontSize: item.role === 'title' || i === 0 && items === before ? 'clamp(24px, 2.4vw, 40px)' : 'clamp(16px, 1.3vw, 24px)', fontWeight: item.bold ? 800 : 600 }}><OmMentions text={item.text} header={items === before} /></div>);
-    return <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage || payload.inputCompiler?.strategy === "PRESERVE_COMPOSITION"}><section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
+    return <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
       {before.length > 0 && <header className="shrink-0 space-y-2">{text(before)}</header>}
       <MonitorDocumentTable columns={tableSlide.table.columns} rows={tableSlide.table.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
       {after.length > 0 && <div className="shrink-0 space-y-1">{text(after)}</div>}
@@ -171,7 +170,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   }
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
-      <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage || payload.inputCompiler?.strategy === "PRESERVE_COMPOSITION"}><section className="relative h-full min-h-0 overflow-hidden">
+      <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0 overflow-hidden">
         <MonitorDocumentLayout scene={scene} ccol={ccol || briefing} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
         {!briefing && <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · fonte rastreável
@@ -186,7 +185,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   </div>;
   const bullets = payload.bullets ?? [];
   return (
-    <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage || payload.inputCompiler?.strategy === "PRESERVE_COMPOSITION"}><section className="relative h-full min-h-0">
+    <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0">
       <div className="mb-5 flex items-start justify-between gap-5">
         <div>
           <div className={"flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] " + (ccol ? "text-sky-800" : "text-sky-300")}>

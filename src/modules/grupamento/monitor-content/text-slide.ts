@@ -5,7 +5,6 @@ import type { MonitorDocumentScenePayload, MonitorSlideTextElement } from "./typ
  * Mixed slides, diagrams, flattened covers and user-corrected layouts stay intact.
  */
 export function monitorTextSlide(payload: MonitorDocumentScenePayload, title: string) {
-  if (payload.inputCompiler?.strategy === "PRESERVE_COMPOSITION" || payload.inputCompiler?.strategy === "BLOCKED") return null;
   if (!payload.layout || payload.onlineEditor || payload.correction?.preserveLayout) return null;
   const elements = payload.layout.elements;
   if (elements.some(item => item.kind === "image" || item.kind === "chart" || item.kind === "table")) return null;
