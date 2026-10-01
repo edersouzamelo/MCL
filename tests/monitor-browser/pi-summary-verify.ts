@@ -21,7 +21,7 @@ const codes = [...new Set(CCO_CLASS_GROUPS.flatMap(g=>g.piCodes)), ...Array.from
 const input=codes.map((pi,i)=>[String((i%30<25?160000:167000)+(i%30)),OM_CREST_CATALOG.units[i%30].acronym,pi,'DESCRIÇÃO DE TESTE PARA O PLANO INTERNO',100000,200000,300000,400000,500000]);
 const sag=parseSagWorkbook(workbook(['UG','NOME_UG','PI','NOME_PI','DISPONIVEL','A_LIQUIDAR','EM_LIQUIDACAO','LIQUIDADO','PAGO'],input),'FIXTURE_SAG_TESTE.xlsx');
 const rpn=parseRpnWorkbook(workbook(['UG','NOME_UG','PI','NOME_PI','TOTAL_INSCRITO','TOTAL_A_LIQUIDAR','TOTAL_LIQUIDADO','CANC'],input.map(r=>[...r.slice(0,4),1100000,250000,750000,100000])),'FIXTURE_RPN_TESTE.xlsx');
-let documentary:MonitorDocumentSceneDto[]=[];
+const documentary:MonitorDocumentSceneDto[]=[];
 let configs=defaultCcoMonitorConfig().map(c=>c.id===9?{...c,label:'MONITOR · DADOS DE TESTE',layout:'ccol' as const,screens:CCO_SCREEN_CATALOG.map(s=>s.id)}:c);
 async function verify(){
  const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3010'],{env:{...process.env,AUTH_SECRET:secret,NEXTAUTH_SECRET:secret,NEXTAUTH_URL:origin},stdio:['ignore','pipe','pipe']});
