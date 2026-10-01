@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronUp, Clock3, Database, ShieldCheck, Wifi, WifiOff } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { GrupamentoClassSummaryScreen } from "@/components/GrupamentoClassSummaryScreen";
-import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from "@/modules/grupamento/class-summary";
+import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, paginateClassSummary, summaryClassId } from "@/modules/grupamento/class-summary";
 import { GrupamentoBaseMonitorScreen } from "@/components/GrupamentoBaseMonitorScreen";
 import { GrupamentoRuleMonitorScreen } from "@/components/GrupamentoRuleMonitorScreen";
 import { activeMonitorCorrection } from "@/modules/grupamento/monitor-content/correction";
@@ -189,8 +189,11 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
       if (screen === "units-rpn-160") rowCount = rpn?.byUg.filter((item) => item.ug.startsWith("160")).length ?? 0;
       if (screen === "units-rpn-167") rowCount = rpn?.byUg.filter((item) => item.ug.startsWith("167")).length ?? 0;
 
-      const pageCount = pageSize > 0 ? Math.max(1, Math.ceil(rowCount / pageSize)) : 1;
-      const baseLabel = CCO_SCREEN_CATALOG.find((item) => item.id === screen)?.label ?? screen;
+      const pageCount = summaryId && sag
+        ? paginateClassSummary(buildCcoClassSummary(summaryId, sag.rows).byPi).length
+        : pageSize > 0 ? Math.max(1, Math.ceil(rowCount / pageSize)) : 1;
+      const catalogLabel = CCO_SCREEN_CATALOG.find((item) => item.id === screen)?.label ?? screen;
+      const baseLabel = summaryId ? `Provisão orçamentária resumida por PI · ${catalogLabel.replace(" - Resumido", "")}` : catalogLabel;
       return Array.from({ length: pageCount }, (_, page) => ({
         kind: "system" as const,
         key: `system:${screen}:${page}`,

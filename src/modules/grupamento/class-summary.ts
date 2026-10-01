@@ -1,7 +1,21 @@
 import { CCO_CLASS_GROUPS, CCO_CLASS_SLIDES, buildCcoClassExecution, type CcoClassId } from "./cco";
 import type { SagRow } from "./sag";
 
-export const CCO_SUMMARY_ROWS_PER_PAGE = 8;
+export const CCO_SUMMARY_ROWS_PER_PAGE = 9;
+
+/** Balanced consecutive pages, with the same boundaries for playlist and renderer. */
+export function paginateClassSummary<T>(items: T[]): T[][] {
+  const count = Math.max(1, Math.ceil(items.length / CCO_SUMMARY_ROWS_PER_PAGE));
+  const size = Math.floor(items.length / count);
+  const extra = items.length % count;
+  let offset = 0;
+  return Array.from({ length: count }, (_, page) => {
+    const length = size + (page < extra ? 1 : 0);
+    const result = items.slice(offset, offset + length);
+    offset += length;
+    return result;
+  });
+}
 
 export function summaryClassId(screen: string): CcoClassId | undefined {
   if (!screen.endsWith("-summary")) return undefined;

@@ -6,7 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 import { parseSagWorkbook } from '../../src/modules/grupamento/sag';
 import { parseRpnWorkbook } from '../../src/modules/grupamento/rpn';
-import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from '../../src/modules/grupamento/class-summary';
+import { buildCcoClassSummary, paginateClassSummary, summaryClassId } from '../../src/modules/grupamento/class-summary';
 import { CCO_CLASS_GROUPS } from '../../src/modules/grupamento/cco';
 import { defaultCcoMonitorConfig, CCO_SCREEN_CATALOG } from '../../src/modules/grupamento/monitor';
 import type { MonitorDocumentSceneDto } from '../../src/modules/grupamento/monitor-content/types';
@@ -56,14 +56,14 @@ async function verify(){
      return {label:document.querySelector('main')!.getAttribute('data-mcl-frame-label'),frame:{height:frame.height,width:frame.width},overflows,scale:document.querySelector('[data-monitor-viewport]')!.getAttribute('data-scale'),pageCount:document.querySelector('[data-monitor-viewport]')!.getAttribute('data-page-count'),piCount:scene.querySelectorAll('.mcl-budget-pi').length,logos:scene.querySelectorAll('.mcl-om-identity img').length};
     });checks.push({mode,size,...info});
     expect(info.scale).toBe('1');expect(info.pageCount).toBe('1');expect(info.piCount).toBeLessThanOrEqual(20);
-    if(info.label?.includes(' - Resumido')){
-      const summaryId=summaryClassId(configs[8].screens.filter(s=>s.endsWith('-summary')).find(s=>info.label?.startsWith(CCO_SCREEN_CATALOG.find(d=>d.id===s)?.label??s))!);
+    if(info.label?.startsWith('Provisão orçamentária resumida por PI')){
+      const summaryId=summaryClassId(configs[8].screens.filter(s=>s.endsWith('-summary')).find(s=>info.label?.includes((CCO_SCREEN_CATALOG.find(d=>d.id===s)?.label??s).replace(' - Resumido','')))!);
       expect(summaryId).toBeDefined();
       const summary=buildCcoClassSummary(summaryId!,sag.rows);
       await expect(page.locator('.mcl-class-summary-total strong .mcl-animated-value > span:not([aria-hidden])')).toHaveText(summary.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));
       const pageIndex=Number(await page.locator('main').getAttribute('data-mcl-frame-label').then(label=>label?.match(/ · (\d+)\//)?.[1]??'1'))-1;
-      const expected=summary.byPi.slice(pageIndex*CCO_SUMMARY_ROWS_PER_PAGE,(pageIndex+1)*CCO_SUMMARY_ROWS_PER_PAGE);
-      await expect(page.locator('.mcl-class-summary-label > strong')).toHaveText(expected.map(item=>item.pi));
+      const expected=paginateClassSummary(summary.byPi)[pageIndex];
+      await expect(page.locator('.mcl-class-summary-identity > strong')).toHaveText(expected.map(item=>item.pi));
     }
     if(mode==='ccol' && size.width===1535 && (i<3||info.label?.includes('Classe I')||info.label?.includes('Resumo')||info.piCount===20||info.label?.includes('série 160 · 1/')))await page.screenshot({path:`${output}/${i}-${size.width}.png`});
    }
