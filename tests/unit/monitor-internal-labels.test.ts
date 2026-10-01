@@ -39,7 +39,8 @@ describe("internal bar annotations", () => {
   it("warns when a requested cell label has no cached text instead of fabricating a percentage", () => {
     const result = extract('<c:extLst><c:ext><c15:showDataLabelsRange val="1"/></c:ext></c:extLst>');
     expect(series(result).dataLabels).toEqual([null, null]);
-    expect(result.warnings).toHaveLength(2);
+    expect(result.warnings.filter(w => w.includes("texto de célula sem cache"))).toHaveLength(2);
+    expect(result.scenes[0].payload.inputCompiler?.preflight.status).toBe("BLOCKED");
     expect(result.warnings[0]).toContain("texto de célula sem cache");
   });
 
