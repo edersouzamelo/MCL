@@ -129,6 +129,7 @@ model Organization {
   needs                  Need[]
   procurementInstruments ProcurementInstrument[]
   financialSourceImports FinancialSourceImport[]
+  piCatalogEntries PiCatalogEntry[]
   monitorContentImports  MonitorContentImport[]
   ccoMonitorConfigurations CcoMonitorConfiguration[]
   monitorDisplayDevices MonitorDisplayDevice[]
@@ -1087,4 +1088,17 @@ model PcaItemRevision {
 
   @@unique([pcaItemId, source, version])
   @@index([recordedAt(sort: Desc), id])
+}
+
+// Exact PI descriptions learned from SAG, scoped to the importing organization.
+model PiCatalogEntry {
+  organizationId String
+  pi             String
+  piName         String
+  sourceFile     String
+  sourceChecksum String
+  importedAt     DateTime
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, pi])
 }

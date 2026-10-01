@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CCO_CLASS_GROUPS } from "@/modules/grupamento/cco";
-import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, summaryClassId } from "@/modules/grupamento/class-summary";
+import { buildCcoClassSummary, CCO_SUMMARY_ROWS_PER_PAGE, paginateClassSummary, summaryClassId } from "@/modules/grupamento/class-summary";
 import { CCO_SCREEN_CATALOG, ccoScreenDescription, defaultCcoMonitorConfig, parseCcoMonitorConfig } from "@/modules/grupamento/monitor";
 import { computeSagSnapshot, type SagRow } from "@/modules/grupamento/sag";
 
@@ -54,5 +54,24 @@ describe("class summaries from the algoritmo.xlsx matrix", () => {
     }
     expect(summaryClassId("class-unknown-summary")).toBeUndefined();
     expect(summaryClassId("class-i")).toBeUndefined();
+  });
+});
+
+describe("balanced PI pagination", () => {
+  it("shows nine PIs together and balances larger lists without changing their order", () => {
+    for (const [count, sizes] of [[9, [9]], [10, [5, 5]], [17, [9, 8]], [19, [7, 6, 6]]] as const) {
+      const items = Array.from({ length: count }, (_, pi) => ({ pi, total: pi + .01 }));
+      const pages = paginateClassSummary(items);
+      expect(pages.map((page) => page.length)).toEqual(sizes);
+      expect(pages.flat()).toEqual(items);
+    }
+  });
+  it("never creates an orphan PI page after a full page", () => {
+    for (let count = 2; count < 150; count++) {
+      const pages = paginateClassSummary(Array.from({ length: count }, (_, i) => i));
+      expect(pages.every((page) => page.length > 1 && page.length <= CCO_SUMMARY_ROWS_PER_PAGE)).toBe(true);
+      expect(Math.max(...pages.map((page) => page.length)) - Math.min(...pages.map((page) => page.length))).toBeLessThanOrEqual(1);
+    }
+    expect(paginateClassSummary([])).toEqual([[]]);
   });
 });

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { collectPiDescriptions, withPiDescriptions } from "@/modules/grupamento/pi-catalog";
 import { prisma } from "@/server/db";
 import type { RpnImportResult } from "@/modules/grupamento/rpn";
 import type { SagImportResult } from "@/modules/grupamento/sag";
@@ -128,22 +129,45 @@ function upsertArgs(input: PersistInput): Prisma.FinancialSourceImportUpsertArgs
   };
 }
 
+async function learnPiCatalog(tx: Prisma.TransactionClient, input: PersistInput, importedAt: Date) {
+  const descriptions = collectPiDescriptions(input.payload.rows);
+  const values = Object.entries(descriptions).map(([pi, piName]) => Prisma.sql`
+    (${input.organizationId}, ${pi}, ${piName}, ${input.fileName}, ${input.checksum}, ${importedAt})`);
+  if (!values.length) return;
+  // One statement per load; stale reimports cannot roll back a newer description.
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "PiCatalogEntry" ("organizationId", "pi", "piName", "sourceFile", "sourceChecksum", "importedAt")
+    VALUES ${Prisma.join(values)}
+    ON CONFLICT ("organizationId", "pi") DO UPDATE SET
+      "piName" = EXCLUDED."piName", "sourceFile" = EXCLUDED."sourceFile",
+      "sourceChecksum" = EXCLUDED."sourceChecksum", "importedAt" = EXCLUDED."importedAt"
+    WHERE "PiCatalogEntry"."importedAt" <= EXCLUDED."importedAt"
+  `);
+}
+
 export async function persistFinancialImport(input: PersistInput) {
-  return prisma.financialSourceImport.upsert(upsertArgs(input));
+  return prisma.$transaction(async (tx) => {
+    const stored = await tx.financialSourceImport.upsert(upsertArgs(input));
+    await learnPiCatalog(tx, input, stored.importedAt);
+    return stored;
+  }, { timeout: 30_000 });
 }
 
 export async function persistFinancialPair(current: PersistInput, rpn: PersistInput) {
   if (current.organizationId !== rpn.organizationId || current.sourceKind !== "CURRENT" || rpn.sourceKind !== "RPNP") {
     throw new Error("Par financeiro inválido para persistência atômica.");
   }
-  return prisma.$transaction([
-    prisma.financialSourceImport.upsert(upsertArgs(current)),
-    prisma.financialSourceImport.upsert(upsertArgs(rpn)),
-  ]);
+  return prisma.$transaction(async (tx) => {
+    const storedCurrent = await tx.financialSourceImport.upsert(upsertArgs(current));
+    const storedRpn = await tx.financialSourceImport.upsert(upsertArgs(rpn));
+    await learnPiCatalog(tx, rpn, storedRpn.importedAt);
+    await learnPiCatalog(tx, current, storedCurrent.importedAt);
+    return [storedCurrent, storedRpn];
+  }, { timeout: 30_000 });
 }
 
 export async function getLatestFinancialSnapshotPair(organizationId: string): Promise<FinancialSnapshotPair> {
-  const [current, rpn] = await Promise.all([
+  const [current, rpn, catalogEntries] = await Promise.all([
     prisma.financialSourceImport.findFirst({
       where: { organizationId, sourceKind: "CURRENT" },
       orderBy: { importedAt: "desc" },
@@ -152,19 +176,26 @@ export async function getLatestFinancialSnapshotPair(organizationId: string): Pr
       where: { organizationId, sourceKind: "RPNP" },
       orderBy: { importedAt: "desc" },
     }),
+    prisma.piCatalogEntry.findMany({ where: { organizationId }, select: { pi: true, piName: true } }),
   ]);
+  const catalog = Object.fromEntries(catalogEntries.map((entry) => [entry.pi, entry.piName]));
+  const currentPayload = current?.payload as unknown as SagImportResult | undefined;
+  const rpnPayload = rpn?.payload as unknown as RpnImportResult | undefined;
 
   return {
     current: current
       ? {
-          ...(current.payload as unknown as SagImportResult),
+          ...currentPayload!,
+          rows: withPiDescriptions(currentPayload!.rows, catalog),
+          byPi: withPiDescriptions(currentPayload!.byPi, catalog),
           persistedAt: current.importedAt.toISOString(),
           checksum: current.checksum,
         }
       : null,
     rpn: rpn
       ? {
-          ...(rpn.payload as unknown as RpnImportResult),
+          ...rpnPayload!,
+          rows: withPiDescriptions(rpnPayload!.rows, catalog),
           persistedAt: rpn.importedAt.toISOString(),
           checksum: rpn.checksum,
         }
