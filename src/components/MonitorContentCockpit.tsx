@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, FileText, Loader2, Presentation, Trash2, Upload, X } from "lucide-react";
+import { AnimatedMonitorSection } from "@/components/CcolMonitorCard";
 import { MonitorContentSceneThumbnail } from "@/components/MonitorContentSceneThumbnail";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
 import type { MonitorDocumentSceneDto, MonitorDocumentScenePayload } from "@/modules/grupamento/monitor-content/types";
@@ -37,14 +38,17 @@ function size(bytes: number) {
 
 export function MonitorContentCockpit({
   monitorId,
+  expanded,
   currentUserName,
   requiresOperatorIdentification = false,
 }: {
   monitorId: number;
+  expanded?: boolean;
   currentUserName?: string;
   requiresOperatorIdentification?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setOpen] = useState(false);
+  const open = expanded ?? internalOpen;
   const [imports, setImports] = useState<ImportRecord[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
@@ -228,12 +232,12 @@ export function MonitorContentCockpit({
   }
 
   return (
-    <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-      <button type="button" onClick={() => setOpen((value) => !value)} className="inline-flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
+    <div className={expanded === undefined ? "mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800" : ""}>
+      {expanded === undefined ? <button type="button" onClick={() => setOpen((value) => !value)} className="inline-flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 transition hover:bg-sky-100 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
         <Presentation className="h-4 w-4" /> Conteúdo documental {imports.some((item) => item.status === "APPROVED") ? "· publicado" : ""}
-      </button>
+      </button> : null}
 
-      {open ? (
+      <AnimatedMonitorSection open={open}>
         <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -323,7 +327,7 @@ export function MonitorContentCockpit({
             {!imports.length ? <div className="py-3 text-center text-[11px] text-zinc-500">Nenhum documento importado para este monitor.</div> : null}
           </div>
         </div>
-      ) : null}
+      </AnimatedMonitorSection>
 
       {selectedScene && preview ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Prévia da cena documental">

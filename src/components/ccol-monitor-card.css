@@ -1,0 +1,36 @@
+.ccol-monitor-trigger{display:block;width:100%;border:0;background:none;cursor:pointer;padding:0 8px 10px;transition:transform .2s}
+.ccol-monitor-trigger:hover{transform:translateY(-3px)}
+.ccol-monitor-trigger:focus-visible{outline:3px solid #0284c7;outline-offset:5px;border-radius:8px}
+.ccol-monitor-bezel{display:block;position:relative;padding:7px 7px 15px;background:linear-gradient(135deg,#52525b,#18181b 35%,#09090b);border:2px solid #52525b;border-radius:7px;box-shadow:0 5px 12px #0003}
+.ccol-monitor-screen{display:block;position:relative;aspect-ratio:16/9;background:#000;overflow:hidden;border:1px solid #000}
+.ccol-monitor-screen img{display:block;width:100%;height:100%;object-fit:contain}
+.ccol-monitor-led{position:absolute;bottom:5px;right:12px;width:4px;height:4px;border-radius:50%;background:#71717a}
+.ccol-monitor-led.enabled{background:#4ade80;box-shadow:0 0 4px #4ade80}
+.ccol-monitor-stand{display:block;width:12%;height:17px;margin:auto;background:linear-gradient(90deg,#27272a,#52525b,#18181b)}
+.ccol-monitor-foot{display:block;width:34%;height:7px;margin:auto;border-radius:70% 70% 3px 3px;background:linear-gradient(#52525b,#18181b)}
+.ccol-test-screen{display:flex;align-items:center;justify-content:center;height:100%;color:#fff;font-size:clamp(20px,3vw,42px);font-weight:800;letter-spacing:.12em}
+.ccol-monitor-divider{position:absolute;background:#000;pointer-events:none;z-index:1}
+.ccol-monitor-divider.horizontal{height:4px;left:0;right:0;top:calc(50% - 2px)}
+.ccol-monitor-divider.vertical{width:4px;top:0;bottom:0;left:calc(50% - 2px)}
+.ccol-monitor-dialog{position:fixed;inset:0;margin:auto;width:min(960px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;border:1px solid #d4d4d8;border-radius:18px;overflow:auto;background:#fff;color:#18181b;box-shadow:0 25px 80px #0006}
+.ccol-monitor-dialog::backdrop{background:#09090ba6;backdrop-filter:blur(5px)}
+.ccol-monitor-dialog-panel{padding:24px}
+.dark .ccol-monitor-dialog{background:#09090b;color:#fafafa;border-color:#3f3f46}
+.ccol-command-help{position:relative;min-width:0}
+.ccol-command{display:flex;justify-content:center;align-items:center;gap:7px;width:100%;min-height:56px;height:100%;padding:10px;border-radius:9px;font-size:12px;font-weight:700;text-align:center;line-height:1.4;cursor:pointer;transition:filter .18s}
+.ccol-command svg{flex-shrink:0}
+.ccol-command:hover{filter:brightness(1.12)}
+.ccol-command:focus-visible{outline:2px solid #0284c7;outline-offset:2px}
+.ccol-command-outline{border:1px solid #7dd3fc;background:#f0f9ff;color:#0c4a6e}
+.ccol-command-outline[aria-expanded=true]{background:#dbeafe;border-color:#0284c7}
+.dark .ccol-command-outline{border-color:#075985;background:#082f49;color:#bae6fd}
+.dark .ccol-command-outline[aria-expanded=true]{background:#0c4a6e}
+.ccol-command-tooltip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);width:220px;max-width:70vw;padding:9px 11px;border-radius:8px;background:#18181b;color:white;font-size:11px;line-height:1.5;font-weight:400;z-index:20;pointer-events:none;visibility:hidden;opacity:0;transition:opacity .15s;box-shadow:0 3px 12px #0004}
+.ccol-command-help:hover .ccol-command-tooltip,.ccol-command-help:focus-within .ccol-command-tooltip{visibility:visible;opacity:1}
+.ccol-animated-section{display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;transition:grid-template-rows .3s ease,opacity .25s ease,visibility 0s .3s}
+.ccol-animated-section.is-open{grid-template-rows:1fr;opacity:1;visibility:visible;transition:grid-template-rows .3s ease,opacity .25s ease,visibility 0s}
+.ccol-animated-inner{min-height:0;overflow:hidden}
+.ccol-subcommands{margin-top:16px;padding:16px;border:1px solid #d4d4d8;border-radius:12px;background:#fafafa}
+.dark .ccol-subcommands{border-color:#3f3f46;background:#18181b}
+@media(max-width:540px){.ccol-monitor-dialog-panel{padding:16px}.ccol-command{flex-direction:column;min-height:82px;font-size:11px;padding:8px 5px}.ccol-command-tooltip{width:160px}}
+@media(prefers-reduced-motion:reduce){.ccol-animated-section,.ccol-monitor-trigger{transition:none}}

@@ -77,6 +77,8 @@ export type CcoMonitorConfig = {
   layout: CcoLayoutId;
   responsibleSector?: CcoResponsibleSector | null;
   updatedOn?: string | null;
+  updatedAt?: string | null;
+  updatedByName?: string | null;
 };
 
 export function defaultCcoMonitorConfig(): CcoMonitorConfig[] {
@@ -103,6 +105,8 @@ export function defaultCcoMonitorConfig(): CcoMonitorConfig[] {
     layout: layout ?? "mcl",
     responsibleSector: index === 9 ? "Seção de Planejamento" : null,
     updatedOn: null,
+    updatedAt: null,
+    updatedByName: null,
   }));
 }
 
@@ -125,6 +129,8 @@ export function parseCcoMonitorConfig(value: unknown, monitorId: number): CcoMon
     screens: item.screens as CcoScreenId[], delaySeconds: item.delaySeconds as number, layout: item.layout,
     responsibleSector: item.responsibleSector as CcoResponsibleSector | null | undefined ?? null,
     updatedOn: item.updatedOn as string | null | undefined ?? null,
+    updatedAt: typeof item.updatedAt === "string" && !Number.isNaN(Date.parse(item.updatedAt)) ? item.updatedAt : null,
+    updatedByName: typeof item.updatedByName === "string" ? item.updatedByName : null,
   };
 }
 

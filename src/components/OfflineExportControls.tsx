@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { MonitorCommandHelp } from "@/components/CcolMonitorCard";
+import { Download, ExternalLink, Loader2 } from "lucide-react";
 
 type CapturedHtmlFrame = {
   html: string;
@@ -303,7 +304,9 @@ export function OfflineExportControls({
   monitorId,
   delaySeconds,
   beforeExport,
+  commandGrid = false,
 }: {
+  commandGrid?: boolean;
   monitorId: number;
   delaySeconds: number;
   beforeExport?: () => Promise<void>;
@@ -351,24 +354,14 @@ export function OfflineExportControls({
     finally { setRunning(false); }
   }
 
-  return (
-    <div className="mt-3 rounded-xl border border-dashed border-sky-200 bg-sky-50/40 p-3 dark:border-sky-900/60 dark:bg-sky-950/10">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-xs font-bold text-sky-900 dark:text-sky-200">Exportação do monitor</div>
-          <div className="mt-0.5 text-[10px] leading-4 text-zinc-500">
-            Gera um HTML portátil do conteúdo publicado neste monitor, com ajuste automático de tela, fade e controles de reprodução. Funciona localmente em Chrome, Edge ou Firefox sem internet. No PPT de correção, textos e formas são editáveis; gráficos são figuras.
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button type="button" disabled={running} onClick={() => void exportForCorrection()} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"><Download className="h-3 w-3" /> Exportar para corrigir</button>
-          <button type="button" disabled={running} onClick={() => void exportOffline()} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">
-            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />} Exportar HTML portátil
-          </button>
-        </div>
-      </div>
-      {progress ? <p className="mt-2 text-[10px] font-semibold text-sky-700 dark:text-sky-300">{progress}</p> : null}
-      {error ? <p className="mt-2 rounded-lg bg-red-50 p-2 text-[10px] font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p> : null}
-    </div>
-  );
+  const controls = <>
+    <MonitorCommandHelp text="Extrai um PowerPoint para correção. Textos e formas são editáveis; gráficos são imagens. Reimporte e aprove após corrigir."><button type="button" disabled={running} onClick={() => void exportForCorrection()} className="ccol-command bg-emerald-800 text-white disabled:opacity-50"><Download className="h-4 w-4" /> Corrigir (extrair PPT)</button></MonitorCommandHelp>
+    <MonitorCommandHelp text="Exporta a apresentação publicada como HTML portátil para exibição sem internet."><button type="button" disabled={running} onClick={() => void exportOffline()} className="ccol-command bg-sky-700 text-white disabled:opacity-50">{running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Exportar (extrair HTML)</button></MonitorCommandHelp>
+    <MonitorCommandHelp text="Abre a apresentação deste monitor em outra aba. Use F11 para ocupar a tela."><a href={`/grupamento/monitor/${monitorId}`} target="_blank" rel="noreferrer" className="ccol-command bg-black text-white"><ExternalLink className="h-4 w-4" /> Exibir / Abrir</a></MonitorCommandHelp>
+  </>;
+  return <div className={commandGrid ? "grid grid-cols-3 gap-2" : "mt-3 grid grid-cols-3 gap-2 rounded-xl border border-sky-200 p-3"}>
+    {controls}
+    {progress ? <p role="status" className="col-span-3 mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">{progress}</p> : null}
+    {error ? <p role="alert" className="col-span-3 mt-2 rounded-lg bg-red-50 p-2 text-xs font-semibold text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p> : null}
+  </div>;
 }
