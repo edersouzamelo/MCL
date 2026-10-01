@@ -351,7 +351,7 @@ export function GrupamentoCommandCenterClient({
               Matriz PI/Classe incorporada: <strong className="text-slate-950 dark:text-white">{CCO_RULE_SOURCE.fileName}</strong> · {CCO_RULE_SOURCE.referenceDate} · {CCO_CLASS_SLIDES.length} quadros de Classe/finalidade
             </div>
           </div>
-          <CcolPanelCounters monitors={monitors} sourceCount={sourceCount} validRows={validRows} ready={monitorsReady} />
+          <CcolPanelCounters monitors={monitors} sourceCount={sourceCount} validRows={validRows} ready={monitorsReady} currentSource={sag?.source} rpnSource={rpn?.source} />
         </div>
       </section>
 

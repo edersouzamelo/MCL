@@ -2,6 +2,11 @@ import { prisma } from "@/server/db";
 import { randomUUID } from "node:crypto";
 import { ccoLocalDate, isCcoMonitorId, defaultCcoMonitorConfig, parseCcoMonitorConfig, type CcoMonitorConfig } from "./monitor";
 
+function identifiedName(value?: string | null) {
+  const name = value?.trim();
+  return name && !/^(?:operador\s+(?:demonstrativo|demo)|respons[aá]vel n[aã]o identificado)$/i.test(name) ? name : undefined;
+}
+
 export async function listCcoMonitorConfigs(organizationId: string): Promise<CcoMonitorConfig[]> {
   const defaults = defaultCcoMonitorConfig();
   const [rows, documents, contentEvents] = await Promise.all([
@@ -9,7 +14,8 @@ export async function listCcoMonitorConfigs(organizationId: string): Promise<Cco
     prisma.monitorContentImport.findMany({ where: { organizationId }, select: { monitorId: true, importedAt: true, importedBy: true, importedByName: true, approvedAt: true, approvedBy: true, archivedAt: true, archivedBy: true } }),
     prisma.auditLog.findMany({ where: { organizationId, action: { in: ["MONITOR_CONTENT_DELETE", "MONITOR_CONTENT_REPROCESS", "MONITOR_CONTENT_ONLINE_EDIT"] }, outcome: "SUCESSO" }, select: { occurredAt: true, actorId: true, metadata: true } }),
   ]);
-  const updates = new Map<number, { at: Date; actorId: string; name?: string | null }>();
+  const updates = new Map<number, { at: Date; actorId: string; name?: string | null; documentName?: string | null }>();
+  const uploadNames = new Map<number, { at: Date; name: string }>();
   for (const row of rows) {
     if (!isCcoMonitorId(row.monitorId)) continue;
     const parsed = parseCcoMonitorConfig(row.configuration, row.monitorId);
@@ -17,27 +23,35 @@ export async function listCcoMonitorConfigs(organizationId: string): Promise<Cco
     updates.set(row.monitorId, { at: row.updatedAt, actorId: row.updatedBy });
   }
   for (const doc of documents) {
+    const name = identifiedName(doc.importedByName);
+    if (isCcoMonitorId(doc.monitorId) && name && (!uploadNames.has(doc.monitorId) || doc.importedAt > uploadNames.get(doc.monitorId)!.at)) uploadNames.set(doc.monitorId, { at: doc.importedAt, name });
     for (const event of [
       { at: doc.importedAt, actorId: doc.importedBy, name: doc.importedByName },
       { at: doc.approvedAt, actorId: doc.approvedBy, name: null },
       { at: doc.archivedAt, actorId: doc.archivedBy, name: null },
     ]) {
       if (!isCcoMonitorId(doc.monitorId) || !event.at || !event.actorId) continue;
-      if (!updates.has(doc.monitorId) || event.at > updates.get(doc.monitorId)!.at) updates.set(doc.monitorId, { at: event.at, actorId: event.actorId, name: event.name });
+      if (!updates.has(doc.monitorId) || event.at > updates.get(doc.monitorId)!.at) updates.set(doc.monitorId, { at: event.at, actorId: event.actorId, name: event.name, documentName: doc.importedByName });
     }
   }
   for (const event of contentEvents) {
-    const metadata = event.metadata as { monitorId?: number } | null;
+    const metadata = event.metadata as { monitorId?: number; actorName?: string } | null;
     const id = metadata?.monitorId;
     if (!id || !isCcoMonitorId(id) || !event.actorId) continue;
-    if (!updates.has(id) || event.occurredAt > updates.get(id)!.at) updates.set(id, { at: event.occurredAt, actorId: event.actorId });
+    if (!updates.has(id) || event.occurredAt > updates.get(id)!.at) updates.set(id, { at: event.occurredAt, actorId: event.actorId, name: metadata?.actorName });
   }
-  const users = await prisma.user.findMany({ where: { id: { in: [...new Set([...updates.values()].map((event) => event.actorId))] } }, select: { id: true, name: true } });
-  const names = new Map(users.map((user) => [user.id, user.name]));
+  const users = await prisma.user.findMany({ where: { id: { in: [...new Set([...updates.values()].map((event) => event.actorId))] } }, select: { id: true, name: true, email: true } });
+  const actors = new Map(users.map((user) => [user.id, user]));
   for (const [id, event] of updates) {
     defaults[id - 1].updatedOn = ccoLocalDate(event.at);
     defaults[id - 1].updatedAt = event.at.toISOString();
-    defaults[id - 1].updatedByName = event.name || names.get(event.actorId) || "Responsável não identificado";
+    const actor = actors.get(event.actorId);
+    const demo = event.actorId.startsWith("usr-demo") || actor?.email?.toLowerCase().endsWith("@mcl.invalid") || /^operador\s+(?:demonstrativo|demo)$/i.test(actor?.name?.trim() ?? "");
+    // Shared accounts cannot identify the approving/configuring person. Keep
+    // the explicit upload identification as the user's requested fallback.
+    const upload = uploadNames.get(id);
+    const fallback = identifiedName(event.documentName) || (upload && upload.at <= event.at ? upload.name : undefined);
+    defaults[id - 1].updatedByName = identifiedName(event.name) || (demo ? fallback : actor?.name) || "Responsável não identificado";
   }
   return defaults;
 }
