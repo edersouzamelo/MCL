@@ -17,3 +17,20 @@ export function monitorFreshness(age: number | null) {
   return { hue, label: age === 0 ? "Atualizado hoje" : age === 1 ? "Há 1 dia" : `Há ${age} dias`, border: `hsl(${hue} 75% 38%)`, background: `hsl(${hue} 75% 50% / 0.12)` };
 }
 export function monitorUpdateTime(value: string) { return new Date(value).toLocaleString("pt-BR", { timeZone: zone, dateStyle: "short", timeStyle: "medium" }); }
+
+export type SagFreshnessSource = { referenceDate?: string; importedAt: string; fileName?: string };
+export function sagSourceFreshness(source?: SagFreshnessSource | null, now = new Date()) {
+  const reference = source?.referenceDate;
+  const referenceInstant = reference && /^\d{4}-\d{2}-\d{2}$/.test(reference) ? `${reference}T12:00:00-04:00` : reference;
+  const referenceAge = monitorUpdateAge(referenceInstant, now);
+  const basis = referenceAge !== null ? "reference" : "import";
+  const date = basis === "reference" ? referenceInstant : source?.importedAt;
+  const age = monitorUpdateAge(date, now);
+  return { age, date: age === null ? undefined : date, basis };
+}
+export function sagPairFreshness(current?: SagFreshnessSource | null, rpn?: SagFreshnessSource | null, now = new Date()) {
+  const sources = [sagSourceFreshness(current,now), sagSourceFreshness(rpn,now)];
+  const complete = Boolean(current && rpn);
+  const age = complete && sources.every(source => source.age !== null) ? Math.max(...sources.map(source => source.age!)) : null;
+  return { age, complete, sources };
+}
