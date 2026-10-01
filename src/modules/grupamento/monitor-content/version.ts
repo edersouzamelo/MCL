@@ -1,7 +1,7 @@
 import type { MonitorDocumentExtraction, MonitorDocumentScenePayload } from "./types";
 import { TEXT_DOCUMENT_VERSION } from "./text-document";
 
-export const CURRENT_MONITOR_EXTRACTION_VERSION = 5;
+export const CURRENT_MONITOR_EXTRACTION_VERSION = 6;
 
 export function stampMonitorExtraction(extraction: MonitorDocumentExtraction): MonitorDocumentExtraction {
   return {

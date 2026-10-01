@@ -67,7 +67,7 @@ describe("PPTX semantic payload v4", () => {
     const graph = result.scenes[0].payload.layout!.elements.find((e) => e.kind === "chart");
     expect(graph?.kind).toBe("chart");
     if (graph?.kind !== "chart") return;
-    expect(graph.chart).toMatchObject({ semanticVersion: 4, orientation: "horizontal", grouping: "stacked", xAxisTitle: "Período", majorUnit: 20, showGridlines: true, gridlineColor: "#888888", legendPosition: "bottom", categoryReverse: true });
+    expect(graph.chart).toMatchObject({ semanticVersion: 5, orientation: "horizontal", grouping: "stacked", xAxisTitle: "Período", majorUnit: 20, showGridlines: true, gridlineColor: "#888888", legendPosition: "bottom", categoryReverse: true });
     expect(graph.chart.series[0]).toMatchObject({ values: [10, 0, 30], categories: ["Jan", "Fev", "Mar"], missingValueIndices: [1], pointColors: [null, null, "#FF0000"], color: "#008000" });
   });
 });

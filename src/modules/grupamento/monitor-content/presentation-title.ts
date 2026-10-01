@@ -33,18 +33,18 @@ export function monitorSceneTitle(elements: MonitorSlideElement[], fallback: str
 
 export function monitorTitleElements(elements: MonitorSlideElement[], fallback: string) {
   const texts = elements.filter((item): item is MonitorSlideTextElement => item.kind === "text");
-  const candidates = texts.filter(item => item.role === "title" && item.y < .3);
+  const candidates = texts.filter(item => !item.chartAnnotation && item.role === "title" && item.y < .3);
   const normalizedFallback = normalizeMonitorTitle(fallback);
-  const matching = texts.find(item => normalizeMonitorTitle(item.text) === normalizedFallback)
-    ?? texts.find(item => item.y < .3 && normalizedFallback.length >= 20 && normalizeMonitorTitle(item.text).startsWith(normalizedFallback));
-  const header = texts.filter(item => item.y < .3 && item.role !== "metric" && !/^(?:Fonte|Dados|Atualizad|Referência|Slide\s+\d)/i.test(item.text.trim()) && /\p{L}/u.test(item.text) && item.w >= .3)
+  const matching = texts.find(item => !item.chartAnnotation && normalizeMonitorTitle(item.text) === normalizedFallback)
+    ?? texts.find(item => !item.chartAnnotation && item.y < .3 && normalizedFallback.length >= 20 && normalizeMonitorTitle(item.text).startsWith(normalizedFallback));
+  const header = texts.filter(item => !item.chartAnnotation && item.y < .3 && item.role !== "metric" && !/^(?:Fonte|Dados|Atualizad|Referência|Slide\s+\d)/i.test(item.text.trim()) && /\p{L}/u.test(item.text) && item.w >= .3)
     .sort((a, b) => (b.fontSizePt ?? 0) - (a.fontSizePt ?? 0) || a.y - b.y)[0];
   const primary = matching ?? candidates.sort((a, b) => (b.fontSizePt ?? 0) - (a.fontSizePt ?? 0) || a.y - b.y)[0] ?? header;
   const charts = elements.filter(item => item.kind === "chart");
   const chartTitle = charts.length === 1 ? charts[0].chart.title?.trim() : undefined;
   const genericFallback = !fallback.trim() || /^(?:Slide|Página|Page)\s+\d+$/i.test(fallback.trim());
   const title = primary?.text ?? (genericFallback ? chartTitle : undefined) ?? fallback;
-  const titles = primary ? texts.filter(item => item === primary || (item.y < .3 && normalizeMonitorTitle(item.text) === normalizeMonitorTitle(primary.text))) : [];
+  const titles = primary ? texts.filter(item => !item.chartAnnotation && (item === primary || (item.y < .3 && normalizeMonitorTitle(item.text) === normalizeMonitorTitle(primary.text)))) : [];
   const content = elements.filter(item => !titles.includes(item as MonitorSlideTextElement));
   // Reflow within the body only. The title has its own non-shrinking layout row.
   const top = content.length ? Math.min(...content.map(item => item.y)) : 0;

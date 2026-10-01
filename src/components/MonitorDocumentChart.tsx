@@ -5,7 +5,7 @@ import { findOmCrest } from "@/modules/grupamento/om-crests";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { MonitorDocumentChart as Chart } from "@/modules/grupamento/monitor-content/types";
 import { barSegments, chartDomain, chartTicks, chartValueLabel, hasPoint, isStacked, seriesColor } from "@/modules/grupamento/monitor-content/chart-geometry";
-import { estimatedChartLabelWidth, fitHorizontalCategoryLabel, fitVerticalCategoryAxis } from "@/modules/grupamento/monitor-content/chart-label-layout";
+import { estimatedChartLabelWidth, fitBarPointLabel, fitHorizontalCategoryLabel, fitVerticalCategoryAxis } from "@/modules/grupamento/monitor-content/chart-label-layout";
 import { pieArcPath, pieLabelPositions, pieSliceGeometry } from "@/modules/grupamento/monitor-content/pie-layout";
 
 export function MonitorDocumentChart({ chart, ccol = false, decorateOms = true, showTitle = true }: { chart: Chart; ccol?: boolean; decorateOms?: boolean; showTitle?: boolean }) {
@@ -41,17 +41,6 @@ export function MonitorDocumentChart({ chart, ccol = false, decorateOms = true, 
   const categoryWidth = Math.min(size.width * .48, Math.max(88, ...categoryLabels.map((text) => estimatedChartLabelWidth(text, preferredCategoryFont) + 8)));
   const margin = { left: (horizontal ? categoryWidth + 16 + crestSpace : Math.max(50, ...ticks.map((v) => label(v).length * font * .6 + 10))) + (yTitle ? font * 2 : 0), top: chart.series.some(series => series.dataLabels?.some(Boolean)) && !horizontal ? font * 4 : font, right: horizontal ? Math.max(24, ...ticks.map((v) => label(v).length * font * .3)) : 24, bottom: font * (xTitle ? 5 : 3.2) };
   const width = Math.max(1, size.width - margin.left - margin.right);
-  const wrap = (text: string, available: number) => {
-    const limit = Math.max(1, Math.floor(available / (font * .58)));
-    const lines: string[] = [];
-    for (const word of text.split(/\s+/)) {
-      if (lines.length && lines[lines.length - 1].length + word.length + 1 <= limit) lines[lines.length - 1] += " " + word;
-      else {
-        for (let start = 0; start < word.length; start += limit) lines.push(word.slice(start, start + limit));
-      }
-    }
-    return lines.length ? lines : [""];
-  };
   const categoryLines = categoryLabels.map((text) => [text]);
   const verticalAxisLayout = horizontal ? null : fitVerticalCategoryAxis(categoryLabels, width / count, size.height, preferredCategoryFont);
   // Keep every tick at its true coordinate; stagger labels when space is scarce.
@@ -154,15 +143,13 @@ export function MonitorDocumentChart({ chart, ccol = false, decorateOms = true, 
             const band = (horizontal ? height : width) / count * .7;
             const thickness = isStacked(chart) || overlap ? band : band / Math.max(1, chart.series.length);
             const cross = chart.type === "bar" ? cat(index) - band / 2 + (isStacked(chart) || overlap ? band / 2 : thickness * (seriesIndex + .5)) : cat(index);
-            const end = val(segment.end);
-            const lines = wrap(text, horizontal ? Math.max(100, width * .55) : Math.max(40, width / count - 8));
-            const textWidth = Math.max(...lines.map(line => line.length)) * font * .58;
-            const outsideFits = horizontal && end + textWidth + 12 < margin.left + width;
-            const x = horizontal ? outsideFits ? end + 8 : Math.max(margin.left + textWidth + 4, end - 8) : cross;
-            const y = horizontal ? cross - (lines.length - 1) * font * .55 + font * .3 : Math.max(font, end - 8 - (lines.length - 1) * font * 1.1);
-            return <text key={`${seriesIndex}:${index}`} data-point-label={`${seriesIndex}:${index}`} x={x} y={y} textAnchor={horizontal ? outsideFits ? "start" : "end" : "middle"} fill={foreground} stroke={ccol ? "#ffffff" : "#071421"} strokeWidth="3" paintOrder="stroke" strokeLinejoin="round" fontSize={font * .9} fontWeight="700">
-              {lines.map((line, lineIndex) => <tspan key={lineIndex} x={x} dy={lineIndex ? font * 1.1 : 0}>{line}</tspan>)}
-            </text>;
+            const point = fitBarPointLabel({ text, position: series.dataLabelPositions?.[index], horizontal, start: val(segment.start), end: val(segment.end), cross, thickness: chart.type === "bar" ? thickness : width / count, fontSize: font * .9, bounds: { left: margin.left, top: 0, right: size.width, bottom: size.height - margin.bottom } });
+            return <g key={`${seriesIndex}:${index}`} aria-label={text} data-point-label={`${seriesIndex}:${index}`} data-label-position={series.dataLabelPositions?.[index] ?? "outEnd"} data-label-inside={point.inside}>
+              {point.callout && <line x1={horizontal ? val(segment.end) : cross} y1={horizontal ? cross : val(segment.end)} x2={point.x} y2={point.y} stroke={foreground} strokeWidth="1" />}
+              <text x={point.x} y={point.y} textAnchor="middle" fill={foreground} stroke={ccol ? "#ffffff" : "#071421"} strokeWidth="3" paintOrder="stroke" strokeLinejoin="round" fontSize={point.fontSize} fontWeight="700">
+                {point.lines.map((line, lineIndex) => <tspan key={lineIndex} x={point.x} dy={lineIndex ? point.fontSize * 1.1 : 0}>{line}</tspan>)}
+              </text>
+            </g>;
           }))}
           {xTitle && <text x={margin.left + width / 2} y={size.height - 4} textAnchor="middle" fill="currentColor" fontWeight="700">{xTitle}</text>}
           {yTitle && <text transform={`translate(${font},${margin.top + height / 2}) rotate(-90)`} textAnchor="middle" fill="currentColor" fontWeight="700">{yTitle}</text>}

@@ -3,7 +3,7 @@ import { inflateRawSync } from "node:zlib";
 import { posix } from "node:path";
 import { chartValueLabel } from "./chart-geometry";
 import { MONITOR_CORRECTION_MARKER } from "./correction";
-import { prepareMonitorElements } from "./presentation-layout";
+import { prepareMonitorElements, preserveChartAnnotations } from "./presentation-layout";
 import type {
   MonitorDocumentAssetDraft,
   MonitorDocumentChart,
@@ -190,7 +190,7 @@ function cachedPoints(xml: string) {
   return points;
 }
 
-function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
+function series(xml: string, theme: Theme, warnings: string[]): MonitorDocumentSeries[] {
   const result: MonitorDocumentSeries[] = [];
   const chartLabels = xml.replace(/<c:ser\b[^>]*>[\s\S]*?<\/c:ser>/g, "").match(/<c:dLbls\b[^>]*>([\s\S]*?)<\/c:dLbls>/)?.[1] ?? "";
   for (const match of xml.matchAll(/<c:ser\b[^>]*>([\s\S]*?)<\/c:ser>/g)) {
@@ -216,6 +216,10 @@ function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
     }
     const seriesStyle = block.replace(/<c:dPt\b[^>]*>[\s\S]*?<\/c:dPt>/g, "").match(/<c:spPr\b[^>]*>([\s\S]*?)<\/c:spPr>/)?.[1] ?? "";
     const ownLabels = block.match(/<c:dLbls\b[^>]*>([\s\S]*?)<\/c:dLbls>/)?.[1] ?? "";
+    // Excel/PowerPoint can store visible labels in a separate cell range cache.
+    // Its point indices belong to this series; never derive percentages from bar heights.
+    const rangeXml = block.match(/<c15:datalabelsRange\b[^>]*>([\s\S]*?)<\/c15:datalabelsRange>/)?.[1] ?? "";
+    const rangeLabels = cachedPoints(rangeXml.replace(/<(\/?)c15:/g, "<$1c:"));
     const defaults = ownLabels.replace(/<c:dLbl\b[^>]*>[\s\S]*?<\/c:dLbl>/g, "") + chartLabels.replace(/<c:dLbl\b[^>]*>[\s\S]*?<\/c:dLbl>/g, "");
     const overrides = new Map<number, string>();
     for (const item of (chartLabels + ownLabels).matchAll(/<c:dLbl\b[^>]*>([\s\S]*?)<\/c:dLbl>/g)) {
@@ -226,7 +230,7 @@ function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
       if (missingValueIndices.includes(index)) return null;
       const own = overrides.get(index) ?? "";
       const settings = own + defaults;
-      const flag = (key: string) => new RegExp('<c:' + key + '\\b[^>]*val="([^" ]+)"').exec(settings)?.[1] === "1";
+      const flag = (key: string) => /^(?:1|true)$/.test(new RegExp('<(?:c|c15):' + key + '\\b[^>]*val="([^" ]+)"').exec(settings)?.[1] ?? "");
       if (flag("delete")) return null;
       const tx = own.match(/<c:tx\b[^>]*>([\s\S]*?)<\/c:tx>/)?.[1] ?? "";
       const custom = paragraphs(tx).join("\n") || [...cachedPoints(tx).values()].join(" ");
@@ -234,6 +238,8 @@ function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
       const format = decode(settings.match(/<c:numFmt\b[^>]*formatCode="([^"]+)"/)?.[1] ?? val.match(/<c:formatCode>([\s\S]*?)<\/c:formatCode>/)?.[1] ?? "");
       const separator = decode(settings.match(/<c:separator>([\s\S]*?)<\/c:separator>/)?.[1] ?? " · ");
       const parts: string[] = [];
+      if (flag("showDataLabelsRange") && rangeLabels.has(index)) parts.push(rangeLabels.get(index)!);
+      if (flag("showDataLabelsRange") && !rangeLabels.has(index)) warnings.push(`Série ${name}, ponto ${index + 1}: texto de célula sem cache no arquivo. Conferir o original antes de aprovar; o texto não foi inferido.`);
       if (flag("showSerName")) parts.push(name);
       if (flag("showCatName")) parts.push(categories[index]);
       if (flag("showVal")) parts.push(chartValueLabel(value, format));
@@ -243,7 +249,13 @@ function series(xml: string, theme: Theme): MonitorDocumentSeries[] {
       }
       return parts.length ? parts.join(separator) : null;
     });
-    if (vals.size) result.push({ name, categories, values, dataLabels, missingValueIndices, pointColors, color: fill(seriesStyle, theme) ?? theme["accent" + ((result.length % 6) + 1)] });
+    const dataLabelPositions = values.map((_, index) => {
+      const settings = (overrides.get(index) ?? "") + defaults;
+      const position = settings.match(/<c:dLblPos\b[^>]*val="([^"]+)"/)?.[1];
+      return ["ctr", "inEnd", "inBase", "outEnd", "t", "b", "l", "r", "bestFit"].includes(position ?? "")
+        ? position as NonNullable<MonitorDocumentSeries["dataLabelPositions"]>[number] : null;
+    });
+    if (vals.size) result.push({ name, categories, values, dataLabels, dataLabelPositions, missingValueIndices, pointColors, color: fill(seriesStyle, theme) ?? theme["accent" + ((result.length % 6) + 1)] });
   }
   return result;
 }
@@ -265,7 +277,7 @@ function chartTitle(xml: string) {
   return cached || undefined;
 }
 
-function chart(xml: string, theme: Theme) {
+function chart(xml: string, theme: Theme, warnings: string[]) {
   const choices = [["barChart","bar"],["lineChart","line"],["pieChart","pie"],["doughnutChart","doughnut"],["areaChart","area"],["scatterChart","scatter"]] as const;
   const found = choices.find(([tag]) => new RegExp("<c:" + tag + "\\b").test(xml));
   const block = found ? xml.match(new RegExp("<c:" + found[0] + "\\b[^>]*>([\\s\\S]*?)<\\/c:" + found[0] + ">"))?.[1] ?? xml : xml;
@@ -290,7 +302,7 @@ function chart(xml: string, theme: Theme) {
   const positions: Record<string, MonitorDocumentChart["legendPosition"]> = { t: "top", b: "bottom", l: "left", r: "right", tr: "right" };
   const gridXml = valueAxis.match(/<c:majorGridlines\b[^>]*>([\s\S]*?)<\/c:majorGridlines>/)?.[1] ?? "";
   return {
-    semanticVersion: 4 as const,
+    semanticVersion: 5 as const,
     title,
     categoryFormat: decode(categoryAxis.match(/<c:numFmt\b[^>]*\bformatCode="([^"]+)"/)?.[1] ?? "") || undefined,
     categoryReverse: /<c:orientation\b[^>]*val="maxMin"/.test(categoryAxis),
@@ -303,7 +315,7 @@ function chart(xml: string, theme: Theme) {
     orientation: found?.[1] === "bar" ? (dir === "bar" ? "horizontal" as const : "vertical" as const) : undefined,
     grouping,
     overlap: Number.isFinite(overlap) ? overlap : 0,
-    series: series(block, theme),
+    series: series(block, theme, warnings),
     valueFormat: format || undefined,
     axisMin: Number.isFinite(min) ? min : undefined,
     axisMax: Number.isFinite(max) ? max : undefined,
@@ -355,7 +367,7 @@ function blocks(xml: string) {
 
 function slideTitle(elements: MonitorSlideElement[], page: number) {
   const texts = elements.filter((item): item is MonitorSlideTextElement => item.kind === "text");
-  const best = [...texts].filter((item) => item.y < 0.28).sort((a,b) => (b.fontSizePt ?? 0)-(a.fontSizePt ?? 0) || a.y-b.y)[0];
+  const best = [...texts].filter((item) => !item.chartAnnotation && item.y < 0.28).sort((a,b) => (b.fontSizePt ?? 0)-(a.fontSizePt ?? 0) || a.y-b.y)[0];
   const value = clean(best?.text.split("\n")[0] ?? "");
   return monitorSceneTitle(elements, value || "Slide " + page);
 }
@@ -408,10 +420,12 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const rid = item.xml.match(/<c:chart\b[^>]*\br:id="([^"]+)"/)?.[1];
         const target = rid ? rels.get(rid)?.target : undefined;
         if (target) {
-          const parsed = chart(entries.get(target)?.toString("utf8") ?? "",theme);
+          const labelWarnings: string[] = [];
+          const parsed = chart(entries.get(target)?.toString("utf8") ?? "",theme,labelWarnings);
+          warnings.push(...labelWarnings.map(warning => `Slide ${page}: ${warning}`));
           if (["unknown", "area", "scatter"].includes(parsed.type)) warnings.push("Slide " + page + ": gráfico " + parsed.type + " requer consulta ao original; renderização fiel ainda não disponível.");
           if (parsed.series.length) {
-            parsed.series.forEach((s) => searchable.push(s.name,...s.categories,...s.values.map(String)));
+            parsed.series.forEach((s) => searchable.push(s.name,...s.categories,...s.values.map(String),...(s.dataLabels ?? []).filter((text): text is string => Boolean(text))));
             if (parsed.title) searchable.push(parsed.title);
             if (parsed.xAxisTitle) searchable.push(parsed.xAxisTitle);
             if (parsed.yAxisTitle) searchable.push(parsed.yAxisTitle);
@@ -438,6 +452,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
       return !overlapsChart;
     });
 
+    if (!correction) elements = preserveChartAnnotations(elements);
     const presentation = correction ? { elements, omitted: [], adjustments: [] } : prepareMonitorElements(elements);
     for (const reason of new Set(presentation.omitted.map((item) => item.reason))) {
       warnings.push("Slide " + page + ": " + reason + ". Omitido na exibição institucional; original preservado.");

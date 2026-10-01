@@ -298,7 +298,7 @@ export function MonitorContentCockpit({
           <div className="mt-4 space-y-2">
             {imports.filter((item) => item.status === "REJECTED").map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-2.5 dark:border-zinc-800 dark:bg-zinc-950"><div><div className="text-[10px] font-black uppercase text-zinc-500">Rejeitado · fora do ar</div><div className="text-[11px] font-semibold">{item.fileName}</div></div><button type="button" disabled={busy} onClick={() => void deleteImport(item.id, item.fileName)} className="inline-flex items-center gap-1 rounded-lg border border-red-400 px-2.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50 dark:text-red-300"><Trash2 className="h-3.5 w-3.5" /> Excluir</button></div>)}
             {imports.filter((item) => item.status === "APPROVED").map((item) => {
-              const chartLegacy = item.scenes.some((scene) => scene.payload?.layout?.elements.some((element) => element.kind === "chart" && element.chart.semanticVersion !== 3));
+              const chartLegacy = item.scenes.some((scene) => scene.payload?.layout?.elements.some((element) => element.kind === "chart" && element.chart.semanticVersion !== 5));
               const legacy = item.scenes.some((scene) => scene.payload?.layoutVersion !== 2);
               return (
                 <div key={item.id} className={"flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-2.5 dark:bg-zinc-950 " + (legacy ? "border-amber-300 dark:border-amber-900/50" : "border-emerald-200 dark:border-emerald-900/40")}>
@@ -307,7 +307,7 @@ export function MonitorContentCockpit({
                       {legacy ? "Fora do ar · reconstrução v1 rejeitada" : "Em exibição"}
                     </div>
                     <div className="text-[11px] font-semibold">{item.fileName} · {item.sceneCount} cena(s)</div>
-                    {chartLegacy && !legacy ? <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Gráfico com payload anterior: reprocessar e revisar a aprovação para recuperar grade, cores por ponto e escala dos eixos. A versão atual continua em exibição.</div> : null}
+                    {chartLegacy && !legacy ? <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Gráfico com payload anterior: reprocessar e revisar a aprovação para recuperar rótulos internos, textos de células, grade e escala dos eixos. A versão atual continua em exibição.</div> : null}
                     {legacy ? <div className="mt-1 text-[10px] text-zinc-500">O original está preservado. Reprocesse para reconstruir posição, imagens e tipo de gráfico antes de aprovar novamente.</div> : null}
                   </div>
                   <div className="flex gap-2">

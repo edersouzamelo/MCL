@@ -8,6 +8,7 @@ export type MonitorDocumentSeries = {
   pointColors?: Array<string | null>;
   missingValueIndices?: number[];
   dataLabels?: Array<string | null>;
+  dataLabelPositions?: Array<"ctr" | "inEnd" | "inBase" | "outEnd" | "t" | "b" | "l" | "r" | "bestFit" | null>;
 };
 
 export type MonitorDocumentChart = {
@@ -23,7 +24,7 @@ export type MonitorDocumentChart = {
   xAxisTitle?: string;
   yAxisTitle?: string;
   legendPosition?: "top" | "bottom" | "left" | "right" | "none";
-  semanticVersion?: 3 | 4;
+  semanticVersion?: 3 | 4 | 5;
   categoryFormat?: string;
   categoryReverse?: boolean;
   valueReverse?: boolean;
@@ -52,6 +53,7 @@ export type MonitorSlideTextElement = MonitorSlideBox & {
   fill?: string;
   lineColor?: string;
   role?: "title" | "metric" | "label" | "body";
+  chartAnnotation?: true;
   z: number;
 };
 

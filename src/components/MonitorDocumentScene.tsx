@@ -65,7 +65,7 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
       lineHeight: item.role === "metric" ? 1 : item.role === "label" ? 1.06 : 1.12,
       fontWeight: preserve ? (item.bold ? 700 : 400) : item.bold || item.role === "metric" || item.role === "title" ? 800 : 650,
       color: preserve ? item.color : presentationTextColor(item, elements, ccol),
-      textShadow: preserve || ccol ? "none" : "0 2px 14px rgba(2,6,23,.55)",
+      textShadow: !preserve && item.chartAnnotation ? (ccol ? "1px 1px 1px white, -1px -1px 1px white, 1px -1px 1px white, -1px 1px 1px white" : "1px 1px 1px #071421, -1px -1px 1px #071421, 1px -1px 1px #071421, -1px 1px 1px #071421") : preserve || ccol ? "none" : "0 2px 14px rgba(2,6,23,.55)",
       letterSpacing: item.role === "label" ? ".02em" : undefined,
       opacity: area < 0.002 ? 0.94 : 1,
     }}>

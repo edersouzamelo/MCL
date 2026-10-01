@@ -46,8 +46,20 @@ function supportsSemanticText(shape: MonitorSlideElement, elements: MonitorSlide
   return elements.some((item) => item.kind === "text" && item.role !== "body" && intersection(shape, item) >= item.w * item.h * .45);
 }
 
+export function preserveChartAnnotations(elements: MonitorSlideElement[]) {
+  // Text boxes are a second source of chart labels. Keep them above the chart,
+  // at their source coordinates, even when the chart follows them in the PPTX.
+  const charts = elements.filter(item => item.kind === "chart");
+  return elements.map(item => {
+    if (item.kind !== "text") return item;
+    const containing = charts.filter(chart => intersection(item, chart) >= Math.max(.000001, item.w * item.h) * .8);
+    return containing.length ? { ...item, role: "label" as const, chartAnnotation: true as const, z: Math.max(item.z, ...containing.map(chart => chart.z + 1)) } : item;
+  });
+}
+
 /** Presentation-only cleanup and adaptive reflow. The original payload and document remain intact. */
 export function prepareMonitorElements(elements: MonitorSlideElement[]) {
+  elements = preserveChartAnnotations(elements);
   const omitted: Array<{ element: MonitorSlideElement; reason: string }> = [];
   const dataElements = elements.filter((item) => item.kind === "chart" || item.kind === "table");
   const hasStructuredData = dataElements.length > 0;
@@ -63,7 +75,7 @@ export function prepareMonitorElements(elements: MonitorSlideElement[]) {
       : 0;
 
     // Never discard charts, tables or numerical annotations. Briefing cleanup targets framing and decoration.
-    if (outside && (item.kind === "shape" || (item.kind === "text" && !/\d/.test(item.text)))) {
+    if (outside && (item.kind === "shape" || (item.kind === "text" && !item.chartAnnotation && !/\d/.test(item.text)))) {
       reason = "Adorno de borda fora da área do slide";
     } else if (hasData && item.kind === "image" && item.y >= 0 && item.y + item.h <= .18 && area < .015 && item.w < .12 && item.h < .16) {
       reason = "Pequeno ícone de cabeçalho em slide de dados";

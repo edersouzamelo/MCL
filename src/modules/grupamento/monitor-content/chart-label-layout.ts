@@ -1,3 +1,5 @@
+import type { MonitorDocumentSeries } from "./types";
+
 export type ChartCategoryLabelLayout = {
   lines: string[];
   fontSize: number;
@@ -62,6 +64,59 @@ export function fitHorizontalCategoryLabel(
 
 export function estimatedChartLabelWidth(text: string, fontPx: number) {
   return textWidth(text, fontPx);
+}
+
+/** Keep a point's label attached to its bar, including internal labels and negative/reversed bars. */
+export function fitBarPointLabel(options: {
+  text: string;
+  position?: NonNullable<MonitorDocumentSeries["dataLabelPositions"]>[number];
+  horizontal: boolean;
+  start: number;
+  end: number;
+  cross: number;
+  thickness: number;
+  fontSize: number;
+  bounds: { left: number; top: number; right: number; bottom: number };
+}) {
+  const { text, position, horizontal, start, end, cross, thickness, bounds } = options;
+  const internal = position === "ctr" || position === "inEnd" || position === "inBase";
+  const length = Math.abs(end - start);
+  const direction = Math.sign(end - start) || (horizontal ? 1 : -1);
+  let fontSize = options.fontSize;
+  let lines = text.split("\n").flatMap(line => wrapChartLabel(line, horizontal ? Math.max(20, bounds.right - bounds.left) : Math.max(20, thickness - 4), fontSize));
+  let inside = false;
+  if (internal) {
+    const availableWidth = Math.max(1, (horizontal ? length : thickness) - 8);
+    const availableHeight = Math.max(1, (horizontal ? thickness : length) - 8);
+    for (let size = options.fontSize; size >= Math.min(9, options.fontSize); size -= .5) {
+      const wrapped = text.split("\n").flatMap(line => wrapChartLabel(line, availableWidth, size));
+      if (Math.max(...wrapped.map(line => textWidth(line, size))) <= availableWidth && wrapped.length * size * 1.1 <= availableHeight) {
+        fontSize = size; lines = wrapped; inside = true; break;
+      }
+    }
+  }
+  const textHeight = lines.length * fontSize * 1.1;
+  const textExtent = horizontal ? Math.max(...lines.map(line => textWidth(line, fontSize))) : textHeight;
+  const coordinate = inside
+    ? position === "inEnd" ? end - direction * (textExtent / 2 + 4)
+      : position === "inBase" ? start + direction * (textExtent / 2 + 4) : (start + end) / 2
+    : end + direction * (textExtent / 2 + 8);
+  let x = horizontal ? coordinate : cross;
+  let y = horizontal ? cross : coordinate;
+  const halfWidth = Math.max(...lines.map(line => textWidth(line, fontSize))) / 2;
+  if (!inside && (position === "t" || position === "b")) {
+    x = horizontal ? (start + end) / 2 : cross;
+    y = position === "t" ? (horizontal ? cross - thickness / 2 : Math.min(start, end)) - textHeight / 2 - 8
+      : (horizontal ? cross + thickness / 2 : Math.max(start, end)) + textHeight / 2 + 8;
+  }
+  if (!inside && (position === "l" || position === "r")) {
+    x = position === "l" ? (horizontal ? Math.min(start, end) : cross - thickness / 2) - halfWidth - 8
+      : (horizontal ? Math.max(start, end) : cross + thickness / 2) + halfWidth + 8;
+    y = horizontal ? cross : (start + end) / 2;
+  }
+  x = Math.max(bounds.left + halfWidth, Math.min(bounds.right - halfWidth, x));
+  y = Math.max(bounds.top + textHeight / 2, Math.min(bounds.bottom - textHeight / 2, y));
+  return { x, y: y - (lines.length - 1) * fontSize * .55 + fontSize * .3, lines, fontSize, inside, callout: internal && !inside };
 }
 
 
