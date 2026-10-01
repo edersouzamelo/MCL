@@ -10,7 +10,7 @@ async function verify() {
   page.on("pageerror", (error) => errors.push(error.message));
   const token = await encode({ secret: "local-monitor-regression-test-secret-20260925", token: { sub: "local-test-only", name: "Operador de teste", roles: ["ADMIN"], organizationId: "fixture-org" } });
   await page.context().addCookies([{ name: "next-auth.session-token", value: token, url: origin }, { name: "mcl_onboarding_completed", value: "true", url: origin }]);
-  let configs = defaultCcoMonitorConfig().map((config) => ({ ...config, updatedByName: "Responsável de teste", updatedAt: "2026-10-01T04:23:00.000Z" }));
+  const configs = defaultCcoMonitorConfig().map((config) => ({ ...config, updatedByName: "Responsável de teste", updatedAt: "2026-10-01T04:23:00.000Z" }));
   let writes = 0;
   await page.route("**/api/grupamento/**", async (route) => {
     const url = new URL(route.request().url());
