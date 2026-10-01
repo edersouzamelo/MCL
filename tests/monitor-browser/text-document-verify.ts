@@ -5,6 +5,8 @@ import { mkdir, readFile } from "node:fs/promises";
 import { defaultCcoMonitorConfig } from "../../src/modules/grupamento/monitor";
 import { composeTextDocument, plainTextBlocks } from "../../src/modules/grupamento/monitor-content/text-document";
 import type { MonitorDocumentSceneDto } from "../../src/modules/grupamento/monitor-content/types";
+import { extractPptxLayout } from "../../src/modules/grupamento/monitor-content/pptx-layout";
+import { monitorTextSlide } from "../../src/modules/grupamento/monitor-content/text-slide";
 const origin = "http://127.0.0.1:3010", secret = "local-monitor-regression-test-secret-20260925";
 const routeText = "ROTAS / PARADAS: Campo Grande, Coxim (47º BI), Rondonópolis (18º GAC), Cuiabá (44º BI Mtz), Cáceres (66º BI Mtz), Aragarças (58º BI Mtz), retorno a Campo Grande.";
 const paragraphs = [routeText, ...Array.from({length:12},(_,i) => `Registro ${i+1}: Carga confirmada de ${i+1} toneladas. A viatura percorreu a rota completa e entregou os materiais relacionados, preservando o registro de todas as organizações apoiadas. `.repeat(2).trim())];
@@ -56,6 +58,41 @@ async function verify() {
           expect(seen.join(" ")).toBe((scenes[index].payload.bullets ?? []).join(" "));
           expect(await text.locator('[data-text-display] img[alt^="Escudo"]').count()).toBe(0);
           if (index===0 && size.width===1366) await page.screenshot({path:`${output}/text-${mode}.png`});
+        }
+      }
+    }
+    // Optional real-source regression, kept outside the public repository.
+    // Exercise published legacy PPT payloads without requiring another upload.
+    if (process.env.MONITOR_TEXT_PPT_FIXTURE) {
+      const original = extractPptxLayout(await readFile(process.env.MONITOR_TEXT_PPT_FIXTURE));
+      const reports = original.scenes.filter(scene => monitorTextSlide(scene.payload,scene.title));
+      expect(reports.length).toBeGreaterThan(0);
+      for (const mode of ["mcl","ccol","briefing"] as const) {
+        configs = configs.map(m => m.id === 8 ? {...m,layout:mode} : m);
+        for (const size of [{width:1366,height:768},{width:1920,height:1080},{width:390,height:844}]) {
+          await page.setViewportSize(size);
+          for (const [index,report] of reports.entries()) {
+            scenes = [{...textScenes[0],...report,id:`real-report-${index}`,sourceFileName:"source.pptx",sourcePage:report.sourcePage ?? null}];
+            await page.evaluate(async () => {for(const name of await caches.keys()) if(name.includes("snapshots")) await caches.delete(name);});
+            await page.goto(origin+"/grupamento/monitor-capture/8");
+            const text = page.locator("[data-monitor-document-text]");
+            await expect(text).toHaveAttribute("data-text-ready","1");
+            const count = Number(await text.getAttribute("data-capture-page-count")), seen: string[] = [];
+            for (let part=0;part<count;part++) {
+              await page.evaluate(part => window.postMessage({type:"MCL_CAPTURE_TEXT_PAGE",page:part},location.origin),part);
+              await expect(text).toHaveAttribute("data-capture-page",String(part));
+              const cards = page.locator("[data-text-display] [data-text-paragraph]");
+              seen.push(...await cards.allTextContents());
+              expect(await cards.evaluateAll(nodes => nodes.every(node => node.scrollHeight <= node.clientHeight+1 && node.scrollWidth <= node.clientWidth+1))).toBe(true);
+              await expect(text.locator('[data-text-display] img[alt^="Escudo"]')).toHaveCount(0);
+            }
+            expect(seen.join(" ")).toBe(monitorTextSlide(report.payload,report.title)!.paragraphs.join(" "));
+            if (mode === "mcl" && size.width === 1366 && index === 1) {
+              await page.evaluate(() => window.postMessage({type:"MCL_CAPTURE_TEXT_PAGE",page:0},location.origin));
+              await expect(text).toHaveAttribute("data-capture-page","0");
+              await page.screenshot({path:output+"/transport-real-source.png"});
+            }
+          }
         }
       }
     }

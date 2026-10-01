@@ -3,6 +3,7 @@ import { posix } from "node:path";
 import { extractImages, extractTextItems, getDocumentProxy } from "unpdf";
 import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
 import { composeTextDocument, isDocumentHeading, plainTextBlocks, pdfTextBlocks, type DocumentBlock } from "./text-document";
+import { monitorTextSlide } from "./text-slide";
 import { stampMonitorExtraction } from "@/modules/grupamento/monitor-content/version";
 import type {
   MonitorDocumentAssetDraft,
@@ -413,7 +414,17 @@ async function extractPdf(buffer: Buffer): Promise<MonitorDocumentExtraction> {
 export async function extractMonitorDocument(buffer: Buffer, fileName: string): Promise<MonitorDocumentExtraction> {
   const extension = fileName.toLowerCase().split(".").pop() ?? "";
   let extraction: MonitorDocumentExtraction;
-  if (extension === "pptx") extraction = extractPptxLayout(buffer);
+  if (extension === "pptx") {
+    extraction = extractPptxLayout(buffer);
+    extraction.scenes = extraction.scenes.flatMap(scene => {
+      const report = monitorTextSlide(scene.payload, scene.title);
+      return report ? composeTextDocument([
+        { kind: "heading", text: report.title, page: scene.sourcePage },
+        ...report.paragraphs.map(text => ({ kind: "paragraph" as const, text, page: scene.sourcePage })),
+      ], report.title) : [scene];
+    });
+    if (extraction.scenes.length > 80) throw new Error("O documento gera mais de 80 telas. Divida o arquivo em partes; nenhum conteúdo foi publicado parcialmente.");
+  }
   else if (extension === "docx") extraction = extractDocx(buffer);
   else if (extension === "pdf") extraction = await extractPdf(buffer);
   else if (extension === "txt") {

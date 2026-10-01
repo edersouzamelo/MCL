@@ -3,6 +3,7 @@
 
 import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
 import { MonitorDocumentText } from "@/components/MonitorDocumentText";
+import { monitorTextSlide } from "@/modules/grupamento/monitor-content/text-slide";
 import { monitorTitleElements, monitorIntegralImage } from "@/modules/grupamento/monitor-content/presentation-title";
 import { OmMentions } from "@/components/OmIdentity";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -69,7 +70,7 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
       letterSpacing: item.role === "label" ? ".02em" : undefined,
       opacity: area < 0.002 ? 0.94 : 1,
     }}>
-      {preserve ? item.text : <OmMentions text={item.text} prose={item.role !== "title"} header={item.role === "title" || item.y < .15} />}
+      {preserve ? item.text : <OmMentions text={item.text} prose header={item.role === "title" || item.y < .15} />}
     </div>
   );
 }
@@ -149,11 +150,12 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
     table: { columns: payload.columns, rows: payload.rows, y: 1 },
     texts: (payload.bullets ?? []).map((text, index): MonitorSlideTextElement => ({kind:'text', text, role:'body', bold:false, x:0, y:0, w:1, h:.1, z:index})),
   } : null;
-  const textDocument = Boolean(payload.textDocument && scene.sceneType === "TEXT" && !payload.onlineEditor && !payload.correction?.preserveLayout);
+  const textReport = monitorTextSlide(payload, scene.title);
+  const textDocument = Boolean(textReport || (payload.textDocument && scene.sceneType === "TEXT" && !payload.onlineEditor && !payload.correction?.preserveLayout));
   const hasTableSlide = Boolean(tableSlide || (!payload.correction?.preserveLayout && payload.layout?.elements.some(item => item.kind === 'table')));
   useEffect(() => { if (!hasTableSlide && !textDocument) onPageCount?.(1); }, [hasTableSlide, textDocument, onPageCount]);
-  if (textDocument) return <MonitorTitleFrame title={scene.title} light={ccol || briefing}>
-    <MonitorDocumentText paragraphs={payload.bullets ?? []} source={scene.sourceFileName} sourcePage={scene.sourcePage} light={ccol || briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
+  if (textDocument) return <MonitorTitleFrame title={textReport?.title ?? scene.title} light={ccol || briefing}>
+    <MonitorDocumentText paragraphs={textReport?.paragraphs ?? payload.bullets ?? []} source={scene.sourceFileName} sourcePage={scene.sourcePage} light={ccol || briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
   </MonitorTitleFrame>;
   if (tableSlide) {
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
