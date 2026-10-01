@@ -18,7 +18,8 @@ export function monitorTextSlide(payload: MonitorDocumentScenePayload, title: st
   const prepared = monitorTitleElements(elements, title);
   const body = prepared.elements.filter((item): item is MonitorSlideTextElement => item.kind === "text")
     .sort((a, b) => a.y - b.y || a.x - b.x);
-  const fields = body.filter(item => /^[^:\n]{2,48}\s*[:\-–]\s*\S/u.test(item.text)).length;
-  if (body.length < 3 || (fields < 2 && body.reduce((sum, item) => sum + item.text.length, 0) < 600)) return null;
-  return { title: prepared.title, paragraphs: body.map(item => item.text) };
+  const paragraphs = body.flatMap(item => item.text.split("\n").filter(text => text.trim()));
+  const fields = paragraphs.filter(text => /^[^:\n]{2,48}\s*[:\-–]\s*\S/u.test(text)).length;
+  if (paragraphs.length < 3 || (fields < 2 && body.reduce((sum, item) => sum + item.text.length, 0) < 600)) return null;
+  return { title: prepared.title, paragraphs: body.flatMap(item => item.text.split("\n").filter(text => text.trim())) };
 }

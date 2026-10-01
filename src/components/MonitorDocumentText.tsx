@@ -40,6 +40,13 @@ export function MonitorDocumentText({ paragraphs, source, sourcePage, light, cyc
     const overflow = nodes.some(node => node.scrollWidth > node.clientWidth + 1 || node.offsetHeight + 10 > geometry.capacity);
     if (overflow && geometry.limit > 30) { setGeometry(old => ({ ...old, limit: Math.max(30, Math.floor(old.limit * .75)) })); return; }
     const pages = tableRowPages(heights, geometry.capacity);
+    // Prefer a complete readable frame before creating another page. Stop at a
+    // readable floor and keep pagination when the material is genuinely longer.
+    const readableFloor = Math.max(18, Math.min(24, Math.floor((frame.current?.clientWidth ?? 0) / 60)));
+    if (pages.length > 1 && geometry.font > readableFloor) {
+      setGeometry(old => ({ ...old, font: Math.max(readableFloor, old.font - 2) }));
+      return;
+    }
     setFit(old => old.ready && JSON.stringify(old.pages) === JSON.stringify(pages) && JSON.stringify(old.heights) === JSON.stringify(heights) ? old : { pages, heights, ready: true });
     setPage(current => Math.min(current, pages.length - 1));
   }, [geometry, contentKey]);
