@@ -23,9 +23,26 @@ describe("native rendering isolation", () => {
     await expect(renderInSandbox(Buffer.from("source"), "pdf")).rejects.toThrow("referência íntegra");
     expect(mocks.create).toHaveBeenCalledOnce(); expect(conversion.stop).toHaveBeenCalledOnce();
   });
-  it("rejects missing project identity before reading source or creating infrastructure", async () => {
+  it("delegates request-context identity to the SDK when the env token is absent", async () => {
     vi.stubEnv("VERCEL_OIDC_TOKEN", "");
-    await expect(renderInSandbox(Buffer.from("source"), "docx")).rejects.toThrow("indisponível");
+    const conversion = vm();
+    mocks.findUnique.mockResolvedValue({ decision: { snapshotId: "cached" } });
+    mocks.create.mockResolvedValue(conversion);
+    await expect(renderInSandbox(Buffer.from("source"), "pptx")).resolves.toEqual({ pages: [] });
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(conversion.writeFiles).toHaveBeenCalledOnce();
+  });
+  it("does not process source bytes when the SDK rejects the actual identity", async () => {
+    vi.stubEnv("VERCEL_OIDC_TOKEN", "");
+    mocks.findUnique.mockResolvedValue(null);
+    mocks.create.mockRejectedValue(new Error("Could not get credentials from OIDC context."));
+    await expect(renderInSandbox(Buffer.from("source"), "docx")).rejects.toThrow("OIDC context");
+    expect(mocks.readFile).not.toHaveBeenCalled();
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+  it("respects an explicitly disabled sandbox before creating infrastructure", async () => {
+    vi.stubEnv("MCL_COMPILER_SANDBOX", "0");
+    await expect(renderInSandbox(Buffer.from("source"), "docx")).rejects.toThrow("desativada");
     expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.readFile).not.toHaveBeenCalled();
   });
 });
