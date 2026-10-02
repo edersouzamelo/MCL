@@ -17,6 +17,29 @@ describe("native rendering isolation", () => {
     expect(conversion.writeFiles.mock.calls[0][0][2]).toEqual({ path: "/tmp/source.pptx", content: Buffer.from("private source bytes") });
     expect(conversion.snapshot).not.toHaveBeenCalled(); expect(conversion.stop).toHaveBeenCalledOnce();
   });
+  it("prepares PDF validation without installing LibreOffice", async () => {
+    const preparation = vm(), conversion = vm();
+    mocks.findUnique.mockResolvedValue(null);
+    mocks.create.mockResolvedValueOnce(preparation).mockResolvedValueOnce(conversion);
+    await renderInSandbox(Buffer.from("pdf source"), "pdf");
+    const install = preparation.runCommand.mock.calls.find(([call]) => call?.cmd === "apt-get" && call?.args?.[0] === "install")?.[0];
+    expect(install?.args).toContain("poppler-utils");
+    expect(install?.args.some((value: string) => value.startsWith("libreoffice"))).toBe(false);
+  });
+
+  it("rebuilds an expired snapshot automatically in the same validation request", async () => {
+    const preparation = vm(), conversion = vm();
+    mocks.findUnique.mockResolvedValueOnce({ decision: { snapshotId: "stale" } }).mockResolvedValueOnce(null);
+    mocks.create
+      .mockRejectedValueOnce(new Error("snapshot expired"))
+      .mockResolvedValueOnce(preparation)
+      .mockResolvedValueOnce(conversion);
+    await expect(renderInSandbox(Buffer.from("source"), "pdf")).resolves.toEqual({ pages: [] });
+    expect(mocks.deleteMany).toHaveBeenCalledOnce();
+    expect(preparation.snapshot).toHaveBeenCalledOnce();
+    expect(conversion.writeFiles).toHaveBeenCalledOnce();
+  });
+
   it("reuses software cache and destroys the conversion VM on a failed converter", async () => {
     const conversion = vm(); conversion.runCommand.mockResolvedValue({ exitCode: 1 });
     mocks.findUnique.mockResolvedValue({ decision: { snapshotId: "cached" } }); mocks.create.mockResolvedValue(conversion);
