@@ -17,7 +17,9 @@ import type {
   MonitorSlideTextElement,
 } from "@/modules/grupamento/monitor-content/types";
 
-const MAX_ENTRIES = 2000;
+// PPTX reais podem conter milhares de partes internas (gráficos, estilos, relações e caches).
+// O orçamento de conteúdo expandido continua sendo a principal barreira contra ZIP bombs.
+const MAX_ENTRIES = 8_000;
 const MAX_EXPANDED = 48 * 1024 * 1024;
 const MAX_ASSETS = 48;
 const MAX_ASSET_BYTES = 18 * 1024 * 1024;
