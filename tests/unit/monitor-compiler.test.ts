@@ -45,9 +45,9 @@ describe("universal compiler invariants", () => {
   });
   it("F: keeps small images and uncertain shapes; only redundant neutral chart backgrounds may be removed", () => {
     const small: MonitorSlideElement = { kind: "image", assetKey: "meaningful-small", x: .95, y: .02, w: .02, h: .02, z: 3 };
-    const result = compile([chart, small]); expect(result.normalizedContent.elements).toContainEqual(small);
+    const result = compile([chart, small]); expect(result.normalizedContent.elements).toContainEqual(expect.objectContaining(small));
     const shape: MonitorSlideElement = { kind: "shape", x: .1, y: .2, w: .8, h: .7, z: 0, fill: "#F8FAFC" };
-    const removed = compile([shape, chart]); expect(removed.parsedInput.nodes[0].element).toEqual(shape); expect(removed.normalizedContent.elements).toHaveLength(1);
+    const removed = compile([shape, chart]); expect(removed.parsedInput.nodes[0].element).toMatchObject(shape); expect(removed.normalizedContent.elements).toHaveLength(1);
     expect(compile([shape, chart, text("Nota", .2, .3)]).normalizedContent.elements.some(item => item.kind === "shape")).toBe(true);
   });
   it("G: applies the same affine transform to all dependent objects", () => {

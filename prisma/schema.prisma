@@ -244,6 +244,7 @@ model MonitorContentImport {
   archivedBy     String?
   archivedAt     DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  editorDrafts   MonitorEditorDraft[]
   scenes         MonitorContentScene[]
   assets         MonitorContentAsset[]
   revisions      MonitorContentRevision[]
@@ -1127,4 +1128,20 @@ model PiCatalogEntry {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@id([organizationId, pi])
+}
+
+// Private work in progress. No renderer reads this table.
+model MonitorEditorDraft {
+  id           String @id @default(uuid())
+  importId     String
+  sceneId      String
+  actorId      String
+  revision     Int @default(1)
+  baseRevision Int
+  base         Json
+  patches      Json
+  updatedAt    DateTime @updatedAt
+  import       MonitorContentImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  @@unique([sceneId, actorId])
+  @@index([importId, actorId])
 }

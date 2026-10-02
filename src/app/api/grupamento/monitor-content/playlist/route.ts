@@ -39,7 +39,10 @@ export async function GET(request: Request) {
   if (!reader) return NextResponse.json({ error: "Autenticação obrigatória." }, { status: 401 });
 
   let scenes = await getApprovedMonitorScenes(reader.organizationId, monitorId);
-  const editedImports = new Set(scenes.filter(scene => scene.payload.onlineEditor).map(scene => scene.importId));
+  const editedImports = new Set(scenes.filter(scene => {
+    const editor = scene.payload.onlineEditor;
+    return editor && (!editor.compiledBase || !editor.overrides);
+  }).map(scene => scene.importId));
   const staleScene = scenes.find(scene => !editedImports.has(scene.importId) && monitorSceneNeedsRefresh(scene));
 
   if (staleScene) {

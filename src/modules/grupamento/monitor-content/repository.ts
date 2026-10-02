@@ -1,3 +1,5 @@
+import { prepareEditorScene } from "./online-editor";
+import { diffContent, rebaseCompiledContent } from "./editor-model";
 import { createHash, randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
@@ -69,7 +71,7 @@ function sceneRowsForImport(
   assetIds: Map<string, string>,
 ) {
   return extraction.scenes.map((scene, index) => ({
-    id: randomUUID(),
+    id: randomUUID() as string,
     importId,
     sceneOrder: index,
     sceneType: scene.sceneType,
@@ -349,9 +351,27 @@ export async function replaceApprovedMonitorContentExtraction(input: {
     });
     if (!current) throw new Error("O conteúdo deixou de estar aprovado durante a atualização automática.");
 
-    const publishedScenes = await tx.monitorContentScene.findMany({ where: { importId: existing.id }, select: { payload: true } });
-    if (publishedScenes.some(scene => Boolean((scene.payload as MonitorDocumentScenePayload).onlineEditor))) throw new Error("Edição online preservada; atualização automática do original cancelada.");
     const previous = await tx.monitorContentScene.findMany({ where: { importId: existing.id }, orderBy: { sceneOrder: "asc" } });
+    for (const old of previous) {
+      const candidates = sceneRows.filter(row => row.sourcePage === old.sourcePage);
+      const matched = candidates.length === 1 ? candidates[0] : candidates.find(row => row.sceneOrder === old.sceneOrder);
+      const editor = (old.payload as MonitorDocumentScenePayload).onlineEditor;
+      if (!matched) {
+        if (editor) throw new Error("Conflito de recompilação: slide editado sem correspondência. Publicação e alterações preservadas.");
+        continue;
+      }
+      matched.id = old.id;
+      if (!editor) continue;
+      if (!editor.compiledBase || !editor.overrides) throw new Error("Edição online legada preservada; recompilação exige revisão explícita.");
+      const prepared = prepareEditorScene({ ...matched, payload: matched.payload as MonitorDocumentScenePayload } as unknown as MonitorDocumentSceneDto);
+      const nextBase = { title: prepared.title, elements: prepared.payload.layout?.elements ?? [] };
+      const rebased = rebaseCompiledContent(editor.compiledBase, nextBase, editor.overrides);
+      if (!rebased.content) throw new Error(`Conflito de recompilação: ${rebased.conflicts[0].message} Alterações preservadas.`);
+      matched.title = rebased.content.title;
+      matched.payload = json({ ...prepared.payload, layout: { ...prepared.payload.layout!, elements: rebased.content.elements }, onlineEditor: { ...editor, revision: editor.revision + 1, compiledBase: rebased.base, overrides: diffContent(rebased.base, rebased.content) } });
+    }
+    const drafts = await tx.monitorEditorDraft.findMany({ where: { importId: existing.id }, select: { sceneId: true } });
+    if (drafts.some(draft => !sceneRows.some(row => row.id === draft.sceneId))) throw new Error("Conflito de recompilação: há rascunho em slide removido. Rascunho e publicação preservados.");
     await appendRevision(tx, { importId: existing.id, sourceHash: existing.checksum, actorId: "actorId" in input && typeof input.actorId === "string" ? input.actorId : "system:monitor-extractor", kind: "BEFORE_REPROCESS", scenes: previous });
     await appendRevision(tx, { importId: existing.id, sourceHash: existing.checksum, actorId: "actorId" in input && typeof input.actorId === "string" ? input.actorId : "system:monitor-extractor", kind: "COMPILED", scenes: sceneRows });
     await tx.monitorContentScene.deleteMany({ where: { importId: existing.id } });

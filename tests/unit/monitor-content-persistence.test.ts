@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   $transaction: vi.fn(),
   monitorContentImport: { findUnique: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+  monitorEditorDraft: { findMany: vi.fn() },
   monitorContentRevision: { create: vi.fn() },
   monitorContentAsset: { createMany: vi.fn(), deleteMany: vi.fn() },
   monitorContentScene: { createMany: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
@@ -26,6 +27,7 @@ beforeEach(() => {
   db.monitorContentImport.findUniqueOrThrow.mockResolvedValue({ id: "import-test", scenes: [] });
   db.monitorContentImport.update.mockResolvedValue({ id: "import-test", scenes: [] });
   db.monitorContentScene.findMany.mockResolvedValue([]);
+  db.monitorEditorDraft.findMany.mockResolvedValue([]);
 });
 
 describe("atomic document persistence", () => {

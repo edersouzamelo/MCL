@@ -4,23 +4,26 @@ import { normalizeMonitorTitle, monitorTitleElements, monitorIntegralImage } fro
 import { prepareMonitorElements } from "./presentation-layout";
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
-const box = { x: z.number().finite().min(-2).max(2), y: z.number().finite().min(-2).max(2), w: z.number().finite().positive().max(3), h: z.number().finite().positive().max(3), z: z.number().int().min(0).max(1000) };
+const identity = { elementId: z.string().min(1).max(160).optional(), groupId: z.string().max(160).optional(), attachedTo: z.string().max(160).optional(), locked: z.boolean().optional(), name: z.string().max(120).optional(), rotation: z.number().finite().min(-360).max(360).optional() };
+const box = { ...identity, x: z.number().finite().min(-2).max(2), y: z.number().finite().min(-2).max(2), w: z.number().finite().positive().max(3), h: z.number().finite().positive().max(3), z: z.number().int().min(0).max(1000) };
 const string = z.string().max(12000);
 const series = z.looseObject({ name: string, categories: z.array(string).max(500), values: z.array(z.number().finite()).max(500), color: color.optional(), pointColors: z.array(color.nullable()).max(500).optional() });
 const chart = z.looseObject({ type: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "unknown"]), series: z.array(series).min(1).max(30) });
 export const editorElementSchema = z.discriminatedUnion("kind", [
-  z.object({ ...box, kind: z.literal("text"), text: string, fontSizePt: z.number().min(10).max(72).optional(), fontFace: z.literal("Arial").optional(), bold: z.boolean().optional(), align: z.enum(["left", "center", "right"]).optional(), verticalAlign: z.enum(["top", "middle", "bottom"]).optional(), color: color.optional(), fill: color.optional(), lineColor: color.optional(), role: z.enum(["body", "metric", "label"]).optional() }),
-  z.object({ ...box, kind: z.literal("image"), assetId: z.string().uuid() }),
-  z.object({ ...box, kind: z.literal("shape"), fill: color.optional(), lineColor: color.optional(), opacity: z.number().min(0).max(1).optional(), radius: z.number().min(0).max(.5).optional() }),
+  z.object({ ...box, kind: z.literal("text"), text: string, fontSizePt: z.number().min(10).max(72).optional(), fontFace: z.enum(["Inter", "Segoe UI", "Arial"]).optional(), bold: z.boolean().optional(), italic: z.boolean().optional(), underline: z.boolean().optional(), align: z.enum(["left", "center", "right"]).optional(), verticalAlign: z.enum(["top", "middle", "bottom"]).optional(), color: color.optional(), fill: color.optional(), lineColor: color.optional(), role: z.enum(["body", "metric", "label"]).optional(), chartAnnotation: z.literal(true).optional() }),
+  z.object({ ...box, kind: z.literal("image"), assetId: z.string().uuid(), fit: z.enum(["contain", "cover"]).optional(), opacity: z.number().min(0).max(1).optional() }),
+  z.object({ ...box, kind: z.literal("shape"), shapeType: z.enum(["rect", "roundRect", "ellipse", "line", "arrow"]).optional(), lineWidth: z.number().min(.1).max(20).optional(), fill: color.optional(), lineColor: color.optional(), opacity: z.number().min(0).max(1).optional(), radius: z.number().min(0).max(.5).optional() }),
   z.object({ ...box, kind: z.literal("chart"), chart }),
   z.object({ ...box, kind: z.literal("table"), columns: z.array(string).max(50), rows: z.array(z.array(string).max(50)).max(1000) }),
-]);
-export const editorSaveSchema = z.object({ scenes: z.array(z.object({ id: z.string().uuid(), revision: z.number().int().nonnegative(), title: z.string().trim().min(1).max(240), elements: z.array(editorElementSchema).max(150) })).min(1).max(80) });
+]).superRefine((element, context) => {
+  if ((element.kind === "chart" || element.kind === "table") && element.rotation) context.addIssue({ code: "custom", message: "Rotação de gráficos e tabelas ainda não tem exportação fiel.", path: ["rotation"] });
+});
+export const editorSaveSchema = z.object({ scenes: z.array(z.object({ id: z.string().uuid(), revision: z.number().int().nonnegative(), draftRevision: z.number().int().nonnegative().optional(), title: z.string().trim().min(1).max(240), elements: z.array(editorElementSchema).max(150) })).min(1).max(80) });
 export type EditorScene = MonitorDocumentSceneDto;
 export function editorRevision(scene: Pick<EditorScene, "payload">) { return scene.payload.onlineEditor?.revision ?? 0; }
 
 /** Convert once to the same body coordinates used by the presentation. */
-export function prepareEditorScene(scene: EditorScene): EditorScene {
+function prepareScene(scene: EditorScene): EditorScene {
   scene = structuredClone(scene);
   if (scene.payload.onlineEditor) return scene;
   const reference = scene.payload.inputCompiler?.nativeReference;
@@ -31,13 +34,30 @@ export function prepareEditorScene(scene: EditorScene): EditorScene {
   const integral = monitorIntegralImage(scene.payload);
   const prepared = monitorTitleElements(scene.payload.inputCompiler ? scene.payload.layout.elements : prepareMonitorElements(scene.payload.layout.elements).elements, scene.title);
   const elements = (integral ? scene.payload.layout.elements : prepared.elements).map(item => item.kind === "text" ? {
-    ...item, fontFace: "Arial", fontSizePt: Math.max(10, Math.min(72, item.fontSizePt ?? 18)), role: item.role === "title" ? "body" as const : item.role,
+    ...item, fontFace: "Inter", fontSizePt: Math.max(10, Math.min(72, item.fontSizePt ?? 18)), role: item.role === "title" ? "body" as const : item.role,
     color: /^#[0-9a-f]{6}$/i.test(item.color ?? "") ? item.color : "#111827",
   } : item).map(item => {
     if (item.kind === "text" || item.kind === "shape") for (const key of ["fill", "lineColor"] as const) if (item[key] && !/^#[0-9a-f]{6}$/i.test(item[key])) delete item[key];
     return item;
   });
   return { ...structuredClone(scene), title: normalizeMonitorTitle(integral ? scene.title : prepared.title), payload: { ...scene.payload, onlineEditor: { version: 1, revision: 0 }, layout: { ...scene.payload.layout, elements } } };
+}
+
+/** IDs are persisted at the first edit and reused from the compiler graph when available. */
+export function prepareEditorScene(scene: EditorScene): EditorScene {
+  const result = prepareScene(scene);
+  if (!result.payload.layout) return result;
+  const nodes = scene.payload.inputCompiler?.parsedInput.nodes ?? [];
+  const used = new Set<string>();
+  result.payload.layout.elements = result.payload.layout.elements.map((element, index) => {
+    const node = nodes.find(n => !used.has(n.id) && n.element.kind === element.kind && JSON.stringify(n.element) === JSON.stringify(element));
+    let id = element.elementId ?? node?.id ?? `${scene.id}:legacy:${index}`;
+    if (used.has(id)) id = `${id}:part:${index}`;
+    used.add(id);
+    const relation = scene.payload.inputCompiler?.interpretedContent.relations.find(r => r.from === id && r.type === "belongs_to_chart");
+    return { ...element, elementId: id, ...(relation && !element.attachedTo ? { attachedTo: relation.to } : {}) };
+  });
+  return result;
 }
 
 export function optimizeEditorElements(input: MonitorSlideElement[], arrange = false): MonitorSlideElement[] {
@@ -75,6 +95,6 @@ export function optimizeEditorElements(input: MonitorSlideElement[], arrange = f
 /** Graph values and metadata remain identical; only series and column colors can change. */
 export function chartWithoutColors(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(chartWithoutColors);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "color" && key !== "pointColors").sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, chartWithoutColors(item)]));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([key]) => !["color", "pointColors", "title", "legendPosition", "showGridlines"].includes(key)).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, chartWithoutColors(item)]));
   return value;
 }

@@ -17,7 +17,8 @@ export function stampMonitorExtraction(extraction: MonitorDocumentExtraction): M
 }
 
 export function monitorSceneNeedsRefresh(scene: { payload: MonitorDocumentScenePayload; sourceFileName?: string }) {
-  if (scene.payload.onlineEditor) return false;
+  const editor = scene.payload.onlineEditor;
+  if (editor && (!editor.compiledBase || !editor.overrides)) return false;
   const textSource = /\.(?:docx|pdf|txt)$/i.test(scene.sourceFileName ?? "");
   return scene.payload.extractionVersion !== CURRENT_MONITOR_EXTRACTION_VERSION
     || (textSource && scene.payload.textDocument?.version !== TEXT_DOCUMENT_VERSION);

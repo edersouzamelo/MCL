@@ -10,5 +10,5 @@ export default async function Page({ params }: { params: Promise<{ monitorId: st
   if (!(session.user.roles ?? []).some(role => role === "ADMIN" || role === "LOGISTICS_MANAGER")) return <main className="mx-auto max-w-xl space-y-4 p-8"><h1 className="text-xl font-bold">Edição restrita a gestores</h1><p>Sua conta permite consultar o painel. Um administrador ou gestor logístico pode editar os documentos publicados.</p><a href="/grupamento" className="underline">Voltar ao painel</a></main>;
   const id = Number((await params).monitorId);
   if (!isCcoMonitorId(id)) notFound();
-  return <MonitorOnlineEditor monitorId={id} currentUserName={session.user.name ?? session.user.email ?? session.user.id} />;
+  return <MonitorOnlineEditor storageScope={`${session.user.organizationId}:${session.user.id}`} monitorId={id} currentUserName={session.user.name ?? session.user.email ?? session.user.id} />;
 }

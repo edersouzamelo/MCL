@@ -14,10 +14,10 @@ beforeEach(() => {
   mocks.transaction.mockImplementation(async callback => callback({ monitorContentScene: { findFirst: mocks.find, updateMany: mocks.update }, monitorContentAsset: { count: mocks.count }, auditLog: { create: mocks.audit } }));
 });
 describe("editor documental", () => {
-  it("normaliza o título, preserva original e registra auditoria no mesmo salvamento", async () => {
+  it("preserva o título manual e original e registra auditoria no mesmo salvamento", async () => {
     await saveOnlineMonitorScenes(input());
     const update = mocks.update.mock.calls[0][0];
-    expect(update.data.title).toBe("Não poder escrever assim"); expect(update.data.payload.onlineEditor).toMatchObject({ revision: 1, updatedByName: "Operador" });
+    expect(update.data.title).toBe("NÃO PODER ESCREVER-ASSIM"); expect(update.data.payload.onlineEditor).toMatchObject({ revision: 1, updatedByName: "Operador" });
     expect(update.where.payload.equals).toEqual(scene.payload); expect(mocks.audit).toHaveBeenCalledOnce();
     expect(mocks.find.mock.calls[0][0].where.import).toEqual({ organizationId: "org", monitorId: 1, status: "APPROVED" });
     expect(mocks.audit.mock.calls[0][0].data.metadata.before.sha256).toMatch(/^[a-f0-9]{64}$/);
@@ -47,6 +47,13 @@ describe("editor documental", () => {
   });
   it("converte coordenadas apenas uma vez e protege a versão editada de reextração", () => {
     const prepared = prepareEditorScene(scene); expect(prepareEditorScene(prepared)).toEqual(prepared); expect(monitorSceneNeedsRefresh(prepared)).toBe(false); expect(scene.payload).not.toHaveProperty("onlineEditor");
+  });
+  it("permite atualizar bases antigas com overrides, mantendo a proteção legada", () => {
+    const prepared = prepareEditorScene(scene);
+    prepared.payload.onlineEditor = { ...prepared.payload.onlineEditor!, compiledBase: { title: prepared.title, elements: prepared.payload.layout!.elements }, overrides: [] };
+    expect(monitorSceneNeedsRefresh(prepared)).toBe(true);
+    prepared.payload.extractionVersion = 7;
+    expect(monitorSceneNeedsRefresh(prepared)).toBe(false);
   });
   it("contém os objetos, resolve painéis sobrepostos e não perde conteúdo", () => {
     const elements: MonitorSlideElement[] = [{ kind: "image", assetId: id, x: -.5, y: -.4, w: .7, h: .7, z: 1 }, { kind: "table", columns: ["UG"], rows: [["42"]], x: .2, y: .2, w: .7, h: .7, z: 2 }];

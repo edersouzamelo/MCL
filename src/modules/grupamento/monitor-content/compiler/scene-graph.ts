@@ -54,6 +54,16 @@ export function compileSlide(input: {
 }) {
   const elements = clone(input.elements);
   const nodes: CompilerNode[] = elements.map((element, index) => ({ id: `s${input.page}:o${index}`, origin: `ppt/slides/slide${input.page}.xml`, children: [], confidence: .98, ...input.native?.[index], element }));
+  const nativeCounts = new Map<string, number>();
+  for (const node of nodes) {
+    if (node.nativeId) {
+      const key = `${node.origin}:${node.nativeId}`;
+      const part = nativeCounts.get(key) ?? 0;
+      nativeCounts.set(key, part + 1);
+      node.id = `${key}:${part}`;
+    }
+    node.element.elementId = node.id;
+  }
   const relations: CompilerDiagnostic["interpretedContent"]["relations"] = [];
   for (const a of nodes) for (const b of nodes) {
     if (a.id === b.id) continue;

@@ -35,6 +35,12 @@ export type MonitorDocumentChart = {
 };
 
 export type MonitorSlideBox = {
+  elementId?: string;
+  groupId?: string;
+  attachedTo?: string;
+  locked?: boolean;
+  name?: string;
+  rotation?: number;
   x: number;
   y: number;
   w: number;
@@ -47,6 +53,8 @@ export type MonitorSlideTextElement = MonitorSlideBox & {
   fontSizePt?: number;
   fontFace?: string;
   bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
   align?: "left" | "center" | "right";
   verticalAlign?: "top" | "middle" | "bottom";
   color?: string;
@@ -61,11 +69,15 @@ export type MonitorSlideImageElement = MonitorSlideBox & {
   kind: "image";
   assetId?: string;
   assetKey?: string;
+  fit?: "contain" | "cover";
+  opacity?: number;
   z: number;
 };
 
 export type MonitorSlideShapeElement = MonitorSlideBox & {
   kind: "shape";
+  shapeType?: "rect" | "roundRect" | "ellipse" | "line" | "arrow";
+  lineWidth?: number;
   opacity?: number;
   fill?: string;
   lineColor?: string;
@@ -103,7 +115,7 @@ export type MonitorSlideLayout = {
 export type MonitorDocumentScenePayload = {
   inputCompiler?: import("./compiler/contracts").CompilerDiagnostic;
   textDocument?: { version: number };
-  onlineEditor?: { version: 1; revision: number; updatedAt?: string; updatedByName?: string };
+  onlineEditor?: { version: 1; revision: number; updatedAt?: string; updatedByName?: string; compiledBase?: import("./editor-model").EditorContent; overrides?: import("./editor-model").EditorPatch[] };
   correction?: { version: 1; preserveLayout: true; fullFrame: true };
   extractionVersion?: number;
   layoutVersion?: number;

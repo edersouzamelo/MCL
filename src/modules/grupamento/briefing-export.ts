@@ -10,7 +10,7 @@ import { CCO_SCREEN_CATALOG, CCO_PI_ROWS_PER_PAGE, CCO_UNIT_ROWS_PER_PAGE, type 
 import type { SagImportResult } from "./sag";
 import type { RpnImportResult } from "./rpn";
 import type { MonitorDocumentChart, MonitorDocumentSceneDto, MonitorSlideBox } from "./monitor-content/types";
-import { normalizeMonitorTitle, monitorIntegralImage } from "./monitor-content/presentation-title";
+import { monitorIntegralImage } from "./monitor-content/presentation-title";
 import { prepareMonitorElements } from "./monitor-content/presentation-layout";
 import { presentationTextColor } from "./monitor-content/presentation-intelligence";
 import { monitorTableSlide } from "./monitor-content/table-layout";
@@ -169,16 +169,16 @@ export async function buildBriefingPowerPoint(input: BriefingExportInput) {
     // Letterbox source layout inside the model's available content area.
     const ratio = layout.width / layout.height;
     const hasOnlineTitle = online && !monitorIntegralImage(scene.payload);
-    if (hasOnlineTitle) text(slide, normalizeMonitorTitle(scene.title), { ...CONTENT, h: .6 }, 22, true);
+    if (hasOnlineTitle) text(slide, scene.title, { ...CONTENT, h: .6 }, 22, true);
     const available = hasOnlineTitle ? body : CONTENT;
     const w = Math.min(available.w, available.h * ratio), h = w / ratio;
     const area = { x: available.x + (available.w - w) / 2, y: available.y + (available.h - h) / 2, w, h };
     const box = (e: MonitorSlideBox): Box => ({ x: area.x + e.x * w, y: area.y + e.y * h, w: e.w * w, h: e.h * h });
     for (const e of elements) {
       if (e.w <= 0 || e.h <= 0) continue;
-      const b = box(e);
-      if (e.kind === "text") slide.addText(e.text, { ...b, fontFace: "Arial", fontSize: (e.fontSizePt ?? 18) * w / (layout.width / 914400), bold: e.bold || e.role === "title" || e.role === "metric", align: e.align ?? "left", valign: e.verticalAlign === "middle" ? "middle" : e.verticalAlign === "bottom" ? "bottom" : "top", color: hex(online ? e.color : presentationTextColor(e, elements, true), "172B24"), margin: 0, fit: "shrink" });
-      else if (e.kind === "shape") slide.addShape(e.radius ? pptx.ShapeType.roundRect : pptx.ShapeType.rect, { ...b, fill: { color: hex(e.fill), transparency: e.fill ? 0 : 100 }, line: { color: hex(e.lineColor), transparency: e.lineColor ? 0 : 100 } });
+      const b = { ...box(e), rotate: e.rotation };
+      if (e.kind === "text") slide.addText(e.text, { ...b, fontFace: e.fontFace ?? "Arial", italic: e.italic, underline: e.underline ? { style: "sng" } : undefined, fontSize: (e.fontSizePt ?? 18) * w / (layout.width / 914400), bold: e.bold || e.role === "title" || e.role === "metric", align: e.align ?? "left", valign: e.verticalAlign === "middle" ? "middle" : e.verticalAlign === "bottom" ? "bottom" : "top", color: hex(online ? e.color : presentationTextColor(e, elements, true), "172B24"), margin: 0, fit: "shrink" });
+      else if (e.kind === "shape") slide.addShape(e.shapeType === "ellipse" ? pptx.ShapeType.ellipse : e.shapeType === "line" || e.shapeType === "arrow" ? pptx.ShapeType.line : e.radius || e.shapeType === "roundRect" ? pptx.ShapeType.roundRect : pptx.ShapeType.rect, { ...b, ...(e.shapeType === "line" || e.shapeType === "arrow" ? { y: b.y + b.h / 2, h: 0 } : {}), fill: { color: hex(e.fill), transparency: e.fill ? (1 - (e.opacity ?? 1)) * 100 : 100 }, line: { color: hex(e.lineColor ?? e.fill), width: e.lineWidth ?? 1, endArrowType: e.shapeType === "arrow" ? "triangle" : undefined, transparency: e.lineColor || e.shapeType === "line" || e.shapeType === "arrow" ? 0 : 100 } });
       else if (e.kind === "chart") addChart(slide, e.chart, b);
       else if (e.kind === "table") table(slide, e.columns, e.rows, b);
       else {
@@ -186,7 +186,7 @@ export async function buildBriefingPowerPoint(input: BriefingExportInput) {
         const asset = await input.loadAsset(e.assetId, scene.monitorId);
         if (!asset) throw new Error(`Figura indisponível em ${scene.sourceFileName}.`);
         const data = `${asset.mimeType};base64,${Buffer.from(asset.data).toString("base64")}`;
-        slide.addImage({ data, ...b, sizing: { type: "contain", ...b } });
+        slide.addImage({ data, ...b, transparency: (1 - (e.opacity ?? 1)) * 100, sizing: { type: e.fit === "cover" ? "cover" : "contain", ...b } });
       }
     }
   }
