@@ -142,9 +142,12 @@ export async function synchronizeMonitor(
   }
 
   const data = { organizationId, monitorId: monitor.id, monitor: sharedMonitor, sag: financial.current, rpn: financial.rpn, scenes, assets };
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ data, stateVersion })));
+  // A partial financial fallback must not acknowledge the new remote version,
+  // otherwise a transient SAG failure could leave the monitor stale indefinitely.
+  const effectiveStateVersion = financialResult.status === "fulfilled" ? stateVersion : previous?.stateVersion;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ data, stateVersion: effectiveStateVersion })));
   const version = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-  const snapshot: MonitorSnapshot = { ...data, schemaVersion: 4, version, stateVersion, savedAt: new Date().toISOString() };
+  const snapshot: MonitorSnapshot = { ...data, schemaVersion: 4, version, stateVersion: effectiveStateVersion, savedAt: new Date().toISOString() };
   await (await caches.open(SNAPSHOT_CACHE)).put(snapshotKey(organizationId, monitor.id), new Response(JSON.stringify(snapshot), { headers: { "Content-Type": "application/json" } }));
   return snapshot;
 }
