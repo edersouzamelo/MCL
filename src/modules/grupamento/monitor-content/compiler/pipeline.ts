@@ -27,7 +27,7 @@ export async function finalizeCompilation(buffer: Buffer, format: string, extrac
   if (!["pptx", "docx", "pdf"].includes(format)) return extraction;
   const needsNative = extraction.scenes.some(scene => scene.payload.inputCompiler?.strategy === "BLOCKED");
   // Native references also enable runtime overflow fallback for simple scenes.
-  if (!needsNative && !process.env.MCL_NATIVE_RENDERER_URL && !process.env.VERCEL_OIDC_TOKEN && renderer === renderNativeDocument) return extraction;
+  if (!needsNative && !process.env.MCL_NATIVE_RENDERER_URL && !process.env.VERCEL_OIDC_TOKEN && process.env.VERCEL !== "1" && renderer === renderNativeDocument) return extraction;
   try {
     const pages = await renderer(buffer, format as "pptx" | "docx" | "pdf");
     if (format === "pptx" && pages.length !== extraction.scenes.length) throw new Error("A quantidade de slides nativos difere da extração estrutural.");

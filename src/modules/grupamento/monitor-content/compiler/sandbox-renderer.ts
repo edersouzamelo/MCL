@@ -29,7 +29,10 @@ async function prepareSnapshot() {
 /** Uses the project's OIDC identity. Each conversion has an isolated filesystem,
  * denied outbound networking, no public port and no saved user-data snapshot. */
 export async function renderInSandbox(buffer: Buffer, format: "pptx" | "docx" | "pdf") {
-  if (!process.env.VERCEL_OIDC_TOKEN || process.env.MCL_COMPILER_SANDBOX === "0") throw new Error("Renderização isolada da Vercel indisponível; configure o serviço nativo alternativo.");
+  if (process.env.MCL_COMPILER_SANDBOX === "0") throw new Error("Renderização isolada da Vercel desativada; configure o serviço nativo alternativo.");
+  // The SDK resolves OIDC from the trusted request context as well as the
+  // environment. An absent env token does not mean the request lacks identity.
+  // Let Sandbox.create authenticate, and keep real provider failures blocked.
   preparing ??= prepareSnapshot().finally(() => { preparing = undefined; });
   const snapshotId = await preparing;
   let sandbox: Sandbox;

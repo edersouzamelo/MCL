@@ -133,7 +133,10 @@ export function MonitorContentCockpit({
       });
       const payload = await finalize.json();
       if (!finalize.ok) throw new Error(payload.error ?? "Falha ao estruturar o documento.");
-      setNotice(`${payload.import.sceneCount} cena(s) gerada(s). Revise a prévia estrutural e aprove antes de publicar.`);
+      const blocked = (payload.import.scenes ?? []).some((scene: ScenePreview) => compilerBlocked(scene.payload ?? {}));
+      setNotice(blocked
+        ? `${payload.import.sceneCount} cena(s) extraída(s), mas a validação está pendente. Use Reprocessar validação antes de aprovar.`
+        : `${payload.import.sceneCount} cena(s) gerada(s). Revise a prévia estrutural e aprove antes de publicar.`);
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha na importação documental.");
@@ -145,19 +148,21 @@ export function MonitorContentCockpit({
 
   async function reprocess(importId: string) {
     setBusy(true);
+    setProgress("Reprocessando e validando o original…");
     setError("");
     setNotice("");
     try {
       const response = await fetch("/api/grupamento/monitor-content/" + importId + "/reprocess", { method: "POST" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Falha ao reprocessar a fonte.");
-      setNotice("Fonte reprocessada com reconstrução espacial. Revise a nova prévia antes de recolocar no ar.");
+      setNotice("Original reprocessado e validado. Revise a nova prévia e clique em Aprovar para exibição.");
       window.dispatchEvent(new CustomEvent("mcl-grupamento-document-content-updated"));
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha ao reprocessar a fonte.");
     } finally {
       setBusy(false);
+      setProgress("");
     }
   }
 
@@ -266,9 +271,10 @@ export function MonitorContentCockpit({
                   <div className="mt-1 text-sm font-bold">{preview.fileName}</div>
                   <div className="text-[11px] text-zinc-500">{size(preview.fileSize)} · {preview.sceneCount} cena(s) · input {new Date(preview.importedAt).toLocaleString("pt-BR")}{preview.importedByName ? ` · ${preview.importedByName}` : ""}</div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <a href={`/api/grupamento/monitor-content/${preview.id}/source`} className="inline-flex items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-[10px] font-bold dark:border-zinc-700 dark:bg-zinc-950"><Download className="h-3.5 w-3.5" /> Original</a>
-                  <button type="button" disabled={busy || preview.scenes.some(scene => compilerBlocked(scene.payload ?? {}))} onClick={() => void setStatus(preview.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-2 text-[10px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" /> Aprovar para exibição</button>
+                  {preview.scenes.some(scene => compilerBlocked(scene.payload ?? {})) && <button type="button" disabled={busy} onClick={() => void reprocess(preview.id)} className="inline-flex items-center gap-1 rounded-lg border border-sky-400 px-2.5 py-2 text-[10px] font-bold text-sky-800 disabled:opacity-50 dark:text-sky-300"><Presentation className="h-3.5 w-3.5" /> Reprocessar validação</button>}
+                  <button type="button" title={preview.scenes.some(scene => compilerBlocked(scene.payload ?? {})) ? "A validação está pendente. Use Reprocessar validação para tentar novamente com o original já salvo." : "Aprovar o conteúdo revisado para exibição no monitor"} disabled={busy || preview.scenes.some(scene => compilerBlocked(scene.payload ?? {}))} onClick={() => void setStatus(preview.id, "APPROVED")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-2 text-[10px] font-bold text-white disabled:opacity-50"><CheckCircle2 className="h-3.5 w-3.5" /> Aprovar para exibição</button>
                   <button type="button" disabled={busy} onClick={() => void setStatus(preview.id, "REJECTED")} className="rounded-lg border border-amber-500 px-2.5 py-2 text-[10px] font-bold text-amber-800 disabled:opacity-50 dark:text-amber-300">Rejeitar</button>
                   <button type="button" disabled={busy} onClick={() => void deleteImport(preview.id, preview.fileName)} className="inline-flex items-center gap-1 rounded-lg border border-red-400 px-2.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50 dark:text-red-300"><Trash2 className="h-3.5 w-3.5" /> Excluir</button>
                 </div>
@@ -294,7 +300,7 @@ export function MonitorContentCockpit({
                 ))}
               </div>
               {preview.warnings?.length ? <div className="mt-3 text-[10px] leading-4 text-amber-800 dark:text-amber-300">Lacunas declaradas: {preview.warnings.slice(0, 3).join(" · ")}</div> : null}
-              {preview.scenes.some(scene => compilerBlocked(scene.payload ?? {})) && <p className="mt-3 text-xs font-semibold text-amber-800 dark:text-amber-300">A referência original ou a validação ainda está pendente. A sequência atual continua em exibição.</p>}
+              {preview.scenes.some(scene => compilerBlocked(scene.payload ?? {})) && <p className="mt-3 text-xs font-semibold text-amber-800 dark:text-amber-300">Aprovação bloqueada: a referência original ou a validação está pendente. Clique em Reprocessar validação para tentar novamente, sem reenviar o arquivo. A sequência atual continua em exibição.</p>}
               {selectedScene && <MonitorCompilerDiagnostics importId={preview.id} sceneId={selectedScene.id} diagnostic={selectedScene.payload?.inputCompiler} onReview={() => void refresh()} />}
             </div>
           ) : null}
