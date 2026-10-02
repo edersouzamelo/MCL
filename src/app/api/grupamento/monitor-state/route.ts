@@ -52,6 +52,10 @@ export async function GET(request: Request) {
 
   const stateVersion = fingerprint({
     monitorId,
+    // O contrato da playlist pode mudar entre deploys sem que o banco mude.
+    // Inclua a versão implantada para forçar reconstrução do snapshot local
+    // quando a lógica de exibição for atualizada.
+    deployment: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
     configuration: configuration?.updatedAt.toISOString() ?? "default",
     current: current ? [current.id, current.checksum, current.importedAt.toISOString()] : null,
     rpn: rpn ? [rpn.id, rpn.checksum, rpn.importedAt.toISOString()] : null,
