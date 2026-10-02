@@ -6,6 +6,8 @@ import { useSession, signOut } from "next-auth/react";
 import { LogOut, Settings2, SlidersHorizontal, User } from "lucide-react";
 import { useSettings, type FontSize, type Language } from "@/contexts/SettingsContext";
 
+import { MessageInbox } from "@/components/MessageInbox";
+
 const ADMIN_EMAIL = "edersouzamelo@gmail.com";
 
 export function UserSettingsMenu() {
@@ -49,6 +51,8 @@ export function UserSettingsMenu() {
   const isVisitor = !isAdmin && (session?.user?.roles ?? []).includes("READ_ONLY");
 
   return (
+    <>
+    <MessageInbox userId={session?.user?.email || "visitor"} />
     <div className="mcl-user-menu" ref={menuRef}>
       <div className="mcl-user-summary">
         <div>
@@ -147,5 +151,6 @@ export function UserSettingsMenu() {
         </div>
       ) : null}
     </div>
+    </>
   );
 }

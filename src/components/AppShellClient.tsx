@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
   Activity,
-  AlertTriangle,
   Bot,
   ClipboardList,
   FileInput,
@@ -231,10 +230,6 @@ export function AppShellClient({ children, variant = "default" }: { children: Re
           <div className="mcl-topbar-actions">
             <button type="button" className="mcl-icon-button" aria-label="Pesquisar">
               <Search aria-hidden />
-            </button>
-            <button type="button" className="mcl-icon-button mcl-alert-button" aria-label="Notificações">
-              <AlertTriangle aria-hidden />
-              <i />
             </button>
             <span className="mcl-topbar-divider" />
             <UserSettingsMenu />
