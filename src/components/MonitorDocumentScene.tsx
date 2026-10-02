@@ -6,7 +6,7 @@ import { MonitorDocumentText } from "@/components/MonitorDocumentText";
 import { monitorTextSlide } from "@/modules/grupamento/monitor-content/text-slide";
 import { monitorTitleElements, monitorIntegralImage } from "@/modules/grupamento/monitor-content/presentation-title";
 import { OmMentions } from "@/components/OmIdentity";
-import { useEffect, useRef, type ReactNode } from "react";
+import { memo, useEffect, useRef, type ReactNode } from "react";
 import { MonitorDocumentTable } from "@/components/MonitorDocumentTable";
 import { monitorTableSlide } from "@/modules/grupamento/monitor-content/table-layout";
 import { BarChart3, FileText, Image as ImageIcon, Table2 } from "lucide-react";
@@ -20,6 +20,8 @@ import { MonitorDocumentChart } from "@/components/MonitorDocumentChart";
 import { MonitorCompiledScene } from "@/components/MonitorCompiledScene";
 import { prepareMonitorElements } from "@/modules/grupamento/monitor-content/presentation-layout";
 import { presentationTextColor } from "@/modules/grupamento/monitor-content/presentation-intelligence";
+
+const StableDocumentChart = memo(MonitorDocumentChart);
 
 function SceneIcon({ type }: { type: MonitorDocumentSceneDto["sceneType"] }) {
   if (type === "CHART") return <BarChart3 className="h-4 w-4" />;
@@ -42,13 +44,14 @@ function adaptedShapeFill(original: string | undefined, area: number, ccol: bool
   return original;
 }
 
-function boxStyle(item: { x: number; y: number; w: number; h: number; z: number }) {
+function boxStyle(item: { x: number; y: number; w: number; h: number; z: number; rotation?: number }) {
   return {
     left: String(item.x * 100) + "%",
     top: String(item.y * 100) + "%",
     width: String(item.w * 100) + "%",
     height: String(item.h * 100) + "%",
     zIndex: item.z,
+    transform: item.rotation ? `rotate(${item.rotation}deg)` : undefined,
   };
 }
 
@@ -64,6 +67,8 @@ function TextElement({ item, elements, ccol, slideWidth, preserve = false }: { i
       textAlign: item.align,
       fontSize: `${size / (slideWidth / 12700) * 100}cqw`,
       fontFamily: preserve ? item.fontFace : undefined,
+      fontStyle: item.italic ? "italic" : undefined,
+      textDecoration: item.underline ? "underline" : undefined,
       lineHeight: item.role === "metric" ? 1 : item.role === "label" ? 1.06 : 1.12,
       fontWeight: preserve ? (item.bold ? 700 : 400) : item.bold || item.role === "metric" || item.role === "title" ? 800 : 650,
       color: preserve ? item.color : presentationTextColor(item, elements, ccol),
@@ -83,7 +88,7 @@ export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeco
   const integralImage = monitorIntegralImage(scene.payload);
   const online = Boolean(scene.payload.onlineEditor);
   const preserve = online || integralImage || Boolean(scene.payload.correction?.preserveLayout);
-  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: layout.elements.filter(item => item.kind === "chart").length === 1 } : monitorTitleElements(scene.payload.inputCompiler ? layout.elements : prepareMonitorElements(layout.elements).elements, scene.title);
+  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: false } : monitorTitleElements(scene.payload.inputCompiler ? layout.elements : prepareMonitorElements(layout.elements).elements, scene.title);
   const sorted = [...(integralImage ? layout.elements : prepared.elements)]
     .sort((a,b) => a.z-b.z);
   return (
@@ -92,21 +97,22 @@ export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeco
         {sorted.map((item: MonitorSlideElement, index) => {
           if (item.kind === "shape") {
             const area = item.w * item.h;
-            return <div key={"shape-" + String(index)} className="absolute" style={{...boxStyle(item),opacity:preserve ? item.opacity : undefined,background:preserve ? item.fill : adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? "1px solid " + item.lineColor : undefined,borderRadius:String((item.radius ?? 0)*100)+"%"}} />;
+            if (item.shapeType === "line" || item.shapeType === "arrow") return <svg key={item.elementId ?? index} className="absolute" style={{...boxStyle(item),opacity:item.opacity}} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d={item.shapeType === "arrow" ? "M0 50 H96 M75 25 L97 50 L75 75" : "M0 50 H100"} stroke={item.lineColor ?? item.fill ?? "#174739"} strokeWidth={item.lineWidth ?? 2} fill="none" vectorEffect="non-scaling-stroke"/></svg>;
+            return <div key={"shape-" + String(index)} className="absolute" style={{...boxStyle(item),opacity:preserve ? item.opacity : undefined,background:preserve ? item.fill : adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? `${item.lineWidth ?? 1}px solid ` + item.lineColor : undefined,borderRadius:item.shapeType === "ellipse" ? "50%" : String((item.radius ?? (item.shapeType === "roundRect" ? .08 : 0))*100)+"%"}} />;
           }
           if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} preserve={preserve} />;
           if (item.kind === "image") {
-            const framed = !integralImage && !briefing && item.w * item.h >= 0.005;
+            const framed = !online && !integralImage && !briefing && item.w * item.h >= 0.005;
             return <div
               key={"image-" + String(index)}
               className={"absolute flex items-center justify-center overflow-hidden " + (framed ? "rounded-xl border border-slate-300/60 bg-white/95 p-[.3%] shadow-[0_8px_22px_rgba(2,6,23,.16)]" : "")}
-              style={boxStyle(item)}
+              style={{...boxStyle(item), opacity: item.opacity}}
             >
-              {item.assetId ? <img src={"/api/grupamento/monitor-content/assets/" + item.assetId} alt="" className={"h-full w-full object-contain " + (framed ? "rounded-lg" : "drop-shadow-[0_8px_16px_rgba(2,6,23,.16)]")} /> : null}
+              {item.assetId ? <img src={"/api/grupamento/monitor-content/assets/" + item.assetId} alt="" style={{ objectFit: item.fit ?? "contain" }} className={"h-full w-full " + (framed ? "rounded-lg" : "drop-shadow-[0_8px_16px_rgba(2,6,23,.16)]")} /> : null}
             </div>;
           }
           if (item.kind === "chart") {
-            return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><MonitorDocumentChart chart={item.chart} ccol={ccol} decorateOms={!preserve} showTitle={!prepared.promotedChartTitle} /></div>;
+            return <div key={"chart-" + String(index)} className={"absolute overflow-hidden p-[1.2%] " + (briefing ? "" : "rounded-xl border border-white/[0.04] bg-slate-950/10")} style={boxStyle(item)}><StableDocumentChart chart={item.chart} ccol={ccol} decorateOms={!preserve} showTitle={!prepared.promotedChartTitle} /></div>;
           }
           return <div key={"table-" + String(index)} className={"absolute overflow-hidden " + (briefing ? "" : "rounded-lg border border-white/10 bg-slate-950/20")} style={boxStyle(item)}>
             {(!preserve || online) ? <MonitorDocumentTable columns={item.columns} rows={item.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={count => {
@@ -165,7 +171,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
     const before = tableSlide.texts.filter(item => item.y < tableSlide.table.y);
     const after = tableSlide.texts.filter(item => item.y >= tableSlide.table.y);
     const text = (items: typeof before) => items.map((item, i) => <div key={i} className="whitespace-pre-line break-words" style={{ fontSize: item.role === 'title' || i === 0 && items === before ? 'clamp(24px, 2.4vw, 40px)' : 'clamp(16px, 1.3vw, 24px)', fontWeight: item.bold ? 800 : 600 }}><OmMentions text={item.text} header={items === before} /></div>);
-    return <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
+    return <MonitorTitleFrame title={title} preserveTitle={Boolean(payload.onlineEditor)} light={ccol || briefing} omitTitle={integralImage}><section className="flex h-full min-h-0 flex-col gap-4 px-2 pb-7" data-adaptive-table-slide>
       {before.length > 0 && <header className="shrink-0 space-y-2">{text(before)}</header>}
       <MonitorDocumentTable columns={tableSlide.table.columns} rows={tableSlide.table.rows} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
       {after.length > 0 && <div className="shrink-0 space-y-1">{text(after)}</div>}
@@ -174,7 +180,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   }
   if (payload.layoutVersion === 2 && payload.layout) {
     return (
-      <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0 overflow-hidden">
+      <MonitorTitleFrame title={title} preserveTitle={Boolean(payload.onlineEditor)} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0 overflow-hidden">
         <MonitorDocumentLayout scene={scene} ccol={ccol || briefing} briefing={briefing} cycleSeconds={cycleSeconds} paused={paused} onPageCount={onPageCount} />
         {!briefing && <div className={"absolute bottom-0 left-0 rounded-full border px-3 py-1 text-[8px] font-bold uppercase tracking-[0.12em] " + (ccol ? "border-slate-300 bg-white/75 text-slate-600" : "border-white/10 bg-slate-950/65 text-slate-400")}>
           Documento estruturado · fonte rastreável
@@ -189,7 +195,7 @@ export function MonitorDocumentScene({ scene, ccol, briefing = false, cycleSecon
   </div>;
   const bullets = payload.bullets ?? [];
   return (
-    <MonitorTitleFrame title={title} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0">
+    <MonitorTitleFrame title={title} preserveTitle={Boolean(payload.onlineEditor)} light={ccol || briefing} omitTitle={integralImage}><section className="relative h-full min-h-0">
       <div className="mb-5 flex items-start justify-between gap-5">
         <div>
           <div className={"flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] " + (ccol ? "text-sky-800" : "text-sky-300")}>

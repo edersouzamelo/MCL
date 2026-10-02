@@ -3,9 +3,9 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { monitorTitleColor, normalizeMonitorTitle } from "@/modules/grupamento/monitor-content/presentation-title";
 
-export function MonitorTitleFrame({ title, light, children, system = false, omitTitle = false }: { title: string; light: boolean; children: ReactNode; system?: boolean; omitTitle?: boolean }) {
+export function MonitorTitleFrame({ title, light, children, system = false, omitTitle = false, preserveTitle = false }: { title: string; light: boolean; children: ReactNode; system?: boolean; omitTitle?: boolean; preserveTitle?: boolean }) {
   const text = useRef<HTMLHeadingElement>(null);
-  const normalized = normalizeMonitorTitle(title);
+  const normalized = preserveTitle ? title : normalizeMonitorTitle(title);
   useLayoutEffect(() => {
     const node = text.current;
     if (!node) return;

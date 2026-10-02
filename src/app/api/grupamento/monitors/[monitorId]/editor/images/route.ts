@@ -19,6 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ mon
     if (!["png", "jpeg", "webp"].includes(metadata.format ?? "")) throw new Error("Use PNG, JPEG ou WebP.");
     const data = await image.rotate().resize({ width: 2560, height: 1440, fit: "inside", withoutEnlargement: true }).webp({ quality: 90 }).toBuffer();
     const asset = await prisma.monitorContentAsset.create({ data: { id: randomUUID(), importId: scene.importId, fileName: file.name.slice(0, 240) + ".webp", mimeType: "image/webp", data: new Uint8Array(data) } });
-    return NextResponse.json({ assetId: asset.id });
+    const output = await sharp(data).metadata();
+    return NextResponse.json({ assetId: asset.id, width: output.width, height: output.height });
   } catch { return NextResponse.json({ error: "Não foi possível ler a imagem. Use PNG, JPEG ou WebP de até 3 MB." }, { status: 400 }); }
 }
