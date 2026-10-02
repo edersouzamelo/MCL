@@ -69,10 +69,12 @@ describe("universal compiler invariants", () => {
     const result = await finalizeCompilation(Buffer.from("source"), "pptx", extraction, renderer);
     expect(result.scenes[0].payload.inputCompiler).toMatchObject({ strategy: "NATIVE_FALLBACK", preflight: { status: "PASS", visual: "NATIVE_VERIFIED" } });
   });
-  it("native text loss never unlocks publication", async () => {
+  it("native visual fallback stays publishable when only the text index differs", async () => {
     const extraction: MonitorDocumentExtraction = { scenes: [{ sceneType: "TEXT", title: "Teste", sourcePage: 1, payload: { inputCompiler: compile([text("Documento confidencial")], [{ code: "GROUP", message: "group", severity: "error", nodeIds: [] }]) } }], assets: [], warnings: [] };
     const result = await finalizeCompilation(Buffer.from("source"), "pptx", extraction, async () => [{ page: 1, sha256: "c".repeat(64), rendererVersion: "test", text: "Documento", asset: { key: "native", fileName: "source.png", mimeType: "image/png", width: 1920, height: 1080, data: Buffer.from("image") } }]);
-    expect(result.scenes[0].payload.inputCompiler?.preflight.status).toBe("BLOCKED");
+    const diagnostic = result.scenes[0].payload.inputCompiler;
+    expect(diagnostic).toMatchObject({ strategy: "NATIVE_FALLBACK", preflight: { status: "PASS", visual: "NATIVE_VERIFIED" } });
+    expect(diagnostic?.preflight.issues).toContainEqual(expect.objectContaining({ code: "NATIVE_TEXT_INDEX_GAP", severity: "warning" }));
   });
   it("optional LLM rejects invented IDs and cannot authorize a blocked scene", async () => {
     const diagnostic = compile([chart, text("Anotação", .2, .4)]);

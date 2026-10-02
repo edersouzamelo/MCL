@@ -29,7 +29,13 @@ export function monitorContentChecksum(buffer: Buffer) {
 }
 
 function assertPublishable(extraction: MonitorDocumentExtraction) {
-  if (extraction.scenes.some(scene => compilerBlocked(scene.payload))) throw new Error("Há conteúdo sem fidelidade validada. A versão publicada foi preservada; conclua a conversão nativa antes de aprovar.");
+  const blocked = extraction.scenes.filter(scene => compilerBlocked(scene.payload));
+  if (!blocked.length) return;
+  const infrastructure = blocked
+    .flatMap(scene => scene.payload.inputCompiler?.preflight.issues ?? [])
+    .find(issue => issue.code === "NATIVE_UNAVAILABLE");
+  if (infrastructure) throw new Error(`Validação visual automática indisponível: ${infrastructure.message}`);
+  throw new Error("Há conteúdo sem fidelidade validada. A versão publicada foi preservada.");
 }
 
 async function appendRevision(tx: Prisma.TransactionClient, input: { importId: string; sourceHash: string; actorId: string; kind: string; scenes: unknown }) {
