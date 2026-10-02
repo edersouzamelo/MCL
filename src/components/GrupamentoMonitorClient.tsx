@@ -133,7 +133,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
           // Payloads completos só são consultados quando o estado persistido realmente mudou.
           const snapshot = await synchronizeMonitor(organizationId, selected, lastSnapshot.current, remote.stateVersion);
           if (cancelled) return;
-          observedStateVersion = remote.stateVersion;
+          observedStateVersion = snapshot.stateVersion ?? null;
           selected = snapshot.monitor;
 
           const sceneIds = snapshot.scenes.map((scene) => scene.id);
