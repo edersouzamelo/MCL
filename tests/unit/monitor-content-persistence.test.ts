@@ -9,7 +9,7 @@ const db = vi.hoisted(() => ({
   monitorContentScene: { createMany: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
 }));
 vi.mock("@/server/db", () => ({ prisma: db }));
-import { persistMonitorContentImport, replaceMonitorContentExtraction, replaceApprovedMonitorContentExtraction } from "@/modules/grupamento/monitor-content/repository";
+import { getApprovedMonitorScenes, persistMonitorContentImport, replaceMonitorContentExtraction, replaceApprovedMonitorContentExtraction } from "@/modules/grupamento/monitor-content/repository";
 import type { MonitorDocumentExtraction } from "@/modules/grupamento/monitor-content/types";
 
 const extraction: MonitorDocumentExtraction = {
@@ -55,6 +55,51 @@ describe("atomic document persistence", () => {
     await replaceApprovedMonitorContentExtraction({ id: "import-test", organizationId: "org-test", extraction });
     expect(db.$transaction.mock.calls[1][1]).toEqual({ maxWait: 10000, timeout: 30000, isolationLevel: "Serializable" });
   });
+  it("keeps an approved native fallback in the monitor playlist even when an older persisted row lacks layoutVersion", async () => {
+    db.monitorContentScene.findMany.mockResolvedValue([
+      {
+        id: "scene-native",
+        importId: "import-native",
+        sceneOrder: 0,
+        sceneType: "FIGURE",
+        title: "Página 1",
+        sourcePage: 1,
+        payload: {
+          inputCompiler: {
+            strategy: "NATIVE_FALLBACK",
+            preflight: { status: "PASS" },
+            nativeReference: { assetId: "asset-native" },
+          },
+        },
+        import: {
+          monitorId: 6,
+          fileName: "slides.pdf",
+          importedAt: new Date("2026-10-02T14:00:00Z"),
+          importedByName: "Operador",
+          approvedAt: new Date("2026-10-02T14:10:00Z"),
+        },
+      },
+      {
+        id: "scene-legacy",
+        importId: "import-legacy",
+        sceneOrder: 1,
+        sceneType: "FIGURE",
+        title: "Legado",
+        sourcePage: 2,
+        payload: {},
+        import: {
+          monitorId: 6,
+          fileName: "legacy.pdf",
+          importedAt: new Date("2026-10-02T14:00:00Z"),
+          importedByName: "Operador",
+          approvedAt: new Date("2026-10-02T14:10:00Z"),
+        },
+      },
+    ]);
+    const scenes = await getApprovedMonitorScenes("org-test", 6);
+    expect(scenes.map((scene) => scene.id)).toEqual(["scene-native"]);
+  });
+
   it("deduplicates an existing preview without loading its original or rewriting its media", async () => {
     db.monitorContentImport.findUnique.mockResolvedValue({ id: "existing", status: "PREVIEW", scenes: [] });
     expect((await persistMonitorContentImport(input)).deduplicated).toBe(true);
