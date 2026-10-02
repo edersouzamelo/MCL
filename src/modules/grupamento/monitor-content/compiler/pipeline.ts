@@ -43,7 +43,7 @@ export async function finalizeCompilation(buffer: Buffer, format: string, extrac
         diagnostic.parsedInput.nodes = all.map((node, i) => ({ ...node, id: `s${page.page}:o${i}` }));
         diagnostic.parsedInput.sourceStrings = source.flatMap(scene => scene.payload.inputCompiler?.parsedInput.sourceStrings ?? []);
         diagnostic.strategy = "BLOCKED";
-        return { sceneType: "FIGURE", title: first?.title ?? `Página ${page.page}`, sourcePage: page.page, payload: { inputCompiler: diagnostic, searchableText: diagnostic.parsedInput.sourceStrings } } satisfies MonitorDocumentSceneDraft;
+        return { sceneType: "FIGURE", title: first?.title ?? `Página ${page.page}`, sourcePage: page.page, payload: { inputCompiler: diagnostic, searchableText: diagnostic.parsedInput.sourceStrings, layoutVersion: 2 } } satisfies MonitorDocumentSceneDraft;
       });
     }
     for (const scene of extraction.scenes) {
