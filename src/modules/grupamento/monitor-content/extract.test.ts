@@ -174,6 +174,26 @@ describe("monitor content extraction", () => {
     expect(result.scenes[0]?.payload.layout?.elements.some((item) => item.kind === "shape" && item.fill === "#F8FAFC")).toBe(false);
   });
 
+  it("accepts PPTX packages with more than 2,000 small entries inside the expanded-content safety budget", async () => {
+    const slide = Buffer.from([
+      "<p:sld xmlns:p=\"p\" xmlns:a=\"a\"><p:cSld><p:spTree>",
+      "<p:sp><p:spPr><a:xfrm><a:off x=\"900000\" y=\"800000\"/><a:ext cx=\"7000000\" cy=\"800000\"/></a:xfrm></p:spPr>",
+      "<p:txBody><a:bodyPr/><a:p><a:r><a:rPr sz=\"2800\" b=\"1\"/><a:t>Teste de pacote amplo</a:t></a:r></a:p></p:txBody></p:sp>",
+      "</p:spTree></p:cSld></p:sld>",
+    ].join(""));
+    const entries: Entry[] = [
+      { name: "ppt/presentation.xml", data: Buffer.from("<p:presentation xmlns:p=\"p\"><p:sldSz cx=\"12192000\" cy=\"6858000\"/></p:presentation>") },
+      { name: "ppt/slides/slide1.xml", data: slide },
+    ];
+    for (let index = 0; index < 2_100; index += 1) {
+      entries.push({ name: `customXml/item${index}.xml`, data: Buffer.from("<x/>") });
+    }
+
+    const result = await extractMonitorDocument(storedZip(entries), "pacote-amplo.pptx");
+    expect(result.scenes).toHaveLength(1);
+    expect(result.scenes[0]?.title).toContain("Teste de pacote amplo");
+  });
+
   it("extracts paragraphs, tables and figures from DOCX deterministically", async () => {
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4xkAAAAASUVORK5CYII=", "base64");
     const document = Buffer.from("<w:document xmlns:w=\"w\"><w:p><w:r><w:t>Classe V</w:t></w:r></w:p><w:p><w:r><w:t>Situação do suprimento</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>OM</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Status</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>9 B Sup</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Regular</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:document>");
