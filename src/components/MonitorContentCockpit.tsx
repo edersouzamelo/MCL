@@ -116,7 +116,8 @@ export function MonitorContentCockpit({
     if (window.sessionStorage.getItem(key) === "1") return;
     automaticRepairStarted.current.add(candidate.id);
     window.sessionStorage.setItem(key, "1");
-    void reprocess(candidate.id, true);
+    const timer = window.setTimeout(() => { void reprocess(candidate.id, true); }, 0);
+    return () => window.clearTimeout(timer);
   }, [busy, imports, open, reprocess]);
 
   async function upload(file: File) {
