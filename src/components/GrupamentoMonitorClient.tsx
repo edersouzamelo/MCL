@@ -11,7 +11,7 @@ import { activeMonitorCorrection } from "@/modules/grupamento/monitor-content/co
 import { latestBriefingUpdate } from "@/modules/grupamento/briefing";
 import { BriefingFrame } from "@/components/BriefingFrame";
 import { MonitorViewport } from "@/components/MonitorViewport";
-import { forgetMonitorSnapshot, prepareMonitorNavigation, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
+import { forgetMonitorSnapshot, prepareMonitorNavigation, readMonitorRemoteState, readMonitorSnapshot, synchronizeMonitor, type MonitorSnapshot } from "@/modules/grupamento/monitor-cache";
 import { MonitorPlaybackControls } from "@/components/MonitorPlaybackControls";
 import { MonitorTitleFrame } from "@/components/MonitorTitleFrame";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
@@ -31,9 +31,9 @@ import {
   type CcoMonitorConfig,
   type CcoScreenId,
 } from "@/modules/grupamento/monitor";
+import { monitorPollIntervalMs } from "@/modules/grupamento/monitor-sync-policy";
 
 const SCREEN_FADE_MS = 320;
-const DATA_REFRESH_MS = 30_000;
 
 function pageSizeForScreen(screen: CcoScreenId) {
   if (summaryClassId(screen)) return CCO_SUMMARY_ROWS_PER_PAGE;
@@ -88,7 +88,20 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
     let running = false;
     let hydrated = false;
     let navigationReady = false;
+    let consecutiveFailures = 0;
+    let observedStateVersion: string | null = null;
+    let timer: number | undefined;
     let selected = defaultCcoMonitorConfig()[Math.max(0, Math.min(CCO_MONITOR_COUNT - 1, monitorId - 1))];
+
+    const schedule = () => {
+      if (cancelled) return;
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = window.setTimeout(() => { void refresh(); }, monitorPollIntervalMs({
+        hidden: document.visibilityState === "hidden",
+        consecutiveFailures,
+      }));
+    };
+
     const refresh = async () => {
       if (running) return;
       running = true;
@@ -96,25 +109,49 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
         if (!hydrated) {
           const cached = await readMonitorSnapshot(organizationId, monitorId);
           if (cancelled) return;
-          if (cached) { selected = cached.monitor; applySnapshot(cached); }
+          if (cached) {
+            selected = cached.monitor;
+            observedStateVersion = cached.stateVersion ?? null;
+            applySnapshot(cached);
+          }
           hydrated = true;
         }
-        if (!navigator.onLine) { setConnectionState("offline"); return; }
-        // A revoked scene must disappear even when playback is paused.
-        const snapshot = await synchronizeMonitor(organizationId, selected, lastSnapshot.current);
+
+        if (!navigator.onLine) {
+          setConnectionState("offline");
+          return;
+        }
+
+        const remote = await readMonitorRemoteState(monitorId);
         if (cancelled) return;
+        if (buildVersion !== "local" && remote.deploymentVersion !== "local" && remote.deploymentVersion !== buildVersion) {
+          window.location.reload();
+          return;
+        }
+
+        if (!hasSnapshot.current || observedStateVersion !== remote.stateVersion) {
+          // Payloads completos só são consultados quando o estado persistido realmente mudou.
+          const snapshot = await synchronizeMonitor(organizationId, selected, lastSnapshot.current, remote.stateVersion);
+          if (cancelled) return;
+          observedStateVersion = snapshot.stateVersion ?? null;
+          selected = snapshot.monitor;
+
+          const sceneIds = snapshot.scenes.map((scene) => scene.id);
+          const playlistChanged = JSON.stringify(activeSceneIds.current) !== JSON.stringify(sceneIds);
+          const configurationChanged = lastSnapshot.current && JSON.stringify(lastSnapshot.current.monitor) !== JSON.stringify(snapshot.monitor);
+          if (!hasSnapshot.current || playlistChanged || configurationChanged) {
+            pendingSnapshot.current = null;
+            applySnapshot(snapshot);
+            if (playlistChanged || configurationChanged) setPlaybackState("playing");
+          } else pendingSnapshot.current = snapshot.version !== activeVersion.current ? snapshot : null;
+        }
+
+        consecutiveFailures = 0;
         setCacheIssue(null);
         setConnectionState("online");
-        const sceneIds = snapshot.scenes.map((scene) => scene.id);
-        const playlistChanged = JSON.stringify(activeSceneIds.current) !== JSON.stringify(sceneIds);
-        const configurationChanged = lastSnapshot.current && JSON.stringify(lastSnapshot.current.monitor) !== JSON.stringify(snapshot.monitor);
-        if (!hasSnapshot.current || playlistChanged || configurationChanged) {
-          pendingSnapshot.current = null;
-          applySnapshot(snapshot);
-          if (playlistChanged || configurationChanged) setPlaybackState("playing");
-        } else pendingSnapshot.current = snapshot.version !== activeVersion.current ? snapshot : null;
         if (!navigationReady) { await prepareMonitorNavigation(monitorId); navigationReady = true; }
       } catch (error) {
+        consecutiveFailures += 1;
         if (!cancelled) {
           if (error instanceof Error && /HTTP (401|403)\b/.test(error.message)) {
             activeVersion.current = null;
@@ -122,6 +159,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             pendingSnapshot.current = null;
             lastSnapshot.current = null;
             hasSnapshot.current = false;
+            observedStateVersion = null;
             setSag(null);
             setRpn(null);
             setDocumentScenes([]);
@@ -131,37 +169,36 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
           setCacheIssue(error instanceof Error ? error.message : "Falha de sincronização/cache");
           console.warn("MCL monitor: última versão preservada", error);
         }
-      } finally { running = false; }
+      } finally {
+        running = false;
+        schedule();
+      }
     };
-    void refresh();
-    const poll = window.setInterval(() => { void refresh(); }, DATA_REFRESH_MS);
-    const refreshEvent = () => { void refresh(); };
+
+    const refreshEvent = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      void refresh();
+    };
+    const visibility = () => {
+      if (document.visibilityState === "visible") refreshEvent();
+      else schedule();
+    };
     const offline = () => setConnectionState("offline");
     const events = ["storage", "online", "mcl-grupamento-sag-updated", "mcl-grupamento-rpn-updated", "mcl-grupamento-monitors-updated", "mcl-grupamento-document-content-updated"];
+
+    void refresh();
     events.forEach((event) => window.addEventListener(event, refreshEvent));
+    window.addEventListener("visibilitychange", visibility);
     window.addEventListener("offline", offline);
+
     return () => {
       cancelled = true;
-      clearInterval(poll);
+      if (timer !== undefined) window.clearTimeout(timer);
       events.forEach((event) => window.removeEventListener(event, refreshEvent));
+      window.removeEventListener("visibilitychange", visibility);
       window.removeEventListener("offline", offline);
     };
-  }, [monitorId, organizationId, applySnapshot]);
-
-  useEffect(() => {
-    if (buildVersion === "local") return;
-    const check = async () => {
-      if (!navigator.onLine) return;
-      try {
-        const response = await fetch(`/api/grupamento/monitor-version?monitorId=${monitorId}`, { cache: "no-store" });
-        if (!response.ok) return;
-        const payload = await response.json();
-        if (payload.version && payload.version !== buildVersion) window.location.reload();
-      } catch { /* A próxima verificação ocorre com a rede restabelecida. */ }
-    };
-    const timer = window.setInterval(() => { void check(); }, 60_000);
-    return () => window.clearInterval(timer);
-  }, [buildVersion, monitorId]);
+  }, [monitorId, organizationId, buildVersion, applySnapshot]);
 
   const commitPending = useCallback(() => {
     if (!pendingSnapshot.current) return;
@@ -441,7 +478,7 @@ export function GrupamentoMonitorClient({ monitorId, organizationId, canEnroll =
             {deviceMessage ? <span className="max-w-64 truncate" title={deviceMessage}>{deviceMessage}</span> : null}
             <span>{monitor.layout === "ccol" ? "layout CCOL" : "layout MCL"}</span>
             <span>{effectiveLoop ? `loop · ${monitor.delaySeconds}s · ${playbackState === "playing" ? "rodando" : "parado"}` : "tela fixa"}</span>
-            <span title={cacheIssue ?? undefined}>{cacheIssue ? "sincronização pendente" : "sync · 30s"}</span>
+            <span title={cacheIssue ?? undefined}>{cacheIssue ? "sincronização pendente" : "sync adaptativa · 1/10 min"}</span>
             <span>{connectionState === "offline" ? "cache local" : "online"}</span>
             <span>{safeIndex + 1}/{Math.max(1, playlist.length)}</span>
           </div>
