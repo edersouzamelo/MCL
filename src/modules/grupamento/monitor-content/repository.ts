@@ -542,7 +542,11 @@ export async function getApprovedMonitorScenes(organizationId: string, monitorId
       sourceImportedByName: row.import.importedByName,
       approvedAt: row.import.approvedAt?.toISOString() ?? null,
     }))
-    .filter((scene) => scene.payload.layoutVersion === 2);
+    .filter((scene) => scene.payload.layoutVersion === 2 || (
+      scene.payload.inputCompiler?.preflight.status === "PASS"
+      && ["NATIVE_FALLBACK", "NATIVE_IMAGE"].includes(scene.payload.inputCompiler.strategy)
+      && Boolean(scene.payload.inputCompiler.nativeReference?.assetId)
+    ));
 }
 
 export async function getMonitorContentAsset(id: string, organizationId: string, monitorId?: number) {
