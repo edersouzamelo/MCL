@@ -90,6 +90,19 @@ describe("atomic monitor cache", () => {
     expect(updated.scenes).toEqual([]);
     expect((await readMonitorSnapshot("org-a", 1))?.scenes).toEqual([]);
   });
+  it("includes native fallback assets in the monitor cache", () => {
+    const nativeScene = {
+      ...scene,
+      payload: {
+        inputCompiler: {
+          strategy: "NATIVE_FALLBACK",
+          nativeReference: { assetId: "native-pdf-page" },
+        },
+      },
+    } as unknown as MonitorDocumentSceneDto;
+    expect(sceneAssetUrls([nativeScene])).toEqual(["/api/grupamento/monitor-content/assets/native-pdf-page"]);
+  });
+
   it("rejects malformed and unapproved playlists instead of silently replacing them", () => {
     expect(() => validatePlaylist({}, 1)).toThrow();
     expect(() => validatePlaylist({ scenes: [{ ...scene, approvedAt: null }] }, 1)).toThrow();

@@ -35,6 +35,7 @@ export function sceneAssetUrls(scenes: MonitorDocumentSceneDto[]) {
   return [...new Set(scenes.flatMap((scene) => [
     ...(scene.payload.assetIds ?? []),
     ...(scene.payload.layout?.elements ?? []).flatMap((element) => element.kind === "image" && element.assetId ? [element.assetId] : []),
+    ...(scene.payload.inputCompiler?.nativeReference?.assetId ? [scene.payload.inputCompiler.nativeReference.assetId] : []),
   ]))].map((id) => `/api/grupamento/monitor-content/assets/${encodeURIComponent(id)}`);
 }
 
