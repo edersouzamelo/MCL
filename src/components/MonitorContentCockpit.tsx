@@ -73,7 +73,7 @@ export function MonitorContentCockpit({
   useEffect(() => {
     if (!open) return;
     const frame = window.requestAnimationFrame(() => { void refresh(); });
-    const poll = window.setInterval(() => { void refresh(); }, 10_000);
+    const poll = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 5 * 60_000);
     const focus = () => { void refresh(); };
     window.addEventListener("focus", focus);
     return () => { window.cancelAnimationFrame(frame); window.clearInterval(poll); window.removeEventListener("focus", focus); };
