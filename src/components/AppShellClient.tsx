@@ -153,7 +153,7 @@ export function AppShellClient({ children, variant = "default" }: { children: Re
             <BrandLogo tone="light" className="h-10 w-10 shrink-0" priority sizes="40px" />
             <span>
               <strong>MCL</strong>
-              <small>CONTINUIDADE LOGÍSTICA</small>
+              <small>CONTINUIDADE<br />LOGÍSTICA</small>
             </span>
           </Link>
           <button
