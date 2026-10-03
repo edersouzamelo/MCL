@@ -337,7 +337,7 @@ export function GrupamentoCommandCenterClient({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-6 text-slate-950 shadow-sm dark:border-sky-900/50 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950 dark:text-white dark:shadow-xl">
+      <section className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-6 text-slate-950 shadow-sm dark:border-white/10 dark:from-transparent dark:via-transparent dark:to-transparent dark:text-white dark:shadow-xl">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-4xl">
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
