@@ -4,6 +4,38 @@ import sharp from "sharp";
 import { zipEntries } from "../pptx-layout";
 import { renderNativeDocument, type NativeRenderer } from "./native-renderer";
 
+async function chartPng(data: Buffer) {
+  const decoded = await sharp(data).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data: pixels, info } = decoded;
+  const seen = new Uint8Array(info.width * info.height);
+  const queue: number[] = [];
+  const white = (offset: number) => pixels[offset] > 245 && pixels[offset + 1] > 245 && pixels[offset + 2] > 245 && pixels[offset + 3] > 0;
+  const enqueue = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= info.width || y >= info.height) return;
+    const index = y * info.width + x;
+    if (seen[index]) return;
+    const offset = index * info.channels;
+    if (!white(offset)) return;
+    seen[index] = 1;
+    queue.push(index);
+  };
+  for (let x = 0; x < info.width; x++) { enqueue(x, 0); enqueue(x, info.height - 1); }
+  for (let y = 0; y < info.height; y++) { enqueue(0, y); enqueue(info.width - 1, y); }
+  for (let cursor = 0; cursor < queue.length; cursor++) {
+    const index = queue[cursor], x = index % info.width, y = Math.floor(index / info.width);
+    const offset = index * info.channels;
+    pixels[offset + 3] = 0;
+    enqueue(x - 1, y); enqueue(x + 1, y); enqueue(x, y - 1); enqueue(x, y + 1);
+  }
+  for (let index = 0; index < info.width * info.height; index++) {
+    const offset = index * info.channels;
+    if (pixels[offset + 3] && pixels[offset] < 50 && pixels[offset + 1] < 50 && pixels[offset + 2] < 50) {
+      pixels[offset] = 255; pixels[offset + 1] = 255; pixels[offset + 2] = 255;
+    }
+  }
+  return sharp(pixels, { raw: info }).png().toBuffer();
+}
+
 /** Rasterize only unsupported vector pictures, never the surrounding editable slide.
  * Conversion still runs in the existing isolated Office renderer. No OCR/invented data. */
 export async function convertVectorImages(buffer: Buffer, renderer: NativeRenderer = renderNativeDocument) {
@@ -53,7 +85,8 @@ export async function convertVectorImages(buffer: Buffer, renderer: NativeRender
     const left = Math.round(box.x * page.asset.width), top = Math.round(box.y * page.asset.height);
     const width = Math.min(page.asset.width - left, Math.round(box.w * page.asset.width));
     const height = Math.min(page.asset.height - top, Math.round(box.h * page.asset.height));
-    const data = await sharp(page.asset.data).extract({ left, top, width, height }).png().toBuffer();
+    const cropped = await sharp(page.asset.data).extract({ left, top, width, height }).png().toBuffer();
+    const data = await chartPng(cropped);
     bytes += data.length;
     if (bytes > 18 * 1024 * 1024) throw new Error("Figuras convertidas excedem o limite seguro.");
     converted.set(path, data);
