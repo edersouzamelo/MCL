@@ -88,7 +88,7 @@ export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeco
   const integralImage = monitorIntegralImage(scene.payload);
   const online = Boolean(scene.payload.onlineEditor);
   const preserve = online || integralImage || Boolean(scene.payload.correction?.preserveLayout);
-  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: false } : monitorTitleElements(scene.payload.inputCompiler ? layout.elements : prepareMonitorElements(layout.elements).elements, scene.title);
+  const prepared = online ? { elements: layout.elements, title: scene.title, promotedChartTitle: false } : monitorTitleElements(prepareMonitorElements(layout.elements).elements, scene.title);
   const sorted = [...(integralImage ? layout.elements : prepared.elements)]
     .sort((a,b) => a.z-b.z);
   return (

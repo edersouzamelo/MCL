@@ -63,6 +63,7 @@ export function prepareMonitorElements(elements: MonitorSlideElement[]) {
   const omitted: Array<{ element: MonitorSlideElement; reason: string }> = [];
   const dataElements = elements.filter((item) => item.kind === "chart" || item.kind === "table");
   const hasStructuredData = dataElements.length > 0;
+  const hasSubstantialVisual = elements.some((item) => item.kind === "image" && item.w * item.h >= .12);
   const hasData = hasStructuredData || elements.some((item) => item.kind === "text" && /R\$|\d[.,]\d|\d\s*%/.test(item.text));
   const neutral = new Set(["#FFFFFF", "#F8FAFC", "#F1F5F9", "#F9FAFB"]);
   const visible = elements.filter((item) => {
@@ -73,11 +74,19 @@ export function prepareMonitorElements(elements: MonitorSlideElement[]) {
     const dataOverlap = hasStructuredData && area > 0
       ? Math.max(0, ...dataElements.map((data) => intersection(item, data) / area))
       : 0;
+    const angle = Math.abs((item.rotation ?? 0) % 360);
+    const quarterTurn = Math.abs(angle - 90) < 8 || Math.abs(angle - 270) < 8;
+    const peripheral = item.x < .08 || item.x + item.w > .92 || item.y < .12 || item.y + item.h > .88;
+    const rotatedPeripheral = angle > 8 && angle < 352 && peripheral;
 
     // Never discard charts, tables or numerical annotations. Briefing cleanup targets framing and decoration.
-    if (outside && (item.kind === "shape" || (item.kind === "text" && !item.chartAnnotation && !/\d/.test(item.text)))) {
+    if (item.kind === "text" && quarterTurn && peripheral && !item.chartAnnotation) {
+      reason = "Texto vertical periférico identificado como adorno de apresentação";
+    } else if (item.kind === "shape" && rotatedPeripheral) {
+      reason = "Forma rotacionada periférica identificada como adorno de apresentação";
+    } else if (outside && (item.kind === "shape" || (item.kind === "text" && !item.chartAnnotation && !/\d/.test(item.text)))) {
       reason = "Adorno de borda fora da área do slide";
-    } else if (hasData && item.kind === "image" && item.y >= 0 && item.y + item.h <= .18 && area < .015 && item.w < .12 && item.h < .16) {
+    } else if ((hasData || hasSubstantialVisual) && item.kind === "image" && item.y >= 0 && item.y + item.h <= .2 && area < .015 && item.w < .12 && item.h < .16) {
       reason = "Pequeno ícone de cabeçalho em slide de dados";
     } else if (hasStructuredData && item.kind === "image" && area < .08 && item.w < .35 && item.h < .35) {
       // Product thumbnails and badges can overlap the chart and sit away from edges.
