@@ -25,14 +25,21 @@ export function missingTokens(input: string[], output: string[]) {
   for (const value of tokens(output)) counts.set(value, (counts.get(value) ?? 0) + 1);
   return tokens(input).filter(value => { const count = counts.get(value) ?? 0; if (!count) return true; counts.set(value, count - 1); return false; });
 }
-export function fitComposition(input: MonitorSlideElement[]) {
+export function visualBox(item: MonitorSlideBox, aspectRatio = 16 / 9) {
+  const angle = (item.rotation ?? 0) * Math.PI / 180;
+  const w = Math.abs(item.w * Math.cos(angle)) + Math.abs(item.h / aspectRatio * Math.sin(angle));
+  const h = Math.abs(item.w * aspectRatio * Math.sin(angle)) + Math.abs(item.h * Math.cos(angle));
+  return { x: item.x + (item.w - w) / 2, y: item.y + (item.h - h) / 2, w, h };
+}
+export function fitComposition(input: MonitorSlideElement[], aspectRatio = 16 / 9) {
   if (!input.length) return [];
-  const left = Math.min(0, ...input.map(item => item.x)), top = Math.min(0, ...input.map(item => item.y));
-  const right = Math.max(1, ...input.map(item => item.x + item.w)), bottom = Math.max(1, ...input.map(item => item.y + item.h));
+  const bounds = input.map(item => visualBox(item, aspectRatio));
+  const left = Math.min(0, ...bounds.map(item => item.x)), top = Math.min(0, ...bounds.map(item => item.y));
+  const right = Math.max(1, ...bounds.map(item => item.x + item.w)), bottom = Math.max(1, ...bounds.map(item => item.y + item.h));
   const scale = Math.min(1 / (right - left), 1 / (bottom - top));
   return clone(input).map(item => ({ ...item, x: (item.x - left) * scale, y: (item.y - top) * scale, w: item.w * scale, h: item.h * scale, ...(item.kind === "text" && item.fontSizePt ? { fontSizePt: item.fontSizePt * scale } : {}) }));
 }
-export function validateCompilerOutput(input: MonitorSlideElement[], output: MonitorSlideElement[], title?: string, paragraphs?: string[]): CompilerIssue[] {
+export function validateCompilerOutput(input: MonitorSlideElement[], output: MonitorSlideElement[], title?: string, paragraphs?: string[], aspectRatio = 16 / 9): CompilerIssue[] {
   const issues: CompilerIssue[] = [];
   const lost = missingTokens(input.flatMap(elementStrings), paragraphs ? [title ?? "", ...paragraphs] : output.flatMap(elementStrings));
   if (lost.length) issues.push({ code: "TEXT_LOSS", message: `${lost.length} tokens de origem ausentes na saída.`, nodeIds: [], severity: "error" });
@@ -43,14 +50,15 @@ export function validateCompilerOutput(input: MonitorSlideElement[], output: Mon
     if (index < 0) issues.push({ code: "OBJECT_LOSS", message: `Objeto informacional ${element.kind} ausente ou alterado.`, nodeIds: [], severity: "error" });
     else remaining.splice(index, 1);
   }
-  for (const [index, element] of output.entries()) {
+  for (const [index, sourceElement] of output.entries()) {
+    const element = visualBox(sourceElement, aspectRatio);
     if (![element.x, element.y, element.w, element.h].every(Number.isFinite) || element.w <= 0 || element.h <= 0 || element.x < -1e-6 || element.y < -1e-6 || element.x + element.w > 1.000001 || element.y + element.h > 1.000001) issues.push({ code: "OUTSIDE_FRAME", message: "Geometria inválida ou fora do frame.", nodeIds: [String(index)], severity: "error" });
   }
   return issues;
 }
 export function compileSlide(input: {
   elements: MonitorSlideElement[]; title: string; page: number; rawHash: string; structuralHash: string;
-  native?: Array<Partial<CompilerNode>>; issues?: CompilerIssue[]; catalog?: SemanticEntry[];
+  aspectRatio?: number; native?: Array<Partial<CompilerNode>>; issues?: CompilerIssue[]; catalog?: SemanticEntry[];
 }) {
   const elements = clone(input.elements);
   const nodes: CompilerNode[] = elements.map((element, index) => ({ id: `s${input.page}:o${index}`, origin: `ppt/slides/slide${input.page}.xml`, children: [], confidence: .98, ...input.native?.[index], element }));
@@ -85,7 +93,7 @@ export function compileSlide(input: {
   }
   const charts = elements.filter(item => item.kind === "chart"), tables = elements.filter(item => item.kind === "table"), images = elements.filter(item => item.kind === "image");
   const texts = elements.filter(item => item.kind === "text");
-  const fullImage = !charts.length && !tables.length && images.some(item => item.w >= .85 && item.h >= .85);
+  const fullImage = !texts.some(item => item.text.trim()) && !charts.length && !tables.length && images.some(item => item.w >= .85 && item.h >= .85);
   const textLines = texts.reduce((sum, item) => sum + item.text.split("\n").filter(Boolean).length, 0);
   let archetype: Archetype = fullImage ? "IMAGE_FULLFRAME" : charts.length && !tables.length && !images.length ? "CHART_CENTRIC" : tables.length && !charts.length && !images.length ? "TABLE_CENTRIC" : charts.length || tables.length || images.length ? "MIXED" : textLines >= 4 ? "DOCUMENT_LIKE" : texts.length ? "TEXT_CENTRIC" : "UNKNOWN";
   if (images.length === 1 && !texts.length && !charts.length && !tables.length && !fullImage) archetype = "COVER";
@@ -95,7 +103,7 @@ export function compileSlide(input: {
     if (linked.length) atomicBlocks.push({ type: "ATOMIC_VISUAL_BLOCK", nodeIds: [node.id, ...linked], reason: "A anotação depende da composição nativa e não pode ser reposicionada independentemente." });
   }
   const complexChart = charts.some(item => ["unknown", "scatter", "area"].includes(item.chart.type) || item.chart.series.some(series => series.missingValueIndices?.length));
-  if (complexChart || archetype === "UNKNOWN" || archetype === "MIXED") atomicBlocks.push({ type: "ATOMIC_VISUAL_BLOCK", nodeIds: nodes.map(item => item.id), reason: "Composição ambígua ou gráfico fora do contrato do renderer estrutural." });
+  if (complexChart || archetype === "UNKNOWN") atomicBlocks.push({ type: "ATOMIC_VISUAL_BLOCK", nodeIds: nodes.map(item => item.id), reason: "Composição ambígua ou gráfico fora do contrato do renderer estrutural." });
   const annotated = preserveChartAnnotations(clone(elements)).map((element, i) => element.kind === "text" && relations.some(relation => relation.from === nodes[i].id && relation.type === "belongs_to_chart") ? {
     ...element, chartAnnotation: true as const, role: "label" as const, z: Math.max(element.z, ...charts.map(chart => chart.z + 1)),
   } : element);
@@ -109,9 +117,9 @@ export function compileSlide(input: {
     && charts.some(chart => chart.z > node.element.z && intersection(node.element, chart) / (node.element.w * node.element.h) >= .25)
     && !texts.some(text => intersection(node.element, text) > 0));
   const redundantIds = new Set(redundant.map(node => node.id));
-  const output = fitComposition(annotated.filter((_, index) => !redundantIds.has(nodes[index].id)));
-  const issues = [...input.issues ?? [], ...validateCompilerOutput(elements, output, prepared.title, paragraphs)];
-  const needsNative = issues.some(issue => issue.severity === "error") || atomicBlocks.length > 0;
+  const output = fitComposition(annotated.filter((_, index) => !redundantIds.has(nodes[index].id)), input.aspectRatio);
+  const issues = [...input.issues ?? [], ...validateCompilerOutput(elements, output, prepared.title, paragraphs, input.aspectRatio)];
+  const needsNative = issues.some(issue => issue.severity === "error") || atomicBlocks.some(block => block.nodeIds.some(id => nodes.find(node => node.id === id)?.element.kind === "chart"));
   const confidence = needsNative ? .4 : document || fullImage ? .98 : .85;
   const diagnostic: CompilerDiagnostic = {
     version: COMPILER_VERSION, source: { rawHash: input.rawHash, page: input.page, structuralHash: input.structuralHash, parserVersion: 2 },

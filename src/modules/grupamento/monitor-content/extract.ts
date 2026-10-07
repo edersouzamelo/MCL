@@ -4,6 +4,7 @@ import { extractImages, extractTextItems, getDocumentProxy } from "unpdf";
 import { extractPptxLayout } from "@/modules/grupamento/monitor-content/pptx-layout";
 import { composeTextDocument, isDocumentHeading, plainTextBlocks, pdfTextBlocks, type DocumentBlock } from "./text-document";
 import { monitorTextSlide } from "./text-slide";
+import { convertVectorImages } from "./compiler/vector-images";
 import { finalizeCompilation } from "./compiler/pipeline";
 import { classifyAmbiguity, type SemanticClassifier } from "./compiler/semantic-classifier";
 import { stampMonitorExtraction } from "@/modules/grupamento/monitor-content/version";
@@ -417,7 +418,12 @@ export async function extractMonitorDocument(buffer: Buffer, fileName: string, c
   const extension = fileName.toLowerCase().split(".").pop() ?? "";
   let extraction: MonitorDocumentExtraction;
   if (extension === "pptx") {
-    extraction = extractPptxLayout(buffer);
+    try {
+      extraction = extractPptxLayout(buffer, await convertVectorImages(buffer));
+    } catch (error) {
+      extraction = extractPptxLayout(buffer);
+      extraction.warnings.push(`Conversão por componente indisponível: ${error instanceof Error ? error.message : "erro desconhecido"}`);
+    }
     extraction.scenes = extraction.scenes.flatMap(scene => {
       if (scene.payload.inputCompiler) return [scene];
       const report = monitorTextSlide(scene.payload, scene.title);

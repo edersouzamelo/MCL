@@ -76,6 +76,7 @@ export type MonitorSlideImageElement = MonitorSlideBox & {
 
 export type MonitorSlideShapeElement = MonitorSlideBox & {
   kind: "shape";
+  customGeometry?: { path: string; width: number; height: number };
   shapeType?: "rect" | "roundRect" | "ellipse" | "line" | "arrow";
   lineWidth?: number;
   opacity?: number;

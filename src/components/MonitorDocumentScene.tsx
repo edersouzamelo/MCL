@@ -97,18 +97,18 @@ export function MonitorDocumentLayout({ scene, ccol, briefing = false, cycleSeco
         {sorted.map((item: MonitorSlideElement, index) => {
           if (item.kind === "shape") {
             const area = item.w * item.h;
+            if (item.customGeometry) return <svg key={item.elementId ?? index} className="absolute" style={{ ...boxStyle(item), opacity: item.opacity }} viewBox={`0 0 ${item.customGeometry.width} ${item.customGeometry.height}`} preserveAspectRatio="none" aria-hidden="true"><path d={item.customGeometry.path} fill={preserve ? item.fill : adaptedShapeFill(item.fill, area, ccol)} stroke={item.lineColor} /></svg>;
             if (item.shapeType === "line" || item.shapeType === "arrow") return <svg key={item.elementId ?? index} className="absolute" style={{...boxStyle(item),opacity:item.opacity}} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d={item.shapeType === "arrow" ? "M0 50 H96 M75 25 L97 50 L75 75" : "M0 50 H100"} stroke={item.lineColor ?? item.fill ?? "#174739"} strokeWidth={item.lineWidth ?? 2} fill="none" vectorEffect="non-scaling-stroke"/></svg>;
             return <div key={"shape-" + String(index)} className="absolute" style={{...boxStyle(item),opacity:preserve ? item.opacity : undefined,background:preserve ? item.fill : adaptedShapeFill(item.fill,area,ccol),border:item.lineColor ? `${item.lineWidth ?? 1}px solid ` + item.lineColor : undefined,borderRadius:item.shapeType === "ellipse" ? "50%" : String((item.radius ?? (item.shapeType === "roundRect" ? .08 : 0))*100)+"%"}} />;
           }
           if (item.kind === "text") return <TextElement key={"text-" + String(index)} item={item} elements={sorted} ccol={ccol} slideWidth={layout.width} preserve={preserve} />;
           if (item.kind === "image") {
-            const framed = !online && !integralImage && !briefing && item.w * item.h >= 0.005;
             return <div
               key={"image-" + String(index)}
-              className={"absolute flex items-center justify-center overflow-hidden " + (framed ? "rounded-xl border border-slate-300/60 bg-white/95 p-[.3%] shadow-[0_8px_22px_rgba(2,6,23,.16)]" : "")}
+              className="absolute flex items-center justify-center overflow-hidden"
               style={{...boxStyle(item), opacity: item.opacity}}
             >
-              {item.assetId ? <img src={"/api/grupamento/monitor-content/assets/" + item.assetId} alt="" style={{ objectFit: item.fit ?? "contain" }} className={"h-full w-full " + (framed ? "rounded-lg" : "drop-shadow-[0_8px_16px_rgba(2,6,23,.16)]")} /> : null}
+              {item.assetId ? <img src={"/api/grupamento/monitor-content/assets/" + item.assetId} alt="" style={{ objectFit: item.fit ?? "contain" }} className="h-full w-full drop-shadow-[0_8px_16px_rgba(2,6,23,.16)]" /> : null}
             </div>;
           }
           if (item.kind === "chart") {

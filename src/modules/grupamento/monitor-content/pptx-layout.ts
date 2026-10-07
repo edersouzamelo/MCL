@@ -1,3 +1,4 @@
+import { customGeometry } from "./custom-geometry";
 import { createHash } from "node:crypto";
 import { compileSlide, compilerHash, missingTokens, elementStrings } from "./compiler/scene-graph";
 import type { CompilerIssue, CompilerNode } from "./compiler/contracts";
@@ -38,7 +39,7 @@ function clean(value: string) {
   return decode(value).replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
 }
 
-function zipEntries(input: Buffer) {
+export function zipEntries(input: Buffer) {
   const min = Math.max(0, input.length - 65557);
   let eocd = -1;
   for (let offset = input.length - 22; offset >= min; offset -= 1) {
@@ -349,16 +350,16 @@ function mime(name: string) {
   return null;
 }
 
-function addAsset(entries: Map<string, Buffer>, path: string, assets: MonitorDocumentAssetDraft[], registry: Map<string,string>, warnings: string[]) {
+function addAsset(entries: Map<string, Buffer>, path: string, assets: MonitorDocumentAssetDraft[], registry: Map<string,string>, warnings: string[], converted: Map<string, Buffer>) {
   if (registry.has(path)) return registry.get(path)!;
-  const data = entries.get(path);
+  const data = converted.get(path) ?? entries.get(path);
   if (!data) return null;
   const used = assets.reduce((total, item) => total + item.data.length, 0);
   if (assets.length >= MAX_ASSETS || used + data.length > MAX_ASSET_BYTES) { warnings.push("Limite de figuras extraídas atingido."); return null; }
-  const mimeType = mime(path);
+  const mimeType = converted.has(path) ? "image/png" : mime(path);
   if (!mimeType) { warnings.push("Figura " + posix.basename(path) + " não renderizável diretamente."); return null; }
   const key = "asset-" + (assets.length + 1);
-  assets.push({ key, fileName: posix.basename(path), mimeType, data });
+  assets.push({ key, fileName: posix.basename(path) + (converted.has(path) ? ".png" : ""), mimeType, data });
   registry.set(path, key);
   return key;
 }
@@ -379,7 +380,7 @@ function slideTitle(elements: MonitorSlideElement[], page: number) {
   return monitorSceneTitle(elements, value || "Slide " + page);
 }
 
-export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
+export function extractPptxLayout(buffer: Buffer, converted = new Map<string, Buffer>()): MonitorDocumentExtraction {
   const entries = zipEntries(buffer);
   const correction = (entries.get("docProps/core.xml")?.toString("utf8") ?? "").includes(MONITOR_CORRECTION_MARKER);
   const size = slideSize(entries);
@@ -417,7 +418,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     const native: Array<Partial<CompilerNode>> = [];
     const issue = (code: string, message: string) => issues.push({ code, message, nodeIds: [], severity: "error" });
     if (/<p:grpSp\b/.test(xml)) issue("GROUP_TRANSFORM", "Grupo nativo exige renderização fiel com transformações hierárquicas.");
-    if (/<(?:p:cxnSp|p:oleObj|dgm:relIds|mc:AlternateContent)\b/.test(xml)) issue("UNSUPPORTED_OBJECT", "Conector, objeto incorporado, diagrama ou representação alternativa nativa.");
+    if (/<(?:p:cxnSp|p:oleObj|dgm:relIds)\b/.test(xml) || [...xml.matchAll(/<mc:AlternateContent\b[\s\S]*?<\/mc:AlternateContent>/g)].some(match => !/<p:transition\b/.test(match[0]) || /<p:(?:sp|pic|graphicFrame|grpSp|oleObj|cxnSp)\b/.test(match[0]))) issue("UNSUPPORTED_OBJECT", "Conector, objeto incorporado, diagrama ou representação alternativa nativa.");
     for (const layoutRel of [...rels.values()].filter(rel => rel.type.endsWith("/slideLayout"))) {
       const layoutXml = entries.get(layoutRel.target)?.toString("utf8") ?? "";
       const master = [...relationships(entries, layoutRel.target).values()].find(rel => rel.type.endsWith("/slideMaster"));
@@ -442,9 +443,10 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
       const parent = [...groups].reverse().find(group => item.index > group.start && item.index < group.end);
       let nativeMetadata: Record<string, unknown> | undefined;
       const rotation = Number(item.xml.match(/<(?:a|p):xfrm\b[^>]*\brot="([^"]+)"/)?.[1] ?? 0) / 60000;
-      if (rotation || /<(?:a|p):xfrm\b[^>]*\bflip[HV]="(?:1|true)"/.test(item.xml) || /<a:srcRect\b/.test(item.xml)) issue("NATIVE_TRANSFORM", "Recorte, rotação ou espelhamento exige renderização nativa.");
+      if (/<(?:a|p):xfrm\b[^>]*\bflip[HV]="(?:1|true)"/.test(item.xml) || /<a:srcRect\b/.test(item.xml)) issue("NATIVE_TRANSFORM", "Recorte, rotação ou espelhamento exige renderização nativa.");
+      const custom = customGeometry(item.xml);
       const nativeGeometry = item.xml.match(/<a:prstGeom\b[^>]*\bprst="([^"]+)"/)?.[1];
-      if (nativeGeometry && !["rect", "roundRect"].includes(nativeGeometry) || /<a:custGeom\b/.test(item.xml)) issue("NATIVE_SHAPE", "Forma não retangular precisa manter a composição nativa.");
+      if (nativeGeometry && !["rect", "roundRect"].includes(nativeGeometry) || /<a:custGeom\b/.test(item.xml) && !custom) issue("NATIVE_SHAPE", "Forma não retangular precisa manter a composição nativa.");
       if (item.kind === "shape") {
         const text = clean(paragraphs(item.xml).join("\n"));
         const sp = item.xml.match(/<p:spPr\b[^>]*>([\s\S]*?)<\/p:spPr>/)?.[1] ?? "";
@@ -452,22 +454,22 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
         const lineBlock = sp.match(/<a:ln\b[^>]*>([\s\S]*?)<\/a:ln>/)?.[1] ?? "";
         const l = correction && /<a:alpha\b[^>]*\bval="0"/.test(lineBlock) ? undefined : line(sp,theme);
         const geometry = item.xml.match(/<a:prstGeom\b[^>]*\bprst="([^"]+)"/)?.[1];
-        if (f || l || geometry === "line") elements.push({kind:"shape",...b,fill:f,opacity:correction ? Number(sp.match(/<a:solidFill\b[^>]*>[\s\S]*?<a:alpha\b[^>]*\bval="(\d+)"/)?.[1] ?? 100000) / 100000 : undefined,lineColor:l,radius:geometry==="roundRect"?0.018:0,z:z*10});
+        if (f || l || geometry === "line") elements.push({kind:"shape",...b,rotation,customGeometry:custom,fill:f,opacity:correction ? Number(sp.match(/<a:solidFill\b[^>]*>[\s\S]*?<a:alpha\b[^>]*\bval="(\d+)"/)?.[1] ?? 100000) / 100000 : undefined,lineColor:l,radius:geometry==="roundRect"?0.018:0,z:z*10});
         if (text) {
           const fs = fontSize(item.xml);
           searchable.push(text);
-          elements.push({kind:"text",...b,text,fontSizePt:fs,fontFace:item.xml.match(/<a:latin\b[^>]*\btypeface="([^"]+)"/)?.[1],bold:/<a:rPr\b[^>]*\bb="(?:1|true)"/i.test(item.xml),align:align(item.xml),verticalAlign:valign(item.xml),color:color(item.xml,theme),role:role(text,fs,b.y),z:z*10+1});
+          elements.push({kind:"text",...b,rotation,text,fontSizePt:fs,fontFace:item.xml.match(/<a:latin\b[^>]*\btypeface="([^"]+)"/)?.[1],bold:/<a:rPr\b[^>]*\bb="(?:1|true)"/i.test(item.xml),align:align(item.xml),verticalAlign:valign(item.xml),color:color(item.xml,theme),role:role(text,fs,b.y),z:z*10+1});
         }
       } else if (item.kind === "picture") {
         const rid = item.xml.match(/<a:blip\b[^>]*\br:embed="([^"]+)"/)?.[1];
         const target = rid ? rels.get(rid)?.target : undefined;
-        const assetKey = target ? addAsset(entries,target,assets,registry,warnings) : null;
+        const assetKey = target ? addAsset(entries,target,assets,registry,warnings,converted) : null;
         const meta = item.xml.match(/<p:cNvPr\b([^>]*)\/?\s*>/)?.[1] ?? "";
         const imageLabel = clean(attribute(meta, "descr") || attribute(meta, "title") || attribute(meta, "name"));
         if (imageLabel) searchable.push(imageLabel);
         if (correction && !assetKey) throw new Error(`Slide ${page}: figura de correção indisponível. Nenhuma cena publicada.`);
         if (!assetKey) issue("MISSING_IMAGE", "Figura não extraída: usar o original nativo.");
-        if (assetKey) elements.push({kind:"image",...b,assetKey,z:z*10+1});
+        if (assetKey) elements.push({kind:"image",...b,rotation,assetKey,z:z*10+1});
       } else {
         const rid = item.xml.match(/<c:chart\b[^>]*\br:id="([^"]+)"/)?.[1];
         const target = rid ? rels.get(rid)?.target : undefined;
@@ -498,7 +500,7 @@ export function extractPptxLayout(buffer: Buffer): MonitorDocumentExtraction {
     const rawStrings = paragraphs(xml);
     const lost = missingTokens(rawStrings, elements.flatMap(elementStrings));
     if (lost.length) issue("UNEXTRACTED_TEXT", `${lost.length} tokens XML não correspondem aos objetos extraídos.`);
-    const compiled = compileSlide({ elements, title: slideTitle(elements, page), page, rawHash: createHash("sha256").update(buffer).digest("hex"), structuralHash: compilerHash({ xml, relationships: [...rels.values()], rawHash: createHash("sha256").update(buffer).digest("hex") }), native, issues });
+    const compiled = compileSlide({ elements, title: slideTitle(elements, page), page, rawHash: createHash("sha256").update(buffer).digest("hex"), structuralHash: compilerHash({ xml, relationships: [...rels.values()], rawHash: createHash("sha256").update(buffer).digest("hex") }), native, issues, aspectRatio: size.width / size.height });
     for (const node of compiled.parsedInput.nodes) if (node.parentId) groups.find(group => group.id === node.parentId)?.children.push(node.id);
     compiled.parsedInput.groups = groups.map(({ id, parentId, children, nativeTransform }) => ({ id, parentId, children, nativeTransform }));
     if (!correction) elements = compiled.normalizedContent.elements;
