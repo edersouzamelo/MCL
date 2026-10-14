@@ -1,4 +1,5 @@
 import { prepareEditorScene } from "./online-editor";
+import { compareApprovedDocumentImports } from "./order";
 import { diffContent, rebaseCompiledContent } from "./editor-model";
 import { createHash, randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
@@ -20,7 +21,7 @@ const MONITOR_IMPORT_PREVIEW_SELECT = {
   id: true, organizationId: true, monitorId: true, fileName: true, mimeType: true,
   fileSize: true, checksum: true, status: true, sceneCount: true, warnings: true,
   importedBy: true, importedByName: true, importedAt: true,
-  approvedBy: true, approvedAt: true, archivedBy: true, archivedAt: true,
+  approvedBy: true, approvedAt: true, displayOrder: true, archivedBy: true, archivedAt: true,
   scenes: { orderBy: { sceneOrder: "asc" } },
 } satisfies Prisma.MonitorContentImportSelect;
 
@@ -427,6 +428,7 @@ export async function listMonitorContentImports(organizationId: string, monitorI
       importedAt: true,
       approvedBy: true,
       approvedAt: true,
+      displayOrder: true,
       archivedAt: true,
       scenes: {
         orderBy: { sceneOrder: "asc" },
@@ -441,6 +443,51 @@ export async function listMonitorContentImports(organizationId: string, monitorI
       },
     },
   });
+}
+
+export async function reorderApprovedMonitorImports(input: {
+  organizationId: string;
+  monitorId: number;
+  actorId: string;
+  userAgent: string;
+  orderedImportIds: string[];
+}) {
+  const ids = input.orderedImportIds;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 1000 ||
+      ids.some((id) => typeof id !== "string" || !id.trim() || id.length > 100) ||
+      new Set(ids).size !== ids.length) {
+    throw new Error("Sequência inválida: informe cada arquivo uma única vez.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const approved = await tx.monitorContentImport.findMany({
+      where: { organizationId: input.organizationId, monitorId: input.monitorId, status: "APPROVED" },
+      select: { id: true, displayOrder: true, approvedAt: true },
+    });
+    const actualIds = new Set(approved.map((item) => item.id));
+    if (actualIds.size !== ids.length || ids.some((id) => !actualIds.has(id))) {
+      throw new Error("A lista de arquivos aprovados mudou. Atualize a janela antes de reordenar.");
+    }
+
+    const before = [...approved].sort(compareApprovedDocumentImports).map((item) => item.id);
+    if (before.every((id, index) => id === ids[index])) return { orderedImportIds: ids, changed: false };
+
+    for (const [displayOrder, id] of ids.entries()) {
+      await tx.monitorContentImport.update({ where: { id }, data: { displayOrder } });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        id: randomUUID(), occurredAt: new Date(), actorId: input.actorId,
+        action: "MONITOR_CONTENT_REORDER", resourceType: "MONITOR_CONTENT",
+        resourceId: String(input.monitorId), organizationId: input.organizationId,
+        requestId: randomUUID(), userAgent: input.userAgent,
+        outcome: "SUCESSO", reason: "Operador reordenou os documentos publicados no monitor.",
+        metadata: { monitorId: input.monitorId, before, after: ids },
+      },
+    });
+    return { orderedImportIds: ids, changed: true };
+  }, { ...MONITOR_DOCUMENT_TRANSACTION_OPTIONS, isolationLevel: "Serializable" });
 }
 
 export async function setMonitorContentStatus(input: {
@@ -522,10 +569,19 @@ export async function getApprovedMonitorScenes(organizationId: string, monitorId
           importedAt: true,
           importedByName: true,
           approvedAt: true,
+          displayOrder: true,
         },
       },
     },
   });
+
+  // Agrupa cenas por arquivo na ordem persistida e mantém a ordem interna de cada PPT.
+  rows.sort((a, b) =>
+    compareApprovedDocumentImports(
+      { id: a.importId, displayOrder: a.import.displayOrder, approvedAt: a.import.approvedAt },
+      { id: b.importId, displayOrder: b.import.displayOrder, approvedAt: b.import.approvedAt },
+    ) || a.sceneOrder - b.sceneOrder
+  );
 
   return rows
     .map((row) => ({

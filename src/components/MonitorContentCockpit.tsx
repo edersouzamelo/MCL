@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Archive, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, FileText, Loader2, Presentation, Trash2, Upload, X } from "lucide-react";
+import { Archive, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Eye, FileText, GripVertical, Loader2, Presentation, Trash2, Upload, X } from "lucide-react";
 import { AnimatedMonitorSection } from "@/components/CcolMonitorCard";
 import { MonitorContentSceneThumbnail } from "@/components/MonitorContentSceneThumbnail";
 import { MonitorDocumentScene } from "@/components/MonitorDocumentScene";
 import { MonitorCompilerDiagnostics } from "@/components/MonitorCompilerDiagnostics";
 import { compilerBlocked } from "@/modules/grupamento/monitor-content/compiler/contracts";
+import { compareApprovedDocumentImports, reorderDocumentIds } from "@/modules/grupamento/monitor-content/order";
 import type { MonitorDocumentSceneDto, MonitorDocumentScenePayload } from "@/modules/grupamento/monitor-content/types";
 
 type ScenePreview = {
@@ -28,6 +29,7 @@ type ImportRecord = {
   importedAt: string;
   importedByName: string | null;
   approvedAt: string | null;
+  displayOrder: number | null;
   scenes: ScenePreview[];
 };
 
@@ -58,6 +60,8 @@ export function MonitorContentCockpit({
   const [notice, setNotice] = useState("");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
+  const draggedImportId = useRef<string | null>(null);
+  const [dragOverImportId, setDragOverImportId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -230,6 +234,31 @@ export function MonitorContentCockpit({
     }
   }
 
+  async function saveApprovedOrder(orderedImportIds: string[]) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/grupamento/monitor-content/order", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monitorId, orderedImportIds }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Falha ao salvar a sequência documental.");
+      setNotice("Nova ordem salva. O monitor exibirá os documentos nesta sequência.");
+      window.dispatchEvent(new CustomEvent("mcl-grupamento-document-content-updated"));
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Falha ao salvar a sequência documental.");
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const approvedImports = imports.filter((item) => item.status === "APPROVED").sort(compareApprovedDocumentImports);
   const previews = imports.filter((item) => item.status === "PREVIEW");
   const preview = previews.find((item) => item.id === selectedImportId) ?? previews[0];
   const selectedScene = preview?.scenes.find((scene) => scene.id === selectedSceneId) ?? null;
@@ -327,7 +356,13 @@ export function MonitorContentCockpit({
 
           <div className="mt-4 space-y-2">
             {imports.filter((item) => item.status === "REJECTED").map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white p-2.5 dark:border-zinc-800 dark:bg-zinc-950"><div><div className="text-[10px] font-black uppercase text-zinc-500">Rejeitado · fora do ar</div><div className="text-[11px] font-semibold">{item.fileName}</div></div><button type="button" disabled={busy} onClick={() => void deleteImport(item.id, item.fileName)} className="inline-flex items-center gap-1 rounded-lg border border-red-400 px-2.5 py-2 text-[10px] font-bold text-red-700 disabled:opacity-50 dark:text-red-300"><Trash2 className="h-3.5 w-3.5" /> Excluir</button></div>)}
-            {imports.filter((item) => item.status === "APPROVED").map((item) => {
+            {approvedImports.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-1 pt-2">
+                <div className="text-[11px] font-black">Ordem de exibição dos arquivos</div>
+                <div className="text-[10px] text-zinc-500">Arraste pelo ícone ou use as setas. A ordem é salva automaticamente.</div>
+              </div>
+            ) : null}
+            {approvedImports.map((item, index) => {
               const chartLegacy = item.scenes.some((scene) => scene.payload?.layout?.elements.some((element) => element.kind === "chart" && element.chart.semanticVersion !== 5));
               const legacy = item.scenes.some((scene) => {
                 const compiler = scene.payload?.inputCompiler;
@@ -337,16 +372,58 @@ export function MonitorContentCockpit({
                 return scene.payload?.layoutVersion !== 2 && !nativeCurrent;
               });
               return (
-                <div key={item.id} className={"flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-2.5 dark:bg-zinc-950 " + (legacy ? "border-amber-300 dark:border-amber-900/50" : "border-emerald-200 dark:border-emerald-900/40")}>
-                  <div>
-                    <div className={"text-[10px] font-black uppercase tracking-wider " + (legacy ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300")}>
-                      {legacy ? "Fora do ar · reconstrução v1 rejeitada" : "Em exibição"}
+                <div key={item.id}
+                  onDragOver={(event) => {
+                    if (!busy && draggedImportId.current && draggedImportId.current !== item.id) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDragOverImportId(item.id);
+                    }
+                  }}
+                  onDrop={(event) => {
+                    if (busy || !draggedImportId.current) return;
+                    event.preventDefault();
+                    const moved = draggedImportId.current;
+                    draggedImportId.current = null;
+                    setDragOverImportId(null);
+                    const next = reorderDocumentIds(approvedImports.map((entry) => entry.id), moved, item.id);
+                    if (next.join("|") !== approvedImports.map((entry) => entry.id).join("|")) void saveApprovedOrder(next);
+                  }}
+                  className={"flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-2.5 transition dark:bg-zinc-950 " +
+                    (dragOverImportId === item.id ? "ring-2 ring-sky-400 " : "") +
+                    (legacy ? "border-amber-300 dark:border-amber-900/50" : "border-emerald-200 dark:border-emerald-900/40")}>
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span
+                      draggable={!busy}
+                      onDragStart={(event) => {
+                        draggedImportId.current = item.id;
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", item.id);
+                      }}
+                      onDragEnd={() => { draggedImportId.current = null; setDragOverImportId(null); }}
+                      aria-label={`Arrastar arquivo ${index + 1} para reordenar`}
+                      title="Arraste para alterar a ordem de exibição"
+                      className={`flex shrink-0 items-center rounded p-1 text-zinc-500 ${busy ? "cursor-not-allowed opacity-40" : "cursor-grab active:cursor-grabbing"}`}
+                    ><GripVertical className="h-4 w-4" /></span>
+                    <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded bg-sky-100 px-1 text-[10px] font-black text-sky-900 dark:bg-sky-950 dark:text-sky-300">{index + 1}</span>
+                    <div className="min-w-0">
+                      <div className={"text-[10px] font-black uppercase tracking-wider " + (legacy ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300")}>
+                        {legacy ? "Fora do ar · reconstrução v1 rejeitada" : "Em exibição"}
+                      </div>
+                      <div className="break-all text-[11px] font-semibold">{item.fileName} · {item.sceneCount} cena(s)</div>
+                      {chartLegacy && !legacy ? <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Gráfico com payload anterior: reprocessar e revisar a aprovação para recuperar rótulos internos, textos de células, grade e escala dos eixos. A versão atual continua em exibição.</div> : null}
+                      {legacy ? <div className="mt-1 text-[10px] text-zinc-500">O original está preservado. Reprocesse para reconstruir posição, imagens e tipo de gráfico antes de aprovar novamente.</div> : null}
                     </div>
-                    <div className="text-[11px] font-semibold">{item.fileName} · {item.sceneCount} cena(s)</div>
-                    {chartLegacy && !legacy ? <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">Gráfico com payload anterior: reprocessar e revisar a aprovação para recuperar rótulos internos, textos de células, grade e escala dos eixos. A versão atual continua em exibição.</div> : null}
-                    {legacy ? <div className="mt-1 text-[10px] text-zinc-500">O original está preservado. Reprocesse para reconstruir posição, imagens e tipo de gráfico antes de aprovar novamente.</div> : null}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" disabled={busy || index === 0}
+                      onClick={() => void saveApprovedOrder(reorderDocumentIds(approvedImports.map((entry) => entry.id), item.id, approvedImports[index - 1].id))}
+                      className="rounded-lg border border-zinc-300 p-2 disabled:opacity-30 dark:border-zinc-700"
+                      title="Mover arquivo para cima" aria-label={`Mover ${item.fileName} para cima`}><ChevronUp className="h-3.5 w-3.5" /></button>
+                    <button type="button" disabled={busy || index === approvedImports.length - 1}
+                      onClick={() => void saveApprovedOrder(reorderDocumentIds(approvedImports.map((entry) => entry.id), item.id, approvedImports[index + 1].id))}
+                      className="rounded-lg border border-zinc-300 p-2 disabled:opacity-30 dark:border-zinc-700"
+                      title="Mover arquivo para baixo" aria-label={`Mover ${item.fileName} para baixo`}><ChevronDown className="h-3.5 w-3.5" /></button>
                     <a href={"/api/grupamento/monitor-content/" + item.id + "/source"} className="rounded-lg border border-zinc-300 p-2 dark:border-zinc-700" title="Baixar fonte"><Download className="h-3.5 w-3.5" /></a>
                     {legacy ? (
                       <button type="button" disabled={busy} onClick={() => void reprocess(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-2.5 py-2 text-[10px] font-bold text-white disabled:opacity-50"><Loader2 className={"h-3.5 w-3.5 " + (busy ? "animate-spin" : "")} /> Reprocessar layout</button>

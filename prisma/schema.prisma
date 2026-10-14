@@ -233,6 +233,7 @@ model MonitorContentImport {
   fileSize       Int
   checksum       String
   status         String       @default("PREVIEW")
+  displayOrder   Int?
   sceneCount     Int
   warnings       Json
   rawFile        Bytes
