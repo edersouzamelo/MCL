@@ -32,6 +32,72 @@ const projection = {
 describe("Assistente IA: roteamento contábil", () => {
   beforeEach(() => vi.resetAllMocks());
 
+  it.each([
+    ["qual o percentual de empenhos a liquidar de todas as OM?", "TO_LIQUIDATE_OF_COMMITTED", "TO_LIQUIDATE"],
+    ["e o percentual de empenho pago?", "PAID_OF_COMMITTED", "PAID"],
+    ["já pagamos quantos % do total empenhado?", "PAID_OF_COMMITTED", "PAID"],
+  ] as const)("entende percentuais: %s", (question, percentage, metric) => {
+    const intent = resolveCreditAnalyticsIntent(request(question));
+    expect(intent.answerable).toBe(true);
+    expect(intent.percentage).toBe(percentage);
+    expect(intent.metric).toBe(metric);
+  });
+
+  it("não devolve total genérico em questões de risco e causalidade", async () => {
+    for (const prompt of [
+      "Existe algum empenho não liquidado que deve gerar alerta?",
+      "porque esse valor deve ser alerta?",
+    ]) {
+      const result = await runCreditAnalyticsContingency({
+        ...request(prompt), history: [{ role: "user", content: "Qual o total empenhado?" }],
+      }, actor, "req-test");
+      expect(result).toBeNull();
+    }
+    expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("calcula parte paga sobre total empenhado, sem substituir porcentagem por valor bruto", async () => {
+    vi.mocked(queryTgCreditAnalytics).mockResolvedValue({
+      ...projection,
+      data: {
+        ...projection.data,
+        metric: "PAID",
+        totals: { ...projection.data.totals, committedCents: 10000, paidCents: 2500, committedToLiquidateCents: 6500 },
+      },
+    } as never);
+    const result = await runCreditAnalyticsContingency(request("já pagamos quantos % do total empenhado?"), actor, "req-test");
+    expect(result?.answer).toContain("25,00%");
+    expect(result?.answer).toContain("R$ 100,00");
+    expect(result?.answer).toContain("R$ 25,00");
+    expect(result?.answer).not.toContain("R$ 1.234,50");
+  });
+
+  it("calcula parte a liquidar por unidade sobre os empenhos, sem gerar alertas automáticos", async () => {
+    vi.mocked(queryTgCreditAnalytics).mockResolvedValue({
+      ...projection,
+      data: {
+        ...projection.data,
+        metric: "TO_LIQUIDATE",
+        filters: { ...projection.data.filters, ug: null },
+        totals: { ...projection.data.totals, committedCents: 10000, committedToLiquidateCents: 6000, paidCents: 3000 },
+        groups: [{
+          label: "160136: Cmdo 9 Gpt Log",
+          committedCents: 8000, committedToLiquidateCents: 4000, paidCents: 3000,
+        }, {
+          label: "160142: 9 B Sup",
+          committedCents: 2000, committedToLiquidateCents: 2000, paidCents: 0,
+        }],
+      },
+    } as never);
+    const result = await runCreditAnalyticsContingency(request("qual o percentual de empenhos a liquidar de todas as OM?"), actor, "req-test");
+    expect(queryTgCreditAnalytics).toHaveBeenCalledWith(actor, expect.objectContaining({
+      metric: "TO_LIQUIDATE", groupBy: "UG",
+    }));
+    expect(result?.answer).toContain("60,00%");
+    expect(result?.answer).toContain("50,00%");
+    expect(result?.answer).toContain("100,00%");
+  });
+
   it("reconhece créditos disponíveis no plural sem precisar do LLM", () => {
     const intent = resolveCreditAnalyticsIntent(request("Quanto de créditos disponíveis temos hoje?"));
     expect(intent.answerable).toBe(true);
