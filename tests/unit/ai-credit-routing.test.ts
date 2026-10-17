@@ -67,8 +67,8 @@ describe("Assistente IA: roteamento contábil", () => {
     } as never);
     const result = await runCreditAnalyticsContingency(request("já pagamos quantos % do total empenhado?"), actor, "req-test");
     expect(result?.answer).toContain("25,00%");
-    expect(result?.answer).toContain("R$ 100,00");
-    expect(result?.answer).toContain("R$ 25,00");
+    expect(result?.answer).toMatch(/R\$\s+100,00/);
+    expect(result?.answer).toMatch(/R\$\s+25,00/);
     expect(result?.answer).not.toContain("R$ 1.234,50");
   });
 
