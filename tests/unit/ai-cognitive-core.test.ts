@@ -99,7 +99,7 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     const invocation = vi.mocked(generateText).mock.calls[0][0];
     expect(String(invocation.prompt)).toContain("saldo liquidado da nossa OM");
     expect(String(invocation.prompt)).toContain("PERCENTUAL eu disse");
-    expect(String(invocation.instructions)).toContain("plano");
+    expect(String(invocation.instructions)).toContain("OBJETO ESTRUTURADO");
   });
 
   it.each([
