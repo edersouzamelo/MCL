@@ -144,8 +144,8 @@ describe("Assistente IA: roteamento contábil", () => {
       expect(answer?.answer).toContain("UG/UASG 160136");
       if (prompt !== conversation[0]) {
         expect(answer?.answer).toContain("40,00%");
-        expect(answer?.answer).toMatch(/R\\$\\s+100,00/);
-        expect(answer?.answer).toMatch(/R\\$\\s+40,00/);
+        expect(answer?.answer).toMatch(/R\$\s+100,00/);
+        expect(answer?.answer).toMatch(/R\$\s+40,00/);
       }
       history.push(prompt);
     }
