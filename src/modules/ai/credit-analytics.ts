@@ -42,13 +42,35 @@ function extractPi(turn: string) {
 }
 
 function extractMetric(turn: string): CreditAnalyticsInput["metric"] | undefined {
+  // A qualificação contábil prevalece sobre o substantivo "empenho".
+  if (/\b(?:a liquidar|nao liquidado|nao liquidados|sem liquidacao)\b/.test(turn)) return "TO_LIQUIDATE";
+  if (/\b(?:pag[oa]s?|pagamento\w*|pagamos|paguei)\b/.test(turn)) return "PAID";
+  if (/\b(?:liquidad[oa]s?|liquidou)\b/.test(turn)) return "LIQUIDATED";
   if (/\b(?:disponivel|disponiveis|saldos?)\b/.test(turn)) return "AVAILABLE";
   if (/\b(?:provisao|provisionado|recebido)\b/.test(turn)) return "PROVISION";
   if (/\b(?:a empenhar|empenhad[oa]s?|empenhou|empenhos?)\b/.test(turn)) return "COMMITTED";
-  if (/\b(?:a liquidar|nao liquidado)\b/.test(turn)) return "TO_LIQUIDATE";
-  if (/\b(?:liquidad[oa]s?|liquidou)\b/.test(turn)) return "LIQUIDATED";
-  if (/\b(?:pag[oa]s?|pagou)\b/.test(turn)) return "PAID";
   return undefined;
+}
+
+type CreditPercentage = "PAID_OF_COMMITTED" | "TO_LIQUIDATE_OF_COMMITTED";
+
+const isPercentageQuestion = (turn: string) =>
+  /\b(?:percentual|percentagem|porcentagem|porcento|percent|quantos?\s*%|\d+\s*%)\b/.test(turn)
+  || /(?:\bquanto\w*\b|\bqual\b).*%/.test(turn);
+
+function extractPercentage(turn: string): CreditPercentage | undefined {
+  if (!isPercentageQuestion(turn)) return undefined;
+  if (/\b(?:a liquidar|nao liquidado|nao liquidados|sem liquidacao)\b/.test(turn)) return "TO_LIQUIDATE_OF_COMMITTED";
+  if (/\b(?:pag[oa]s?|pagamento\w*|pagamos|paguei)\b/.test(turn)) return "PAID_OF_COMMITTED";
+  return undefined;
+}
+
+/** Perguntas analíticas devem chegar ao modelo, não receber um agregado fora de contexto. */
+export function isOpenFinancialQuestion(input: MclChatRequest) {
+  const current = normalize(input.prompt);
+  return /\b(?:alertas?|riscos?|irregularidades?|preocupante|critic[oa]s?|recomend\w*|prioriz\w*|impacto|justific\w*|explic\w*|porque|motivos?|avali\w*)\b/.test(current)
+    || /\bpor que\b/.test(current)
+    || /\bdeve\b.*\b(?:alerta|risco)\b/.test(current);
 }
 
 function extractRpnpMetric(turn: string): CreditAnalyticsInput["metric"] | undefined {
@@ -78,6 +100,7 @@ function extractSearch(current: string) {
 
 export type ResolvedCreditIntent = CreditAnalyticsInput & {
   ranking: boolean;
+  percentage?: CreditPercentage;
   answerable: boolean;
 };
 
@@ -87,7 +110,14 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
   const ranking = /\b(?:mais caros?|maiores|ranking|top)\b/.test(current) && /\b(?:empenhos?|empenhad[oa]s?)\b/.test(current);
   const search = extractSearch(input.prompt);
   const rpnpSignal = turns.some((turn) => /\b(?:restos? a pagar|rpnp|reinscrit\w*)\b/.test(normalize(turn)));
-  const metric = rpnpSignal ? latestMatch(turns, extractRpnpMetric) : latestMatch(turns, extractMetric);
+  const isFollowUp = /\b(?:detalhe|detalhar|distribua|distribuicao|por uasg|por ug|por pi|por nd)\b/.test(current);
+  const percentage = extractPercentage(current)
+    ?? (isFollowUp ? latestMatch(turns.slice(0, -1), extractPercentage) : undefined);
+  const explicitMetric = rpnpSignal ? extractRpnpMetric(current) : extractMetric(current);
+  const metric = explicitMetric ?? (percentage === "PAID_OF_COMMITTED"
+    ? "PAID"
+    : percentage === "TO_LIQUIDATE_OF_COMMITTED" ? "TO_LIQUIDATE"
+      : rpnpSignal ? latestMatch(turns.slice(0, -1), extractRpnpMetric) : latestMatch(turns.slice(0, -1), extractMetric));
   const ug = latestMatch(turns, extractUg);
   // Uma nova busca por objeto mantém a unidade da conversa, mas não herda
   // classificações contábeis antigas que o usuário não repetiu.
@@ -96,7 +126,9 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
   const includeFinalities = /\b(?:finalidades?|destinacoes?|descricoes? das? ncs?)\b/.test(current);
   const groupBy = ranking || search
     ? "NE"
-    : /\b(?:cada|por)\s+(?:ug|uasg)\b/.test(current) || Boolean(ug && !/^\d{6}$/.test(ug))
+    : /\b(?:cada|por)\s+(?:ug|uasg|om|unidade)\b/.test(current)
+        || /\b(?:todas? as? (?:om|unidades|organizacoes))\b/.test(current)
+        || Boolean(ug && !/^\d{6}$/.test(ug))
       ? "UG"
       : "TOTAL";
   const financialSignal = turns.some((turn) => /\b(?:creditos?|provisao|empenh\w*|liquid\w*|pag\w*|saldo|nd|natureza de despesa|uasg|ug|restos? a pagar|rpnp|inscrit\w*|reinscrit\w*)\b/.test(normalize(turn)));
@@ -111,7 +143,8 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
     includeFinalities,
     limit: ranking ? 10 : 20,
     ranking,
-    answerable: financialSignal && Boolean(metric || ranking || search || nd || pi || includeFinalities),
+    percentage,
+    answerable: financialSignal && !isOpenFinancialQuestion(input) && Boolean(metric || percentage || ranking || search || nd || pi || includeFinalities),
   };
 }
 
@@ -147,10 +180,14 @@ type CreditToolData = {
   source: { fileName: string; importedAt: string };
   filters: { ug: string | null; nd: string | null; pi: string | null; search: string | null; matchedUgs: Array<{ ug: string; om: string }> };
   metric: NonNullable<CreditAnalyticsInput["metric"]>;
-  totals: { metricValueCents: number; neCount: number; ncCount: number; registeredCents?: number; reinscribedCents?: number };
+  totals: { metricValueCents: number; neCount: number; ncCount: number; registeredCents?: number; reinscribedCents?: number;
+    committedCents?: number; committedToLiquidateCents?: number; paidCents?: number };
   groups: Array<{
     label: string;
     metricValueCents: number;
+    committedCents?: number;
+    committedToLiquidateCents?: number;
+    paidCents?: number;
     ug?: string;
     ne?: string;
     supplier?: string;
@@ -175,6 +212,33 @@ export function formatCreditAnalyticsAnswer(data: CreditToolData, intent: Resolv
 
   if ((data.filters.nd || data.filters.pi) && data.totals.ncCount === 0 && data.totals.neCount === 0) {
     return `Nenhum movimento contábil corresponde a ${scope}. Não foi apresentado R$ 0,00 porque o filtro não encontrou registros.`;
+  }
+
+
+  if (intent.percentage) {
+    const denominator = data.totals.committedCents;
+    const numerator = intent.percentage === "PAID_OF_COMMITTED" ? data.totals.paidCents : data.totals.committedToLiquidateCents;
+    const numeratorLabel = intent.percentage === "PAID_OF_COMMITTED" ? "pago" : "a liquidar";
+    if (denominator === undefined || numerator === undefined || denominator <= 0) {
+      return "Não é possível calcular o percentual: os valores de empenhado e " + numeratorLabel +
+        " não estão disponíveis com denominador positivo para este filtro. Nenhum percentual foi estimado.";
+    }
+    const percentage = (part: number, total: number) => new Intl.NumberFormat("pt-BR", {
+      style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(part / total);
+    const groupLines = data.groups.length > 1 ? data.groups.map((group) => {
+      const base = group.committedCents;
+      const value = intent.percentage === "PAID_OF_COMMITTED" ? group.paidCents : group.committedToLiquidateCents;
+      return base !== undefined && value !== undefined && base > 0
+        ? `${group.label}: ${percentage(value, base)} (${currency(value)} de ${currency(base)} empenhados).`
+        : `${group.label}: sem base positiva ou dados completos para calcular o percentual.`;
+    }) : [];
+    return [
+      `Do total empenhado ${scope ? `em ${scope}` : "no conjunto consultado"}, ${percentage(numerator, denominator)} está ${numeratorLabel}.`,
+      `Total empenhado: ${currency(denominator)}. Montante ${numeratorLabel}: ${currency(numerator)}.`,
+      ...groupLines,
+      `Fonte: ${data.source.fileName}, importada em ${new Date(data.source.importedAt).toLocaleString("pt-BR", { timeZone: "America/Campo_Grande" })}.`,
+    ].join("\n");
   }
 
   if (data.metric.startsWith("RPNP_") && data.filters.search && data.totals.neCount === 0) {
