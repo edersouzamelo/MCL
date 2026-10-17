@@ -121,6 +121,30 @@ describe("API Route - /api/ai/chat", () => {
     expect(body.error).toContain("Nenhuma resposta substituta");
   });
 
+  it("consulta o motor financeiro primeiro sem depender do Gateway", async () => {
+    authenticatedActor();
+    const responseData: RagResponse = {
+      answer: "Saldo da UASG 160136 com referência à carga importada.",
+      citations: [],
+      suggestedQuestions: [],
+      warnings: ["Dados históricos, não atualizados hoje."],
+      requestId: "req-ai-test",
+      provider: "mcl-deterministic",
+      model: "motor-analitico-financeiro-v2",
+      authMode: "session-rbac",
+    };
+    vi.mocked(runCreditAnalyticsContingency).mockResolvedValue(responseData);
+    const response = await POST(request({ prompt: "Quanto de créditos disponíveis temos hoje?" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(responseData);
+    expect(runMclAssistant).not.toHaveBeenCalled();
+    expect(runCreditAnalyticsContingency).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: "Quanto de créditos disponíveis temos hoje?" }),
+      expect.objectContaining({ organizationId: "org-ai-test" }),
+      "req-ai-test",
+    );
+  });
+
   it("usa o motor financeiro auditável quando o Gateway limita uma consulta suportada", async () => {
     authenticatedActor();
     vi.mocked(runMclAssistant).mockRejectedValue({
@@ -137,7 +161,7 @@ describe("API Route - /api/ai/chat", () => {
       model: "motor-analitico-financeiro-v2",
       authMode: "session-rbac",
     };
-    vi.mocked(runCreditAnalyticsContingency).mockResolvedValue(contingency);
+    vi.mocked(runCreditAnalyticsContingency).mockResolvedValueOnce(null).mockResolvedValueOnce(contingency);
 
     const response = await POST(request({
       prompt: "desse tanto, quanto que era de ND 339039?",
