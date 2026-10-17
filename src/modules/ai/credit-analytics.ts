@@ -165,6 +165,13 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
       ? "UG"
       : "TOTAL";
   const financialSignal = turns.some((turn) => /\b(?:creditos?|provisao|empenh\w*|liquid\w*|pag\w*|saldo|nd|natureza de despesa|uasg|ug|restos? a pagar|rpnp|inscrit\w*|reinscrit\w*)\b/.test(normalize(turn)));
+  // Histórico autoriza herdar escopo, não transformar qualquer comentário
+  // posterior em uma consulta de saldo. Aceitar só intenção estruturada
+  // identificável na mensagem atual ou continuação explicitamente solicitada.
+  const structuredRequest = Boolean(
+    explicitMetric || percentage || percentageNeedsClarification || ranking
+    || search || extractNd(current) || extractPi(current) || includeFinalities || isFollowUp,
+  );
   return {
     ug,
     nd,
@@ -181,6 +188,7 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
     percentageNeedsClarification,
     answerable: (financialSignal || percentageNeedsClarification)
       && !isOpenFinancialQuestion(input)
+      && structuredRequest
       && Boolean(metric || percentage || ranking || search || nd || pi || includeFinalities || percentageNeedsClarification),
   };
 }
