@@ -1,3 +1,46 @@
+# Cognitive Core v1.0 — manual de manutenção (MVP Créditos/TG)
+
+**Situação:** implementação experimental do registro semântico e planejador LLM. Não declarar prontidão do clipe antes de CI, deploy e interação real autenticada. Documentação visível no Guia Técnico, seção Agente LLM com RAG. Linear: EDE-32 hoje; EDE-31 evolução; EDE-33 atualização TG.
+
+## Contrato de execução
+
+1. A rota /api/ai/chat autentica, verifica autorização e limite por usuário.
+2. O SDK AI Gateway gera em uma chamada um plano validado por Zod (não uma cadeia de palavras-chave) conforme src/modules/ai/semantic-registry.ts. Entrada: pergunta e histórico recente.
+3. Catálogo semântico descreve entidades, medidas, agrupamentos, permissões, ferramenta e origem de cada domínio habilitado. MVP: somente credits-tg.
+4. src/modules/ai/cognitive-core.ts valida plano e escopo. UASG da própria OM vem do vínculo da organização autenticada; ausência do vínculo impede falsa consulta agregada. Uma unidade explícita é filtrada somente dentro do snapshot autorizado.
+5. src/modules/ai/silos.ts consulta a projeção TG persistida no banco. O executor financeiro calcula valores e percentuais em centavos. Denominador ausente/zero é reportado, não estimado.
+6. A resposta indica arquivo, importação, fontes, lacunas e provedor de interpretação. Para perguntas abertas, o agente original continua como caminho separado; o RAG técnico atual é lexical, versionado e limitado.
+7. Se o Gateway estiver indisponível, o sistema declara falha e só pode usar contingência determinística explicitamente marcada, sem fingir interpretação LLM.
+
+## Esquema do plano semântico
+
+- capability: credits-tg ou other.
+- intent: value, ratio, breakdown, ranking, analysis ou clarify.
+- metric: AVAILABLE, PROVISION, COMMITTED, LIQUIDATED, TO_LIQUIDATE, PAID e principais RPNP.
+- denominator: COMMITTED ou PROVISION para razões matemáticas.
+- scope: own, all, unit, context. unit/nd/pi/search/groupBy/clarification são campos opcionais anuláveis.
+
+## Extensão para módulos futuros, inclusive Radar
+
+Adicionar um descritor ao registro semântico com entidades, relações, métricas, dimensões, origem, natureza de dado, ferramenta, autorização e versão. Expor adaptador server-side somente leitura, com contrato Zod, limites, timeout e log. Testar controle de acesso e proveniência. Só anunciar disponibilidade ao LLM depois do adaptador realmente funcionar. O núcleo orquestrador não deve ganhar uma lista de frases por módulo.
+
+Radar ainda independente: seus dados de licitações, etapas, prazos, responsáveis e documentos ficam no banco e controle de acesso próprios até existir integração autorizada e testada. O sistema não copia indiscriminadamente dados do frontend, nem confunde estado local com registro oficial.
+
+## Limitações verificáveis
+
+- O registro habilita apenas Créditos/TG; o plano de domínio desconhecido volta ao agente original.
+- O modelo pode interpretar incorretamente ou estourar timeout; exige avaliação por perguntas inéditas e sequências conversacionais, não só build.
+- O banco não é lido diretamente pelo LLM; não há SQL livre; o LLM não importa, aprova, decide alertas ou altera registros.
+- A data de importação do TG não prova dados contábeis atuais; a investigação dos arquivos parados em setembro está no EDE-33.
+- Partes da documentação histórica que declaram Créditos bloqueados não descrevem a versão atual. Manter essa distinção até revisão consolidada.
+
+## Critérios de aceite e arquivos
+
+Arquivos-alvo: semantic-registry.ts, cognitive-core.ts, provider.ts, credit-analytics.ts, silos.ts, route.ts, testes de IA e Guia Técnico. Executar diff, lint, typecheck, vitest e build. Confirmar deploy na Vercel e testar consultas autenticadas de liquidação, pagamento, percentual, UASG da própria OM, desatualização e indisponibilidade. Não usar mocks para afirmar que o provedor funciona.
+
+---
+
+## Documentação histórica do agente original
 # Assistente IA — Gateway OIDC e RAG vivo
 
 ## Estado

@@ -4,6 +4,7 @@ import { getRouteActor } from "@/modules/auth/route-actor";
 import { runMclAssistant } from "@/modules/ai/agent";
 import { runCreditAnalyticsContingency } from "@/modules/ai/credit-analytics";
 import { runFinancialInterpretation } from "@/modules/ai/financial-interpretation";
+import { runMclCognitiveCore } from "@/modules/ai/cognitive-core";
 import { POST } from "@/app/api/ai/chat/route";
 
 vi.mock("@/modules/auth/route-actor", () => ({
@@ -22,6 +23,9 @@ vi.mock("@/modules/ai/credit-analytics", async () => {
 
 vi.mock("@/modules/ai/financial-interpretation", () => ({
   runFinancialInterpretation: vi.fn(),
+}));
+vi.mock("@/modules/ai/cognitive-core", () => ({
+  runMclCognitiveCore: vi.fn(),
 }));
 
 function request(body: unknown) {
@@ -44,6 +48,7 @@ describe("API Route - /api/ai/chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(runFinancialInterpretation).mockResolvedValue(null);
+    vi.mocked(runMclCognitiveCore).mockResolvedValue(null);
   });
 
   it("rejeita consulta sem sessão antes de chamar o modelo", async () => {
@@ -146,7 +151,7 @@ describe("API Route - /api/ai/chat", () => {
     expect(runCreditAnalyticsContingency).not.toHaveBeenCalled();
   });
 
-  it("consulta o motor financeiro primeiro sem depender do Gateway", async () => {
+  it("envia pergunta financeira primeiro ao planejador semântico LLM", async () => {
     authenticatedActor();
     const responseData: RagResponse = {
       answer: "Saldo da UASG 160136 com referência à carga importada.",
@@ -158,15 +163,16 @@ describe("API Route - /api/ai/chat", () => {
       model: "motor-analitico-financeiro-v2",
       authMode: "session-rbac",
     };
-    vi.mocked(runCreditAnalyticsContingency).mockResolvedValue(responseData);
+    vi.mocked(runMclCognitiveCore).mockResolvedValue(responseData);
     const response = await POST(request({ prompt: "Quanto de créditos disponíveis temos hoje?" }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(responseData);
     expect(runMclAssistant).not.toHaveBeenCalled();
-    expect(runCreditAnalyticsContingency).toHaveBeenCalledWith(
+    expect(runCreditAnalyticsContingency).not.toHaveBeenCalled();
+    expect(runMclCognitiveCore).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "Quanto de créditos disponíveis temos hoje?" }),
       expect.objectContaining({ organizationId: "org-ai-test" }),
-      "req-ai-test",
+      "req-ai-test", expect.any(AbortSignal),
     );
   });
 
@@ -186,7 +192,7 @@ describe("API Route - /api/ai/chat", () => {
       model: "motor-analitico-financeiro-v2",
       authMode: "session-rbac",
     };
-    vi.mocked(runCreditAnalyticsContingency).mockResolvedValueOnce(null).mockResolvedValueOnce(contingency);
+    vi.mocked(runCreditAnalyticsContingency).mockResolvedValue(contingency);
 
     const response = await POST(request({
       prompt: "desse tanto, quanto que era de ND 339039?",
