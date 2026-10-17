@@ -70,6 +70,21 @@ export async function POST(request: Request) {
   try {
     input = mclChatRequestSchema.parse(await request.json());
     assertMclAiRateLimit(actor.id);
+
+    // Structured financial reads do not require two LLM round trips.
+    // Keep the provider available for open-ended questions.
+    const structured = await runCreditAnalyticsContingency(input, actor, requestId);
+    if (structured) {
+      console.info(JSON.stringify({
+        level: "info",
+        message: "Assistente IA concluiu consulta financeira determinística",
+        route: "/api/ai/chat",
+        requestId,
+        durationMs: Date.now() - startedAt,
+      }));
+      return NextResponse.json(structured);
+    }
+
     console.info(JSON.stringify({
       level: "info",
       message: "Assistente IA iniciou consulta",

@@ -1,5 +1,6 @@
 import type { MclAiActor, MclChatRequest, RagResponse } from "@/modules/ai/contracts";
 import { queryTgCreditAnalytics, type CreditAnalyticsInput } from "@/modules/ai/silos";
+import { prisma } from "@/server/db";
 
 const normalize = (value: string) => value
   .normalize("NFD")
@@ -41,7 +42,7 @@ function extractPi(turn: string) {
 }
 
 function extractMetric(turn: string): CreditAnalyticsInput["metric"] | undefined {
-  if (/\b(?:disponivel|saldo disponivel|credito disponivel)\b/.test(turn)) return "AVAILABLE";
+  if (/\b(?:disponivel|disponiveis|saldos?)\b/.test(turn)) return "AVAILABLE";
   if (/\b(?:provisao|provisionado|recebido)\b/.test(turn)) return "PROVISION";
   if (/\b(?:a empenhar|empenhad[oa]s?|empenhou|empenhos?)\b/.test(turn)) return "COMMITTED";
   if (/\b(?:a liquidar|nao liquidado)\b/.test(turn)) return "TO_LIQUIDATE";
@@ -110,7 +111,7 @@ export function resolveCreditAnalyticsIntent(input: MclChatRequest): ResolvedCre
     includeFinalities,
     limit: ranking ? 10 : 20,
     ranking,
-    answerable: financialSignal && Boolean(metric || ranking || search || nd || pi),
+    answerable: financialSignal && Boolean(metric || ranking || search || nd || pi || includeFinalities),
   };
 }
 
@@ -231,28 +232,84 @@ export function formatCreditAnalyticsAnswer(data: CreditToolData, intent: Resolv
   return `O ${label} para ${scope || "o filtro informado"} é ${currency(data.totals.metricValueCents)}. Fonte: ${data.source.fileName}, importada em ${new Date(data.source.importedAt).toLocaleString("pt-BR", { timeZone: "America/Campo_Grande" })}.`;
 }
 
+const ownOmReference = (value: string) =>
+  /\b(?:noss[ao]s?|minha|meu)\s+(?:om|unidade|organizacao)\b/.test(normalize(value));
+
+const financialResponse = (
+  answer: string,
+  requestId: string,
+  citations: RagResponse["citations"] = [],
+  warnings: string[] = [],
+): RagResponse => ({
+  answer,
+  citations,
+  suggestedQuestions: ["Detalhe esse resultado por UASG, ND ou PI.", "Mostre os empenhos de maior valor nesse filtro."],
+  warnings,
+  requestId,
+  provider: "mcl-deterministic",
+  model: "motor-analitico-financeiro-v2",
+  authMode: "session-rbac",
+});
+
+/**
+ * Consultas financeiras suportadas usam o motor contábil determinístico como
+ * caminho principal. O Gateway permanece disponível para questões abertas.
+ * Nunca agregar todas as UASG para responder "nossa OM" sem vínculo confirmado.
+ */
 export async function runCreditAnalyticsContingency(
   input: MclChatRequest,
   actor: MclAiActor,
   requestId: string,
-  gatewayFailure: string,
+  gatewayFailure?: string,
 ): Promise<RagResponse | null> {
   const intent = resolveCreditAnalyticsIntent(input);
   if (!intent.answerable) return null;
+
+  if (ownOmReference(input.prompt) && !extractUg(normalize(input.prompt))) {
+    const organization = actor.organizationId
+      ? await prisma.organization.findUnique({
+          where: { id: actor.organizationId },
+          select: { uasg: true },
+        })
+      : null;
+    if (!organization?.uasg) {
+      return financialResponse(
+        "Não é possível determinar o saldo da sua OM: a organização do usuário não possui UASG vinculada e validada. Informe a UASG ou configure o vínculo organizacional. Nenhum total agregado foi apresentado como saldo da OM.",
+        requestId,
+        [],
+        ["UASG da organização não identificada; consulta financeira não executada."],
+      );
+    }
+    intent.ug = organization.uasg;
+    intent.groupBy = "TOTAL";
+  }
+
   const result = await queryTgCreditAnalytics(actor, intent);
-  if (result.status !== "AVAILABLE") return null;
+  if (result.status !== "AVAILABLE") {
+    return financialResponse(
+      `Não foi possível obter um valor financeiro verificável: ${result.gaps.join(" ") || "projeção do Tesouro Gerencial indisponível."} Nenhum saldo foi estimado.`,
+      requestId,
+      result.citations,
+      result.gaps,
+    );
+  }
+
   const data = result.data as CreditToolData;
-  return {
-    answer: formatCreditAnalyticsAnswer(data, intent),
-    citations: result.citations,
-    suggestedQuestions: ["Detalhe esse resultado por UASG, ND ou PI.", "Mostre os empenhos de maior valor nesse filtro."],
-    warnings: [
-      `O modelo de linguagem ficou indisponível (${gatewayFailure}); a resposta foi concluída pelo motor analítico auditável do MCL.`,
-      ...result.gaps,
-    ],
-    requestId,
-    provider: "mcl-deterministic",
-    model: "motor-analitico-financeiro-v2",
-    authMode: "session-rbac",
-  };
+  const importedAtMs = Date.parse(result.asOf);
+  const outdated = Number.isFinite(importedAtMs) && Date.now() - importedAtMs > 24 * 60 * 60 * 1000;
+  const asksForCurrent = /\b(?:hoje|agora|atual|atualmente)\b/.test(normalize(input.prompt));
+  const freshnessWarning = outdated
+    ? "A carga financeira tem mais de 24 horas. O valor é histórico e não foi validado como saldo atual."
+    : undefined;
+  const baseAnswer = formatCreditAnalyticsAnswer(data, intent);
+  const answer = asksForCurrent && outdated
+    ? `${baseAnswer}\nAtenção: esta é a última posição importada, não uma consulta ao saldo de hoje.`
+    : baseAnswer;
+  return financialResponse(answer, requestId, result.citations, [
+    ...(gatewayFailure
+      ? [`O modelo de linguagem ficou indisponível (${gatewayFailure}); a resposta foi concluída pelo motor analítico auditável do MCL.`]
+      : []),
+    ...(freshnessWarning ? [freshnessWarning] : []),
+    ...result.gaps,
+  ]);
 }
