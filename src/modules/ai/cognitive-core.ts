@@ -1,0 +1,197 @@
+import { createHash } from "node:crypto";
+import { generateText, Output } from "ai";
+import type { MclAiActor, MclChatRequest, RagResponse } from "@/modules/ai/contracts";
+import { type ResolvedCreditIntent, formatCreditAnalyticsAnswer } from "@/modules/ai/credit-analytics";
+import { resolveMclModel } from "@/modules/ai/provider";
+import { queryTgCreditAnalytics, type CreditAnalyticsInput } from "@/modules/ai/silos";
+import { prisma } from "@/server/db";
+import { aiSemanticPlanSchema, findSemanticCapability, semanticCatalogueForModel, type AiSemanticPlan } from "@/modules/ai/semantic-registry";
+
+const money = (cents: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+const percent = (part: number, total: number) => new Intl.NumberFormat("pt-BR", {
+  style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2,
+}).format(part / total);
+const fmtDate = (value: string) => new Date(value).toLocaleString("pt-BR", { timeZone: "America/Campo_Grande" });
+
+const instructions = [
+  "Você é o planejador semântico do MCL, não é o redator da resposta. Interprete a pergunta e o histórico como uma conversa normal.",
+  "Responda apenas o OBJETO ESTRUTURADO solicitado. Não invente dados ou valores; as ferramentas farão os cálculos.",
+  "Escolha capability=credits-tg para dados de Crédito/Tesouro Gerencial e other para domínios não cadastrados.",
+  "Uma pergunta de percentual é intent=ratio, metric=NUMERADOR e denominator=DENOMINADOR. Exemplo: liquidação do total empenhado significa LIQUIDATED/COMMITTED.",
+  "PERCENTUAL eu disse é uma correção da pergunta anterior, não uma nova pergunta sobre o valor empenhado.",
+  "Preserve unidade, medidas e filtros no histórico, a menos que o usuário os altere. Nossa OM é scope=own; todas as OM é scope=all.",
+  "Se mencionar outra UG/UASG, use scope=unit e informe unit. No acompanhamento da própria OM, continue scope=own.",
+  "Para divisão por OM/UASG, groupBy=UG; por ND use ND, por PI use PI. Para maior empenho ranking e groupBy=NE.",
+  "Se houver ambiguidade genuína que impeça o cálculo, intent=clarify e uma pergunta específica em clarification.",
+  "Alerta/risco/por quê pede intent=analysis: nenhum valor bruto isolado comprova irregularidade.",
+  "O seletor visual do frontend não restringe a consulta contábil. Nunca adivinhe códigos, datas, percentuais ou UASG.",
+].join("\n");
+
+export async function planMclSemanticQuery(input: MclChatRequest, actor: MclAiActor, abortSignal?: AbortSignal) {
+  const model = resolveMclModel();
+  const pseudonymous = createHash("sha256").update(actor.id).digest("hex").slice(0, 24);
+  const planned = await generateText({
+    model: model.model,
+    output: Output.object({ schema: aiSemanticPlanSchema }),
+    instructions: instructions + "\nCatálogo de capacidades habilitadas: " + JSON.stringify(semanticCatalogueForModel()),
+    prompt: JSON.stringify({
+      currentQuestion: input.prompt,
+      recentHistory: input.history.slice(-8).map(({ role, content }) => ({ role, content: content.slice(0, 950) })),
+    }),
+    abortSignal,
+    timeout: { totalMs: 22_000 },
+    maxOutputTokens: 420,
+    providerOptions: { gateway: {
+      disallowPromptTraining: true,
+      sort: "cost",
+      tags: ["mcl", "cognitive-core-v1"],
+      user: "mcl-" + pseudonymous,
+    } },
+  });
+  return { plan: planned.output, model, usage: planned.usage };
+}
+
+type CreditResultData = {
+  source: { fileName: string; importedAt: string };
+  filters: { ug: string | null; nd: string | null; pi: string | null; matchedUgs: Array<{ ug: string; om: string }> };
+  metric: string;
+  totals: Record<string, number> & { metricValueCents: number };
+  groups: Array<{ label: string; metricValueCents: number } & Record<string, number | string | undefined>>;
+};
+
+const metricField: Record<string, string> = {
+  AVAILABLE: "availableCreditCents",
+  PROVISION: "provisionUpdatedCents",
+  COMMITTED: "committedCents",
+  LIQUIDATED: "liquidatedCents",
+  TO_LIQUIDATE: "committedToLiquidateCents",
+  PAID: "paidCents",
+};
+
+function metricName(metric: string) {
+  const labels: Record<string, string> = {
+    AVAILABLE: "crédito disponível", PROVISION: "provisão atualizada",
+    COMMITTED: "total empenhado", LIQUIDATED: "total liquidado",
+    TO_LIQUIDATE: "total a liquidar", PAID: "total pago",
+  };
+  return labels[metric] ?? metric;
+}
+
+function formatRatio(data: CreditResultData, plan: AiSemanticPlan): string {
+  const numeratorField = plan.metric ? metricField[plan.metric] : undefined;
+  const denominatorField = plan.denominator ? metricField[plan.denominator] : undefined;
+  const numerator = numeratorField ? data.totals[numeratorField] : undefined;
+  const denominator = denominatorField ? data.totals[denominatorField] : undefined;
+  if (!numeratorField || !denominatorField || !Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
+    return "Não é possível calcular o percentual: numerador ou denominador não está disponível ou é igual a zero. Nenhum percentual foi estimado.";
+  }
+  const detail = data.groups.length > 1 && plan.groupBy && plan.groupBy !== "TOTAL"
+    ? data.groups.map((group) => {
+      const n = Number(group[numeratorField]);
+      const d = Number(group[denominatorField]);
+      if (!Number.isFinite(n) || !Number.isFinite(d) || d <= 0) return group.label + ": sem denominador positivo.";
+      return group.label + ": " + percent(n, d) + " (" + money(n) + " de " + money(d) + ").";
+    }) : [];
+  return [
+    percent(numerator, denominator) + " do " + metricName(plan.denominator || "") + " corresponde ao " + metricName(plan.metric || "") + ".",
+    "Numerador: " + money(numerator) + ". Denominador: " + money(denominator) + ".",
+    ...detail,
+    "Fonte: " + data.source.fileName + ", importada em " + fmtDate(data.source.importedAt) + ".",
+  ].join("\n");
+}
+
+async function resolveAuthorizedUnit(plan: AiSemanticPlan, input: MclChatRequest, actor: MclAiActor) {
+  // 'context' só resolve quando existe referência verificável no histórico.
+  const previousText = input.history.map(({ content }) => content).join(" ");
+  const bound = plan.scope === "own" || (plan.scope === "context" && /\b(?:noss[ao]s?|minha|meu)\s+(?:om|unidade)\b/i.test(previousText));
+  if (bound) {
+    const organization = actor.organizationId ? await prisma.organization.findUnique({
+      where: { id: actor.organizationId }, select: { uasg: true },
+    }) : null;
+    return { unit: organization?.uasg || null, needsUnit: !organization?.uasg };
+  }
+  if (plan.scope === "unit") return { unit: plan.unit || null, needsUnit: !plan.unit };
+  if (plan.scope === "context") {
+    const recentExplicit = previousText.match(/\b(1\d{5})\b/g)?.at(-1);
+    return { unit: recentExplicit || null, needsUnit: true };
+  }
+  return { unit: null, needsUnit: false };
+}
+
+function cognitiveResponse(
+  answer: string, requestId: string, parsed: Awaited<ReturnType<typeof planMclSemanticQuery>>,
+  citations: RagResponse["citations"] = [], warnings: string[] = [],
+): RagResponse {
+  return {
+    answer, citations, warnings, requestId,
+    suggestedQuestions: ["Detalhe o resultado por UASG.", "Compare valor empenhado, liquidado e pago."],
+    provider: parsed.model.provider, model: parsed.model.modelId, authMode: parsed.model.authMode,
+    usage: {
+      inputTokens: parsed.usage.inputTokens,
+      outputTokens: parsed.usage.outputTokens,
+      totalTokens: parsed.usage.totalTokens,
+    },
+  };
+}
+
+/**
+ * Cognitive Core MVP: LLM selects typed financial operation; server validates scope
+ * and performs exact arithmetic using persisted TG. Never exposes SQL to the model.
+ * A new module registers a capability and server adapter; this core has no phrases.
+ */
+export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiActor, requestId: string, signal?: AbortSignal): Promise<RagResponse | null> {
+  const parsed = await planMclSemanticQuery(input, actor, signal);
+  const plan = parsed.plan;
+  if (plan.capability === "other" || !findSemanticCapability(plan.capability)) return null;
+  // Open-ended analysis remains in the dedicated evidence-grounded tool path for
+  // this MVP; it is not reduced to a numeric total or labelled as an alert.
+  if (plan.intent === "analysis") return null;
+  if (plan.intent === "clarify" || !plan.metric) {
+    return cognitiveResponse(plan.clarification || "Qual medida financeira deseja consultar?", requestId, parsed);
+  }
+
+  const target = await resolveAuthorizedUnit(plan, input, actor);
+  if (target.needsUnit) {
+    return cognitiveResponse(
+      "Preciso identificar a UASG da unidade para essa consulta. Informe a UASG ou estabeleça o vínculo da sua OM no módulo de Créditos; não vou ampliar silenciosamente a consulta para todas as unidades.",
+      requestId, parsed,
+    );
+  }
+  if (plan.intent === "ratio" && (!plan.denominator || !metricField[plan.metric] || !metricField[plan.denominator])) {
+    return cognitiveResponse("Qual é o denominador do percentual pretendido? Não farei uma divisão por inferência.", requestId, parsed);
+  }
+
+  const filters: CreditAnalyticsInput = {
+    ug: target.unit || undefined,
+    nd: plan.nd || undefined, pi: plan.pi || undefined, search: plan.search || undefined,
+    metric: plan.metric,
+    groupBy: plan.intent === "ranking" ? "NE" : (plan.groupBy || "TOTAL"),
+    sort: plan.intent === "ranking" ? "VALUE_DESC" : undefined,
+    limit: plan.intent === "ranking" ? 8 : 15,
+    includeFinalities: false,
+  };
+  const envelope = await queryTgCreditAnalytics(actor, filters);
+  if (envelope.status !== "AVAILABLE") {
+    return cognitiveResponse(
+      "Não há dados de Créditos verificáveis para esta consulta. " + (envelope.gaps.join(" ") || "Fonte indisponível."),
+      requestId, parsed, envelope.citations, envelope.gaps,
+    );
+  }
+
+  const data = envelope.data as CreditResultData;
+  const asOf = Date.parse(envelope.asOf);
+  const isOld = Number.isFinite(asOf) && Date.now() - asOf > 24 * 60 * 60 * 1000;
+  const notes = [
+    ...(isOld ? ["Carga TG desatualizada há mais de 24 horas; estes valores não representam saldo atualizado hoje."] : []),
+    ...envelope.gaps,
+  ];
+  if (filters.ug && !data.filters.matchedUgs.length) {
+    return cognitiveResponse("Nenhuma UG/UASG corresponde ao filtro solicitado. Isso não equivale a saldo zero.", requestId, parsed, envelope.citations, notes);
+  }
+  if (plan.intent === "ratio") {
+    return cognitiveResponse(formatRatio(data, plan), requestId, parsed, envelope.citations, notes);
+  }
+  const intent: ResolvedCreditIntent = { ...filters, ranking: plan.intent === "ranking", answerable: true };
+  const answer = formatCreditAnalyticsAnswer(data as Parameters<typeof formatCreditAnalyticsAnswer>[0], intent);
+  return cognitiveResponse(answer, requestId, parsed, envelope.citations, notes);
+}
