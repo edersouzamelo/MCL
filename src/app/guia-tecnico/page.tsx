@@ -57,6 +57,19 @@ export default function TechnicalGuidePage() {
           <h2 className="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">Ampliação do núcleo</h2>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Capacidades adicionais que enriquecem o sistema sem se tornarem dependências do núcleo determinístico.</p>
           <ModuleList modules={SUPPLEMENTARY_MODULES} />
+          <section id="agente-llm-rag" aria-labelledby="agente-llm-rag-titulo" className="mt-5 rounded-lg border border-violet-300 p-4 dark:border-violet-900">
+            <h3 id="agente-llm-rag-titulo" className="font-semibold text-zinc-950 dark:text-zinc-50">Agente LLM com RAG · Cognitive Core v1.0</h3>
+            <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">Núcleo cognitivo para interpretar perguntas livres, consultar fontes verificáveis e ampliar capacidades por módulos. A versão experimental habilita apenas Créditos/TG. Radar e demais módulos precisam de adaptadores validados.</p>
+            <ol className="mt-3 list-decimal space-y-2 pl-5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+              <li>Registro semântico: entidades, medidas, dimensões, fontes, permissões e ferramentas tipadas de cada módulo.</li>
+              <li>O LLM analisa a pergunta e o histórico e produz um plano estruturado. O servidor valida o plano e consulta dados autorizados sem executar SQL gerado pela IA.</li>
+              <li>Valores financeiros são calculados no executor determinístico em centavos. As respostas exibem a fonte, a data de importação e as lacunas.</li>
+              <li>Perguntas abertas e domínios ainda não habilitados usam o agente/RAG existente. O RAG técnico é lexical e versionado, não lê autonomamente todas as bases.</li>
+              <li>Para novos módulos: declarar contrato semântico e adaptador de leitura, autorização, origem, tratamento de erro e testes. O núcleo não precisa de regras por pergunta.</li>
+            </ol>
+            <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400">Estado: MVP experimental. Build verde não comprova qualidade em produção. Integração Radar planejada, ainda não operacional. O Gateway OIDC e a atualização do TG são dependências independentes.</p>
+            <Link href="/assistente" className="mt-3 inline-block text-sm font-semibold text-violet-700 underline dark:text-violet-300">Abrir Assistente IA</Link>
+          </section>
         </Card>
       </div>
     </AppShell>
