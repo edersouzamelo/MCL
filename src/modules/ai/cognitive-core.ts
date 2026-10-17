@@ -147,7 +147,7 @@ async function resolveAuthorizedUnit(plan: AiSemanticPlan, input: MclChatRequest
   // against the authorized TG projection before reporting its identity.
   const previousAssistantUg = input.history.slice().reverse()
     .filter((message) => message.role === "assistant")
-    .map((message) => message.content.match(/UG\\/UASG\\s+(1\\d{5})/i)?.[1])
+    .map((message) => message.content.match(/UG\/UASG\s+(1\d{5})/i)?.[1])
     .find(Boolean);
   if (plan.scope === "context" && previousAssistantUg) {
     return { unit: previousAssistantUg, needsUnit: false };
