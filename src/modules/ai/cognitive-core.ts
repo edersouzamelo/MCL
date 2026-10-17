@@ -82,7 +82,7 @@ function formatRatio(data: CreditResultData, plan: AiSemanticPlan): string {
   const denominatorField = plan.denominator ? metricField[plan.denominator] : undefined;
   const numerator = numeratorField ? data.totals[numeratorField] : undefined;
   const denominator = denominatorField ? data.totals[denominatorField] : undefined;
-  if (!numeratorField || !denominatorField || !Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
+  if (!numeratorField || !denominatorField || typeof numerator !== "number" || typeof denominator !== "number" || !Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
     return "Não é possível calcular o percentual: numerador ou denominador não está disponível ou é igual a zero. Nenhum percentual foi estimado.";
   }
   const detail = data.groups.length > 1 && plan.groupBy && plan.groupBy !== "TOTAL"
@@ -113,7 +113,7 @@ async function resolveAuthorizedUnit(plan: AiSemanticPlan, input: MclChatRequest
   if (plan.scope === "unit") return { unit: plan.unit || null, needsUnit: !plan.unit };
   if (plan.scope === "context") {
     const recentExplicit = previousText.match(/\b(1\d{5})\b/g)?.at(-1);
-    return { unit: recentExplicit || null, needsUnit: true };
+    return { unit: recentExplicit || null, needsUnit: !recentExplicit };
   }
   return { unit: null, needsUnit: false };
 }
