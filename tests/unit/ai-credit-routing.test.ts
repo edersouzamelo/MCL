@@ -98,6 +98,97 @@ describe("Assistente IA: roteamento contábil", () => {
     expect(result?.answer).toContain("100,00%");
   });
 
+  it.each([
+    ["qual o percentual de liquidação em relação ao total empenhado?", "LIQUIDATED_OF_COMMITTED", "LIQUIDATED"],
+    ["qual a porcentagem liquidada sobre o empenhado?", "LIQUIDATED_OF_COMMITTED", "LIQUIDATED"],
+    ["já liquidamos qual percentual do total empenhado?", "LIQUIDATED_OF_COMMITTED", "LIQUIDATED"],
+  ] as const)("reconhece percentual liquidado: %s", (prompt, percentage, metric) => {
+    const intent = resolveCreditAnalyticsIntent(request(prompt));
+    expect(intent.answerable).toBe(true);
+    expect(intent.percentage).toBe(percentage);
+    expect(intent.metric).toBe(metric);
+  });
+
+  it("preserva a UASG e calcula a liquidação na sequência real de três turnos", async () => {
+    vi.mocked(prisma.organization.findUnique).mockResolvedValue({ uasg: "160136" } as never);
+    vi.mocked(queryTgCreditAnalytics).mockResolvedValue({
+      ...projection,
+      data: {
+        ...projection.data,
+        metric: "LIQUIDATED",
+        totals: {
+          ...projection.data.totals,
+          committedCents: 10000,
+          liquidatedCents: 4000,
+          paidCents: 3000,
+        },
+      },
+    } as never);
+
+    const conversation = [
+      "qual o saldo liquidado da nossa OM?",
+      "qual o percentual de liquidação em relação ao total empenhado?",
+      "PERCENTUAL eu disse",
+    ];
+    const history = [];
+    for (const prompt of conversation) {
+      const input = {
+        ...request(prompt),
+        history: history.map((content) => ({ role: "user" as const, content })),
+      };
+      const answer = await runCreditAnalyticsContingency(input, actor, "req-sequencia");
+      expect(queryTgCreditAnalytics).toHaveBeenLastCalledWith(
+        actor,
+        expect.objectContaining({ ug: "160136", metric: "LIQUIDATED", groupBy: "TOTAL" }),
+      );
+      expect(answer?.answer).toContain("UG/UASG 160136");
+      if (prompt !== conversation[0]) {
+        expect(answer?.answer).toContain("40,00%");
+        expect(answer?.answer).toMatch(/R\$\s+100,00/);
+        expect(answer?.answer).toMatch(/R\$\s+40,00/);
+      }
+      history.push(prompt);
+    }
+    expect(prisma.organization.findUnique).toHaveBeenCalledTimes(3);
+    expect(queryTgCreditAnalytics).toHaveBeenCalledTimes(3);
+  });
+
+  it("não herda unidade própria quando o pedido atual abrange todas as OM", () => {
+    const intent = resolveCreditAnalyticsIntent({
+      ...request("Qual percentual a liquidar de todas as OM?"),
+      history: [{ role: "user", content: "Qual o saldo da nossa OM?" }],
+    });
+    expect(intent.ownUnitContext).toBe(false);
+    expect(intent.ug).toBeUndefined();
+    expect(intent.groupBy).toBe("UG");
+    expect(intent.percentage).toBe("TO_LIQUIDATE_OF_COMMITTED");
+  });
+
+  it("sem numerador identificável pede esclarecimento em vez de imprimir valor empenhado", async () => {
+    const answer = await runCreditAnalyticsContingency({
+      ...request("PERCENTUAL eu disse"),
+      history: [{ role: "user", content: "Qual o total empenhado?" }],
+    }, actor, "req-clarify");
+    expect(answer?.answer).toContain("Especifique");
+    expect(answer?.answer).toContain("percentual");
+    expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("não recicla o último total quando a nova mensagem exige outra interpretação", async () => {
+    const input = {
+      ...request("O que posso concluir disso?"),
+      history: [
+        { role: "user" as const, content: "Qual o saldo liquidado da nossa OM?" },
+        { role: "user" as const, content: "Qual percentual liquidado do total empenhado?" },
+      ],
+    };
+    const intent = resolveCreditAnalyticsIntent(input);
+    expect(intent.answerable).toBe(false);
+    const response = await runCreditAnalyticsContingency(input, actor, "req-open");
+    expect(response).toBeNull();
+    expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
   it("reconhece créditos disponíveis no plural sem precisar do LLM", () => {
     const intent = resolveCreditAnalyticsIntent(request("Quanto de créditos disponíveis temos hoje?"));
     expect(intent.answerable).toBe(true);
