@@ -603,7 +603,7 @@ export function AssistenteIaClient({
                             </span>
                             {msg.response && (
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-                                {msg.response.model} · {msg.response.authMode === "oidc" ? "Gateway OIDC" : "motor analítico de contingência"}
+                                {msg.response.model} · {msg.response.authMode === "oidc" ? "Gateway OIDC" : msg.response.warnings.some((warning) => warning.includes("modelo de linguagem ficou indisponível")) ? "motor analítico de contingência" : "motor analítico financeiro"}
                               </span>
                             )}
                             {msg.errorCode && (

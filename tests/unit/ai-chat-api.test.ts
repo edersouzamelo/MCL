@@ -3,6 +3,7 @@ import { MclAiServiceError, type RagResponse } from "@/modules/ai/contracts";
 import { getRouteActor } from "@/modules/auth/route-actor";
 import { runMclAssistant } from "@/modules/ai/agent";
 import { runCreditAnalyticsContingency } from "@/modules/ai/credit-analytics";
+import { runFinancialInterpretation } from "@/modules/ai/financial-interpretation";
 import { POST } from "@/app/api/ai/chat/route";
 
 vi.mock("@/modules/auth/route-actor", () => ({
@@ -18,6 +19,10 @@ vi.mock("@/modules/ai/credit-analytics", async () => {
   const actual = await vi.importActual<typeof import("@/modules/ai/credit-analytics")>("@/modules/ai/credit-analytics");
   return { ...actual, runCreditAnalyticsContingency: vi.fn() };
 });
+
+vi.mock("@/modules/ai/financial-interpretation", () => ({
+  runFinancialInterpretation: vi.fn(),
+}));
 
 function request(body: unknown) {
   return new Request("http://localhost/api/ai/chat", {
@@ -38,6 +43,7 @@ function authenticatedActor() {
 describe("API Route - /api/ai/chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(runFinancialInterpretation).mockResolvedValue(null);
   });
 
   it("rejeita consulta sem sessão antes de chamar o modelo", async () => {
@@ -119,6 +125,25 @@ describe("API Route - /api/ai/chat", () => {
     expect(body.code).toBe("AI_GATEWAY_BUDGET_EXHAUSTED");
     expect(body.answer).toBeUndefined();
     expect(body.error).toContain("Nenhuma resposta substituta");
+  });
+
+  it("encaminha perguntas abertas sobre alertas para a interpretação cognitiva", async () => {
+    authenticatedActor();
+    const answer: RagResponse = {
+      answer: "O valor empenhado não é alerta por si só; analise saldo a liquidar e prazos.",
+      citations: [], suggestedQuestions: [], warnings: [],
+      requestId: "req-ai-test", provider: "vercel-ai-gateway",
+      model: "openai/gpt-5-mini", authMode: "oidc",
+    };
+    vi.mocked(runFinancialInterpretation).mockResolvedValue(answer);
+    const response = await POST(request({
+      prompt: "Existe algum empenho não liquidado que deve gerar alerta?",
+      history: [{ role: "user", content: "Qual o total empenhado?" }],
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(answer);
+    expect(runMclAssistant).not.toHaveBeenCalled();
+    expect(runCreditAnalyticsContingency).not.toHaveBeenCalled();
   });
 
   it("consulta o motor financeiro primeiro sem depender do Gateway", async () => {
