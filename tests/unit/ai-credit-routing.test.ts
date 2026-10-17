@@ -174,6 +174,21 @@ describe("Assistente IA: roteamento contábil", () => {
     expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
   });
 
+  it("não recicla o último total quando a nova mensagem exige outra interpretação", async () => {
+    const input = {
+      ...request("O que posso concluir disso?"),
+      history: [
+        { role: "user" as const, content: "Qual o saldo liquidado da nossa OM?" },
+        { role: "user" as const, content: "Qual percentual liquidado do total empenhado?" },
+      ],
+    };
+    const intent = resolveCreditAnalyticsIntent(input);
+    expect(intent.answerable).toBe(false);
+    const response = await runCreditAnalyticsContingency(input, actor, "req-open");
+    expect(response).toBeNull();
+    expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
   it("reconhece créditos disponíveis no plural sem precisar do LLM", () => {
     const intent = resolveCreditAnalyticsIntent(request("Quanto de créditos disponíveis temos hoje?"));
     expect(intent.answerable).toBe(true);
