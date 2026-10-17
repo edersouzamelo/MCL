@@ -2,6 +2,15 @@
 
 **Situação:** implementação experimental do registro semântico e planejador LLM. Não declarar prontidão do clipe antes de CI, deploy e interação real autenticada. Documentação visível no Guia Técnico, seção Agente LLM com RAG. Linear: EDE-32 hoje; EDE-31 evolução; EDE-33 atualização TG.
 
+## Correção de robustez e perguntas sobre a origem de um valor (17/10/2026)
+
+- O planejamento semântico usa por padrão o modelo não-raciocinante `openai/gpt-4.1-mini` via Vercel AI Gateway. A variável opcional `MCL_AI_PLANNER_MODEL` permite configurá-lo; o modelo conversacional (por padrão `openai/gpt-5-mini`) permanece para análises abertas e retentativa do planejamento.
+- O teto anterior de 420 tokens poderia gerar `AI_NoOutputGeneratedError` na produção. Agora a saída estruturada dispõe de 1.024 tokens; quando o modelo produz saída vazia ou objeto inválido, ocorre uma única retentativa com o modelo conversacional e 2.048 tokens. Erros de autenticação, quota e indisponibilidade não recebem retentativa cega.
+- Após duas saídas vazias, a resposta informa `AI_SEMANTIC_PLAN_EMPTY`, nunca resultado inventado. Esse tratamento é de engenharia defensiva, não prova de que o serviço remoto responde bem.
+- O contrato semântico inclui `intent=source` para perguntas sobre qual UG/UASG originou o valor anterior. O núcleo recupera a UG da última resposta efetivamente exibida, consulta novamente o TG autorizado e expõe o nome da UG, a distinção de escopo e a proveniência, sem reproduzir o valor como se fosse outra consulta.
+- A interface exclui mensagens de erro do histórico do LLM, preservando o contexto válido da última resposta.
+- A execução real do Gateway, sua quota e a taxa de sucesso ainda dependem de validação autenticada. O acesso aos logs Vercel dessa conta esteve negado com HTTP 403 durante a investigação.
+
 ## Contrato de execução
 
 1. A rota /api/ai/chat autentica, verifica autorização e limite por usuário.
