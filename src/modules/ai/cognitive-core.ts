@@ -206,7 +206,7 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
       requestId, parsed,
     );
   }
-  if (plan.intent === "ratio" && (!plan.denominator || !metricField[plan.metric] || !metricField[plan.denominator])) {
+  if (plan.intent === "ratio" && (!plan.metric || !plan.denominator || !metricField[plan.metric] || !metricField[plan.denominator])) {
     return cognitiveResponse("Qual é o denominador do percentual pretendido? Não farei uma divisão por inferência.", requestId, parsed);
   }
 
