@@ -48,7 +48,7 @@ export const AI_CAPABILITY_REGISTRY: readonly SemanticCapability[] = [
 
 export const aiSemanticPlanSchema = z.object({
   capability: z.enum(["credits-tg", "other"]),
-  intent: z.enum(["value", "ratio", "breakdown", "ranking", "analysis", "clarify"]),
+  intent: z.enum(["value", "ratio", "breakdown", "ranking", "analysis", "source", "clarify"]),
   metric: z.enum([
     "AVAILABLE", "PROVISION", "COMMITTED", "LIQUIDATED", "TO_LIQUIDATE", "PAID",
     "RPNP_REGISTERED_TOTAL", "RPNP_TO_LIQUIDATE", "RPNP_PAID",

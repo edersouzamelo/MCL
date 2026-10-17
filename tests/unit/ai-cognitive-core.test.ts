@@ -61,6 +61,56 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     plan();
   });
 
+  it.each([
+    "isso é da uasg principal ou das OMDS?",
+    "esse crédito é referente a qual uasg?",
+    "Esse crédito é disponivel de qual UG???",
+  ])("recupera a identidade comprovada da UG do resultado anterior: %s", async (prompt) => {
+    plan({ intent: "source", metric: null, denominator: null, scope: "context", groupBy: null });
+    const history = [
+      { role: "user" as const, content: "qual é o crédito disponível da nossa uasg?" },
+      { role: "assistant" as const, content: "O crédito disponível para UG/UASG 160136 é R$ 3.031.367,21. Fonte: TG_SET_2026.xlsx." },
+    ];
+    const response = await runMclCognitiveCore(input(prompt, history), actor, "req-source");
+    expect(queryTgCreditAnalytics).toHaveBeenCalledWith(actor, expect.objectContaining({
+      ug: "160136", groupBy: "UG",
+    }));
+    expect(response?.answer).toContain("UG/UASG 160136");
+    expect(response?.answer).toContain("Cmdo 9 Gpt Log");
+    expect(response?.answer).toContain("não para a soma das OMDS");
+    expect(response?.citations[0].source).toBe("TESOURO_GERENCIAL");
+  });
+
+  it("pede esclarecimento verificável se não existe UG na resposta anterior", async () => {
+    plan({ intent: "source", metric: null, denominator: null, scope: "context" });
+    const response = await runMclCognitiveCore(input("Esse saldo é de qual UASG?"), actor, "req-no-provenance");
+    expect(response?.answer).toContain("Preciso identificar a UASG");
+    expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("retenta planejamento sem saída uma única vez, usando o modelo conversacional", async () => {
+    const err = Object.assign(new Error("structured output empty"), { name: "AI_NoOutputGeneratedError" });
+    vi.mocked(generateText).mockRejectedValueOnce(err).mockResolvedValueOnce({
+      output: aiSemanticPlanSchema.parse({ ...basePlan, intent: "value", metric: "AVAILABLE", denominator: null }),
+      usage: { inputTokens: 120, outputTokens: 60, totalTokens: 180 },
+    } as never);
+    const result = await runMclCognitiveCore(input("Crédito disponível da nossa UG"), actor, "req-retry");
+    expect(generateText).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(generateText).mock.calls[0][0].maxOutputTokens).toBe(1024);
+    expect(vi.mocked(generateText).mock.calls[1][0].maxOutputTokens).toBe(2048);
+    expect(result?.model).toBe("openai/gpt-5-mini");
+    expect(result?.answer).toContain("UG/UASG 160136");
+  });
+
+  it("não mascara duas falhas seguidas de saída do LLM como resposta de IA", async () => {
+    const empty = Object.assign(new Error("no output"), { name: "AI_NoOutputGeneratedError" });
+    vi.mocked(generateText).mockRejectedValue(empty);
+    await expect(runMclCognitiveCore(input("De que UG é esse saldo?"), actor, "req-double-fail"))
+      .rejects.toMatchObject({ name: "MclAiServiceError", code: "AI_SEMANTIC_PLAN_EMPTY", status: 503 });
+    expect(generateText).toHaveBeenCalledTimes(2);
+    expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
   it("catálogo publica só capacidades efetivamente adaptadas; Radar não é falso disponível", () => {
     expect(AI_CAPABILITY_REGISTRY).toHaveLength(1);
     expect(AI_CAPABILITY_REGISTRY[0].id).toBe("credits-tg");

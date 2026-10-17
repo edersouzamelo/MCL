@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { generateText, Output } from "ai";
+import { gateway, generateText, Output } from "ai";
+import { MclAiServiceError } from "@/modules/ai/contracts";
 import type { MclAiActor, MclChatRequest, RagResponse } from "@/modules/ai/contracts";
 import { type ResolvedCreditIntent, formatCreditAnalyticsAnswer } from "@/modules/ai/credit-analytics";
 import { resolveMclModel } from "@/modules/ai/provider";
@@ -23,32 +24,71 @@ const instructions = [
   "Se mencionar outra UG/UASG, use scope=unit e informe unit. No acompanhamento da própria OM, continue scope=own.",
   "Para divisão por OM/UASG, groupBy=UG; por ND use ND, por PI use PI. Para maior empenho ranking e groupBy=NE.",
   "Se houver ambiguidade genuína que impeça o cálculo, intent=clarify e uma pergunta específica em clarification.",
+  "Para perguntas sobre qual UG/UASG gerou o valor anterior, ou se pertence ao Comando ou OMDS, use intent=source, scope=context, metric=null. Verifique a proveniência, sem recalcular saldos nem pedir outra métrica.",
   "Alerta/risco/por quê pede intent=analysis: nenhum valor bruto isolado comprova irregularidade.",
   "O seletor visual do frontend não restringe a consulta contábil. Nunca adivinhe códigos, datas, percentuais ou UASG.",
 ].join("\n");
 
+function noStructuredOutput(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("name" in error)) return false;
+  return error.name === "AI_NoOutputGeneratedError" || error.name === "AI_NoObjectGeneratedError";
+}
+
+/**
+ * A non-reasoning, structured-output-capable planner prevents the tiny output
+ * budget from being exhausted by model reasoning. Retry exactly once, with the
+ * configured conversational model, only for empty/malformed model output.
+ */
 export async function planMclSemanticQuery(input: MclChatRequest, actor: MclAiActor, abortSignal?: AbortSignal) {
-  const model = resolveMclModel();
+  const conversationalModel = resolveMclModel();
+  const plannerId = process.env.MCL_AI_PLANNER_MODEL?.trim() || "openai/gpt-4.1-mini";
+  if (!/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i.test(plannerId)) {
+    throw new MclAiServiceError("INVALID_AI_MODEL", "MCL_AI_PLANNER_MODEL inválido.", 500);
+  }
+  const primaryModel = plannerId === conversationalModel.modelId
+    ? conversationalModel
+    : { ...conversationalModel, model: gateway(plannerId), modelId: plannerId };
   const pseudonymous = createHash("sha256").update(actor.id).digest("hex").slice(0, 24);
-  const planned = await generateText({
-    model: model.model,
-    output: Output.object({ schema: aiSemanticPlanSchema }),
-    instructions: instructions + "\nCatálogo de capacidades habilitadas: " + JSON.stringify(semanticCatalogueForModel()),
-    prompt: JSON.stringify({
-      currentQuestion: input.prompt,
-      recentHistory: input.history.slice(-8).map(({ role, content }) => ({ role, content: content.slice(0, 950) })),
-    }),
-    abortSignal,
-    timeout: { totalMs: 22_000 },
-    maxOutputTokens: 420,
-    providerOptions: { gateway: {
-      disallowPromptTraining: true,
-      sort: "cost",
-      tags: ["mcl", "cognitive-core-v1"],
-      user: "mcl-" + pseudonymous,
-    } },
+  const prompt = JSON.stringify({
+    currentQuestion: input.prompt,
+    recentHistory: input.history.slice(-8).map(({ role, content }) => ({ role, content: content.slice(0, 950) })),
   });
-  return { plan: planned.output, model, usage: planned.usage };
+  const callPlanner = async (model: typeof primaryModel, maxOutputTokens: number) => {
+    const planned = await generateText({
+      model: model.model,
+      output: Output.object({ schema: aiSemanticPlanSchema }),
+      instructions: instructions + "\nCatálogo de capacidades habilitadas: " + JSON.stringify(semanticCatalogueForModel()),
+      prompt,
+      abortSignal,
+      timeout: { totalMs: 25_000 },
+      maxOutputTokens,
+      providerOptions: { gateway: {
+        disallowPromptTraining: true, sort: "cost",
+        tags: ["mcl", "cognitive-core-v1"],
+        user: "mcl-" + pseudonymous,
+      } },
+    });
+    return { plan: planned.output, model, usage: planned.usage };
+  };
+  try {
+    return await callPlanner(primaryModel, 1024);
+  } catch (error) {
+    if (!noStructuredOutput(error)) throw error;
+    console.warn(JSON.stringify({
+      level: "warning", message: "Planejador não gerou saída; retentativa estruturada com segundo modelo",
+      code: "AI_NO_STRUCTURED_OUTPUT", model: primaryModel.modelId,
+    }));
+    try {
+      return await callPlanner(conversationalModel, 2048);
+    } catch (retryError) {
+      if (!noStructuredOutput(retryError)) throw retryError;
+      throw new MclAiServiceError(
+        "AI_SEMANTIC_PLAN_EMPTY",
+        "O serviço de IA não produziu plano após duas tentativas. A interpretação não foi simulada.",
+        503, true,
+      );
+    }
+  }
 }
 
 type CreditResultData = {
@@ -103,6 +143,15 @@ function formatRatio(data: CreditResultData, plan: AiSemanticPlan): string {
 async function resolveAuthorizedUnit(plan: AiSemanticPlan, input: MclChatRequest, actor: MclAiActor) {
   // 'context' só resolve quando existe referência verificável no histórico.
   const previousText = input.history.map(({ content }) => content).join(" ");
+  // Reuse only a previously displayed assistant UG and validate it again
+  // against the authorized TG projection before reporting its identity.
+  const previousAssistantUg = input.history.slice().reverse()
+    .filter((message) => message.role === "assistant")
+    .map((message) => message.content.match(/UG\/UASG\s+(1\d{5})/i)?.[1])
+    .find(Boolean);
+  if (plan.scope === "context" && previousAssistantUg) {
+    return { unit: previousAssistantUg, needsUnit: false };
+  }
   const bound = plan.scope === "own" || (plan.scope === "context" && /\b(?:noss[ao]s?|minha|meu)\s+(?:om|unidade)\b/i.test(previousText));
   if (bound) {
     const organization = actor.organizationId ? await prisma.organization.findUnique({
@@ -146,7 +195,7 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
   // Open-ended analysis remains in the dedicated evidence-grounded tool path for
   // this MVP; it is not reduced to a numeric total or labelled as an alert.
   if (plan.intent === "analysis") return null;
-  if (plan.intent === "clarify" || !plan.metric) {
+  if (plan.intent === "clarify" || (!plan.metric && plan.intent !== "source")) {
     return cognitiveResponse(plan.clarification || "Qual medida financeira deseja consultar?", requestId, parsed);
   }
 
@@ -157,15 +206,15 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
       requestId, parsed,
     );
   }
-  if (plan.intent === "ratio" && (!plan.denominator || !metricField[plan.metric] || !metricField[plan.denominator])) {
+  if (plan.intent === "ratio" && (!plan.metric || !plan.denominator || !metricField[plan.metric] || !metricField[plan.denominator])) {
     return cognitiveResponse("Qual é o denominador do percentual pretendido? Não farei uma divisão por inferência.", requestId, parsed);
   }
 
   const filters: CreditAnalyticsInput = {
     ug: target.unit || undefined,
     nd: plan.nd || undefined, pi: plan.pi || undefined, search: plan.search || undefined,
-    metric: plan.metric,
-    groupBy: plan.intent === "ranking" ? "NE" : (plan.groupBy || "TOTAL"),
+    metric: plan.metric ?? "AVAILABLE",
+    groupBy: plan.intent === "source" ? "UG" : plan.intent === "ranking" ? "NE" : (plan.groupBy || "TOTAL"),
     sort: plan.intent === "ranking" ? "VALUE_DESC" : undefined,
     limit: plan.intent === "ranking" ? 8 : 15,
     includeFinalities: false,
@@ -187,6 +236,22 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
   ];
   if (filters.ug && !data.filters.matchedUgs.length) {
     return cognitiveResponse("Nenhuma UG/UASG corresponde ao filtro solicitado. Isso não equivale a saldo zero.", requestId, parsed, envelope.citations, notes);
+  }
+  if (plan.intent === "source") {
+    const verified = target.unit
+      ? data.filters.matchedUgs.filter((item) => item.ug === target.unit)
+      : data.filters.matchedUgs;
+    const identity = verified.length === 1
+      ? "O valor consultado pertence à UG/UASG " + verified[0].ug + ": " + verified[0].om
+        + ". Está filtrado para essa UG, não para a soma das OMDS."
+      : verified.length > 1
+        ? "A consulta abrange " + verified.length + " UGs: "
+          + verified.map((item) => item.ug + " (" + item.om + ")").join("; ") + "."
+        : "Não consegui comprovar a UG/UASG da resposta anterior com a fonte autorizada. Informe o código para verificar.";
+    return cognitiveResponse(
+      identity + " Fonte: " + data.source.fileName + ", importada em " + fmtDate(data.source.importedAt) + ".",
+      requestId, parsed, envelope.citations, notes,
+    );
   }
   if (plan.intent === "ratio") {
     return cognitiveResponse(formatRatio(data, plan), requestId, parsed, envelope.citations, notes);
