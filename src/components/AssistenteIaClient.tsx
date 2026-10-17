@@ -166,7 +166,9 @@ export function AssistenteIaClient({
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    const history = (chatId ? [] : messages.slice(-8)).map((message) => ({
+    // Errors are UI events, not assistant knowledge. Keep the previous successful
+    // answer as conversation context even after successive provider failures.
+    const history = (chatId ? [] : messages.filter((message) => !message.errorCode).slice(-8)).map((message) => ({
       role: message.sender === "user" ? "user" as const : "assistant" as const,
       content: message.text,
     }));
