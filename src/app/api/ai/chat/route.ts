@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { classifyMclAiError, runMclAssistant } from "@/modules/ai/agent";
 import { runCreditAnalyticsContingency } from "@/modules/ai/credit-analytics";
+import { runFinancialInterpretation } from "@/modules/ai/financial-interpretation";
 import { mclChatRequestSchema, type MclChatRequest } from "@/modules/ai/contracts";
 import { assertMclAiRateLimit } from "@/modules/ai/rate-limit";
 import { getRouteActor } from "@/modules/auth/route-actor";
@@ -71,8 +72,22 @@ export async function POST(request: Request) {
     input = mclChatRequestSchema.parse(await request.json());
     assertMclAiRateLimit(actor.id);
 
+    // Complex financial interpretation receives a bounded, audited TG projection
+    // and makes only one model call. Simple financial reads stay deterministic.
+    const interpretation = await runFinancialInterpretation(input, actor, requestId, request.signal);
+    if (interpretation) {
+      console.info(JSON.stringify({
+        level: "info",
+        message: "Assistente IA concluiu interpretação financeira baseada em evidências",
+        route: "/api/ai/chat",
+        requestId,
+        provider: interpretation.provider,
+        durationMs: Date.now() - startedAt,
+      }));
+      return NextResponse.json(interpretation);
+    }
+
     // Structured financial reads do not require two LLM round trips.
-    // Keep the provider available for open-ended questions.
     const structured = await runCreditAnalyticsContingency(input, actor, requestId);
     if (structured) {
       console.info(JSON.stringify({
