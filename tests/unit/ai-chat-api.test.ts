@@ -192,7 +192,7 @@ describe("API Route - /api/ai/chat", () => {
       model: "motor-analitico-financeiro-v2",
       authMode: "session-rbac",
     };
-    vi.mocked(runCreditAnalyticsContingency).mockResolvedValueOnce(null).mockResolvedValueOnce(contingency);
+    vi.mocked(runCreditAnalyticsContingency).mockResolvedValue(contingency);
 
     const response = await POST(request({
       prompt: "desse tanto, quanto que era de ND 339039?",
