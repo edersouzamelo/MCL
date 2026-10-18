@@ -27,6 +27,7 @@ import {
   Database,
 } from "lucide-react";
 import type { RagResponse } from "@/modules/ai/contracts";
+import { buildBoundedMclHistory } from "@/modules/ai/chat-history";
 
 interface MessageItem {
   id: string;
@@ -166,12 +167,10 @@ export function AssistenteIaClient({
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    // Errors are UI events, not assistant knowledge. Keep the previous successful
-    // answer as conversation context even after successive provider failures.
-    const history = (chatId ? [] : messages.filter((message) => !message.errorCode).slice(-8)).map((message) => ({
-      role: message.sender === "user" ? "user" as const : "assistant" as const,
-      content: message.text,
-    }));
+    // Grandes listas financeiras são exibidas integralmente, mas o histórico
+    // enviado à API respeita o limite contratual de 4.000 caracteres/mensagem.
+    // O próprio texto abreviado sinaliza que a fonte deve ser consultada novamente.
+    const history = buildBoundedMclHistory(chatId ? [] : messages);
     setMessages((prev) => [...prev, userMessage]);
     setPrompt("");
     setLoading(true);
