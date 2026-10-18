@@ -4,7 +4,7 @@ import { MclAiServiceError } from "@/modules/ai/contracts";
 import type { MclAiActor, MclChatRequest, RagResponse } from "@/modules/ai/contracts";
 import { type ResolvedCreditIntent, formatCreditAnalyticsAnswer } from "@/modules/ai/credit-analytics";
 import { resolveMclModel } from "@/modules/ai/provider";
-import { queryTgCreditAnalytics, type CreditAnalyticsInput } from "@/modules/ai/silos";
+import { queryTgCreditAnalytics, queryTgNcComposition, type CreditAnalyticsInput } from "@/modules/ai/silos";
 import { prisma } from "@/server/db";
 import { aiSemanticPlanSchema, findSemanticCapability, semanticCatalogueForModel, type AiSemanticPlan } from "@/modules/ai/semantic-registry";
 
@@ -24,6 +24,10 @@ const instructions = [
   "Se mencionar outra UG/UASG, use scope=unit e informe unit. No acompanhamento da própria OM, continue scope=own.",
   "Para divisão por OM/UASG, groupBy=UG; por ND use ND, por PI use PI. Para maior empenho ranking e groupBy=NE.",
   "Se houver ambiguidade genuína que impeça o cálculo, intent=clarify e uma pergunta específica em clarification.",
+  "source significa apenas identificar qual UG/OM originou o resultado agregado anterior. Para listar documentos, não use source.",
+  "documents significa listar registros ou documentos que contribuíram com uma medida; preencha entity=NC para Notas de Crédito e entity=NE para Notas de Empenho. NC não é NE.",
+  "O módulo Créditos oferece queryTgNcComposition para detalhar NC da provisão e sua relação com o saldo. Para 'quais NC compõem esse saldo', intent=documents e entity=NC; preserve UG do diálogo, metric=AVAILABLE e NÃO preencha search com 'NC'.",
+  "Se o assistente acabou de perguntar se o usuário quer a lista e o usuário respondeu sim/quero, EXECUTE a intenção de listar os documentos, sem repetir a mesma confirmação.",
   "Para perguntas sobre qual UG/UASG gerou o valor anterior, ou se pertence ao Comando ou OMDS, use intent=source, scope=context, metric=null. Verifique a proveniência, sem recalcular saldos nem pedir outra métrica.",
   "Alerta/risco/por quê pede intent=analysis: nenhum valor bruto isolado comprova irregularidade.",
   "O seletor visual do frontend não restringe a consulta contábil. Nunca adivinhe códigos, datas, percentuais ou UASG.",
@@ -140,6 +144,39 @@ function formatRatio(data: CreditResultData, plan: AiSemanticPlan): string {
   ].join("\n");
 }
 
+type NcCompositionData = Awaited<ReturnType<typeof queryTgNcComposition>>["data"];
+
+function formatNcComposition(
+  data: Exclude<NcCompositionData, { records: never[] }>,
+): string {
+  const ugLabel = data.filters.matchedUgs.length === 1
+    ? "UG/UASG " + data.filters.matchedUgs[0].ug + " (" + data.filters.matchedUgs[0].om + ")"
+    : data.filters.matchedUgs.length + " UGs autorizadas";
+  const lines = data.documents.map((doc, index) =>
+    (index + 1) + ". NC " + doc.nc +
+    " | Provisão atualizada: " + money(doc.provisionUpdatedCents) +
+    " | PI: " + (doc.pis.join(", ") || "não informado") +
+    " | ND: " + (doc.nds.join(", ") || "não informada") +
+    " | Finalidade: " + (doc.purpose || "não informada"),
+  );
+  const totals = data.totals;
+  return [
+    "Na " + ugLabel + ", encontrei " + data.totalDocuments + " Nota(s) de Crédito individualizadas na carga TG." +
+      (data.totalDocuments > data.shownDocuments ? " Exibindo as " + data.shownDocuments + " primeiras." : ""),
+    ...lines,
+    "Conciliação do crédito disponível: provisão atualizada " + money(totals.provisionUpdatedCents) +
+      " menos empenhos " + money(totals.committedCents) +
+      " = crédito disponível " + money(totals.availableCreditCents) + ".",
+    "A fonte registra " + money(totals.reportedAvailableCreditCents) +
+      " no Item Informação 19 para esse filtro. " +
+      (totals.availableReconciliationCents !== 0
+        ? "Há divergência de " + money(totals.availableReconciliationCents) + " em relação ao saldo calculado; requer conferência."
+        : "Esse valor confere com o saldo calculado."),
+    "Importante: as NC compõem a provisão; não é possível afirmar o saldo exclusivo de cada NC sem vínculo documental entre NC e NE.",
+    "Fonte: " + data.source.fileName + ", importada em " + fmtDate(data.source.importedAt) + ".",
+  ].join("\n");
+}
+
 async function resolveAuthorizedUnit(plan: AiSemanticPlan, input: MclChatRequest, actor: MclAiActor) {
   // 'context' só resolve quando existe referência verificável no histórico.
   const previousText = input.history.map(({ content }) => content).join(" ");
@@ -195,7 +232,9 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
   // Open-ended analysis remains in the dedicated evidence-grounded tool path for
   // this MVP; it is not reduced to a numeric total or labelled as an alert.
   if (plan.intent === "analysis") return null;
-  if (plan.intent === "clarify" || (!plan.metric && plan.intent !== "source")) {
+  const ncDrilldown = plan.entity === "NC" && ["documents", "breakdown", "ranking", "source"].includes(plan.intent)
+    || plan.intent === "documents" && (plan.entity === "NC" || plan.entity == null);
+  if (plan.intent === "clarify" || (!plan.metric && plan.intent !== "source" && !ncDrilldown)) {
     return cognitiveResponse(plan.clarification || "Qual medida financeira deseja consultar?", requestId, parsed);
   }
 
@@ -203,6 +242,37 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
   if (target.needsUnit) {
     return cognitiveResponse(
       "Preciso identificar a UASG da unidade para essa consulta. Informe a UASG ou estabeleça o vínculo da sua OM no módulo de Créditos; não vou ampliar silenciosamente a consulta para todas as unidades.",
+      requestId, parsed,
+    );
+  }
+  if (ncDrilldown) {
+    const envelope = await queryTgNcComposition(actor, {
+      ug: target.unit || undefined,
+      nd: plan.nd || undefined, pi: plan.pi || undefined, limit: 25,
+    });
+    if (envelope.status !== "AVAILABLE" || !("documents" in envelope.data)) {
+      return cognitiveResponse(
+        "Não foi possível consultar as NC individualizadas nesta carga. " + envelope.gaps.join(" "),
+        requestId, parsed, envelope.citations, envelope.gaps,
+      );
+    }
+    const records = envelope.data;
+    const old = Number.isFinite(Date.parse(envelope.asOf)) && Date.now() - Date.parse(envelope.asOf) > 86_400_000;
+    const warnings = [
+      ...(old ? ["Carga TG desatualizada; os valores não representam saldos de hoje."] : []),
+      ...envelope.gaps,
+    ];
+    if (records.totalDocuments === 0) {
+      return cognitiveResponse(
+        "Não há NC individualizadas no filtro disponível. Não é possível reconstruir documentos que a fonte não contém.",
+        requestId, parsed, envelope.citations, warnings,
+      );
+    }
+    return cognitiveResponse(formatNcComposition(records), requestId, parsed, envelope.citations, warnings);
+  }
+  if (plan.intent === "documents" && plan.entity && plan.entity !== "NC") {
+    return cognitiveResponse(
+      "Esse tipo de documento ainda não tem ferramenta de detalhamento habilitada no catálogo semântico de Créditos.",
       requestId, parsed,
     );
   }

@@ -11,6 +11,14 @@
 - A interface exclui mensagens de erro do histórico do LLM, preservando o contexto válido da última resposta.
 - A execução real do Gateway, sua quota e a taxa de sucesso ainda dependem de validação autenticada. O acesso aos logs Vercel dessa conta esteve negado com HTTP 403 durante a investigação.
 
+## Detalhamento documental de NC (Cognitive Core v1.1)
+
+O registro semântico declara tanto ferramentas agregadas quanto ferramentas de documentos por entidade. O planejamento pode solicitar intent=documents e entity=NC; a execução queryTgNcComposition usa a última projeção TG autorizada e os filtros UG/UASG, ND e PI. A pergunta atual não é interpretada como termo de pesquisa de NE. A interface apresenta os códigos reais das NC, finalidade, PI, ND e montantes de provisão. Uma mesma NC com linhas em diferentes PI/ND é agrupada documentalmente; totais contábeis são reconciliados de modo independente.
+
+**Limite institucional obrigatório:** NC compõem a provisão, enquanto saldo disponível resulta de provisão atualizada menos empenhado. Uma NE não é automaticamente vinculada a uma NC individual nesta projeção. Portanto, não afirmar um saldo restante exclusivo de determinada NC, mesmo quando o TG tenha Item Informação 19 individualizado. Se houver mais de 25 NC, informar o total e a truncagem, com possibilidade de refinar PI/ND. Se não houver NC, declarar ausência, não inventar.
+
+A continuidade do diálogo deve preservar escopo e intenção documental. Uma confirmação de listagem não é solicitação de nova confirmação. A suíte automatizada contém exemplos da conversa de 17/10; o desempenho do LLM real requer teste autenticado e não é provado pelo mock do planejador.
+
 ## Contrato de execução
 
 1. A rota /api/ai/chat autentica, verifica autorização e limite por usuário.
