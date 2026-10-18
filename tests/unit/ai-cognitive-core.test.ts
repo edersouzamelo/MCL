@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { generateText } from "ai";
 import { prisma } from "@/server/db";
 import { queryTgCreditAnalytics, queryTgNcComposition } from "@/modules/ai/silos";
@@ -21,6 +22,7 @@ const input = (prompt: string, history: Array<{role: "user" | "assistant"; conte
 const basePlan: AiSemanticPlan = {
   capability: "credits-tg", intent: "ratio", metric: "LIQUIDATED", denominator: "COMMITTED",
   scope: "own", unit: null, nd: null, pi: null, search: null, groupBy: "TOTAL", clarification: null,
+  entity: null,
 };
 
 function plan(overrides: Partial<AiSemanticPlan> = {}) {
@@ -73,6 +75,22 @@ const ncRecords = {
 };
 
 describe("Cognitive Core v1 / contratos semânticos", () => {
+  it("gera JSON Schema estrito com TODOS os campos obrigatórios (Gateway OpenAI)", () => {
+    const generated = z.toJSONSchema(aiSemanticPlanSchema);
+    expect(generated.type).toBe("object");
+    const properties = Object.keys(generated.properties ?? {});
+    expect(generated.required).toEqual(expect.arrayContaining(properties));
+    expect(generated.required).toHaveLength(properties.length);
+    expect(properties).toContain("entity");
+    expect(generated.additionalProperties).toBe(false);
+    // Sem entidade o planejador retorna null, não omite campo obrigatório.
+    expect(aiSemanticPlanSchema.safeParse({ ...basePlan, entity: null }).success).toBe(true);
+    expect(aiSemanticPlanSchema.safeParse(Object.fromEntries(
+      Object.entries(basePlan).filter(([key]) => key !== "entity")
+    )).success).toBe(false);
+  });
+
+
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(resolveMclModel).mockReturnValue({
