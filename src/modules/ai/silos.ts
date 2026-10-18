@@ -904,6 +904,10 @@ export function projectTgNcComposition(
   const totals = projectCreditAnalytics(projection, {
     ...input, metric: "AVAILABLE", groupBy: "TOTAL", includeFinalities: false,
   });
+  const accountingTotals = totals.totals;
+  if (!("availableCreditCents" in accountingTotals)) {
+    throw new Error("O detalhamento de NC exige dados de execução corrente, não o contrato RPNP.");
+  }
   const allowedUgs = new Set(totals.filters.matchedUgs.map((item) => item.ug));
   const ncRows = projection.operational.ncMovements.filter((row) =>
     allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi)
@@ -940,7 +944,7 @@ export function projectTgNcComposition(
   return {
     source: totals.source,
     filters: totals.filters,
-    totals: totals.totals,
+    totals: accountingTotals,
     totalDocuments: documents.length,
     shownDocuments: Math.min(count, documents.length),
     documents: documents.slice(0, count),
