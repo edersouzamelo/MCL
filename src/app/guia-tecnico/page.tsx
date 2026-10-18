@@ -64,6 +64,7 @@ export default function TechnicalGuidePage() {
               <li>Registro semântico: entidades, medidas, dimensões, fontes, permissões e ferramentas tipadas de cada módulo.</li>
               <li>O LLM analisa a pergunta e o histórico e produz um plano estruturado. O servidor valida o plano e consulta dados autorizados sem executar SQL gerado pela IA.</li>
               <li>Valores financeiros são calculados no executor determinístico em centavos. As respostas exibem a fonte, a data de importação e as lacunas.</li>
+              <li>Detalhamento de NC: a ferramenta específica lista notas de crédito existentes no TG com número, finalidade, PI, ND e provisão; reconcilia o disponível com os empenhos, sem atribuir saldo individual por NC sem vínculo comprovado.</li>
               <li>Perguntas abertas e domínios ainda não habilitados usam o agente/RAG existente. O RAG técnico é lexical e versionado, não lê autonomamente todas as bases.</li>
               <li>Para novos módulos: declarar contrato semântico e adaptador de leitura, autorização, origem, tratamento de erro e testes. O núcleo não precisa de regras por pergunta.</li>
             </ol>
