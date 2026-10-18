@@ -3,6 +3,7 @@ import { gateway, generateText, Output } from "ai";
 import { MclAiServiceError } from "@/modules/ai/contracts";
 import type { MclAiActor, MclChatRequest, RagResponse } from "@/modules/ai/contracts";
 import { type ResolvedCreditIntent, formatCreditAnalyticsAnswer } from "@/modules/ai/credit-analytics";
+import { resolveNcQuestion } from "@/modules/ai/nc-validity";
 import { resolveMclModel } from "@/modules/ai/provider";
 import { queryTgCreditAnalytics, type CreditAnalyticsInput } from "@/modules/ai/silos";
 import { prisma } from "@/server/db";
@@ -26,6 +27,9 @@ const instructions = [
   "Se houver ambiguidade genuína que impeça o cálculo, intent=clarify e uma pergunta específica em clarification.",
   "Para perguntas sobre qual UG/UASG gerou o valor anterior, ou se pertence ao Comando ou OMDS, use intent=source, scope=context, metric=null. Verifique a proveniência, sem recalcular saldos nem pedir outra métrica.",
   "Alerta/risco/por quê pede intent=analysis: nenhum valor bruto isolado comprova irregularidade.",
+  "Nota de Crédito (NC) não é Nota de Empenho (NE). Nunca responda ranking de NC com linhas de NE.",
+  "Para validade, prazo de vencimento e NC mais urgentes pelo menor prazo, use intent=nc_validity com metric=null; a projeção TG atual não disponibiliza data-limite validada de NC.",
+  "Se o usuário já respondeu validade ou confirmou essa escolha, não peça nova confirmação. Continue a intenção anterior.",
   "O seletor visual do frontend não restringe a consulta contábil. Nunca adivinhe códigos, datas, percentuais ou UASG.",
 ].join("\n");
 
@@ -191,6 +195,59 @@ function cognitiveResponse(
 export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiActor, requestId: string, signal?: AbortSignal): Promise<RagResponse | null> {
   const parsed = await planMclSemanticQuery(input, actor, signal);
   const plan = parsed.plan;
+  // The planner can miss short follow-up confirmations and confuse NC with NE.
+  // This narrow post-planner guard preserves the user's explicit NC subject.
+  const ncQuestion = resolveNcQuestion(input, plan.intent);
+  if (ncQuestion === "UNSPECIFIED_URGENCY") {
+    return cognitiveResponse(
+      "Você perguntou quais NC são mais urgentes. Qual critério de urgência deseja utilizar? Se for o menor prazo de validade, a projeção atual do Tesouro Gerencial não disponibiliza uma data-limite validada para ordenar as NC por vencimento.",
+      requestId, parsed,
+    );
+  }
+  if (ncQuestion === "VALIDITY") {
+    const target = await resolveAuthorizedUnit(plan, input, actor);
+    if (target.needsUnit) {
+      return cognitiveResponse(
+        "Para consultar as NC dessa unidade, preciso identificar a UASG autorizada. Informe a UASG ou vincule a OM no módulo de Créditos. Não ampliarei o escopo para outras unidades.",
+        requestId, parsed,
+      );
+    }
+    // Query the authorized persisted snapshot only for provenance. The NC
+    // expiry field is not present in the validated projection contract.
+    const envelope = await queryTgCreditAnalytics(actor, {
+      ug: target.unit || undefined, metric: "AVAILABLE", groupBy: "TOTAL",
+      limit: 1, includeFinalities: false,
+    });
+    if (envelope.status !== "AVAILABLE") {
+      return cognitiveResponse(
+        "Entendi: você quer a validade das Notas de Crédito (NC), não o prazo de entrega das NE. Não há carga TG consultável para verificar as NC: "
+        + (envelope.gaps.join(" ") || "fonte indisponível.") + " Nenhum vencimento foi presumido.",
+        requestId, parsed, envelope.citations, envelope.gaps,
+      );
+    }
+    const evidence = envelope.data as CreditResultData;
+    const stale = Date.parse(envelope.asOf);
+    const notes = [
+      ...(Number.isFinite(stale) && Date.now() - stale > 24 * 60 * 60 * 1000
+        ? ["Carga TG desatualizada há mais de 24 horas; não comprova a situação atual."] : []),
+      ...envelope.gaps,
+    ];
+    if (target.unit && !evidence.filters.matchedUgs.some((item) => item.ug === target.unit)) {
+      return cognitiveResponse(
+        "Não encontrei a UG/UASG " + target.unit + " na carga TG autorizada. Não posso indicar prazos de NC para outra unidade.",
+        requestId, parsed, envelope.citations, notes,
+      );
+    }
+    return cognitiveResponse(
+      "Entendi: você quer as NC com o menor prazo de validade"
+      + (target.unit ? " da UG/UASG " + target.unit : "") + ". "
+      + "A projeção TG consultável não possui um campo validado de data-limite de utilização ou vencimento das NC. "
+      + "Portanto, não é possível informar esses prazos nem classificar as NC por urgência de vencimento. "
+      + "A data registrada na NC não pode ser tratada automaticamente como prazo de validade. "
+      + "Fonte: " + evidence.source.fileName + ", importada em " + fmtDate(evidence.source.importedAt) + ".",
+      requestId, parsed, envelope.citations, notes,
+    );
+  }
   if (plan.capability === "other" || !findSemanticCapability(plan.capability)) return null;
   // Open-ended analysis remains in the dedicated evidence-grounded tool path for
   // this MVP; it is not reduced to a numeric total or labelled as an alert.

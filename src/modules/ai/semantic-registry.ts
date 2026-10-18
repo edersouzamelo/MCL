@@ -42,13 +42,13 @@ export const AI_CAPABILITY_REGISTRY: readonly SemanticCapability[] = [
     tool: "queryTgCreditAnalytics",
     provenance: "Planilha do Tesouro Gerencial persistida, com nome, data da importação e data da fonte",
     permission: "Consulta apenas à organização autenticada; 'nossa OM' exige UASG vinculada",
-    description: "Leitura, agrupamento, ranking e divisão auditável de medidas de execução. Valores são centavos inteiros. Não executa importação nem decisões.",
+    description: "Leitura, agrupamento, ranking e divisão auditável de medidas de execução. A projeção TG atual não contém prazo de validade/vencimento das NC e não permite ranking por menor prazo. Valores são centavos inteiros. Não executa importação nem decisões.",
   },
 ] as const;
 
 export const aiSemanticPlanSchema = z.object({
   capability: z.enum(["credits-tg", "other"]),
-  intent: z.enum(["value", "ratio", "breakdown", "ranking", "analysis", "source", "clarify"]),
+  intent: z.enum(["value", "ratio", "breakdown", "ranking", "analysis", "source", "clarify", "nc_validity"]),
   metric: z.enum([
     "AVAILABLE", "PROVISION", "COMMITTED", "LIQUIDATED", "TO_LIQUIDATE", "PAID",
     "RPNP_REGISTERED_TOTAL", "RPNP_TO_LIQUIDATE", "RPNP_PAID",
