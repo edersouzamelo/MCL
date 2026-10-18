@@ -891,6 +891,95 @@ export function projectCreditAnalytics(
   };
 }
 
+/**
+ * Drill-down documental de NC dentro do mesmo snapshot TG e do mesmo escopo
+ * autorizado pelo assistente. A NC compõe a provisão; sem vínculo de NE para
+ * NC, não atribuir saldo calculado a um documento individual.
+ */
+export function projectTgNcComposition(
+  projection: TgDashboardProjection,
+  input: Pick<CreditAnalyticsInput, "ug" | "nd" | "pi">,
+  limit = 25,
+) {
+  const totals = projectCreditAnalytics(projection, {
+    ...input, metric: "AVAILABLE", groupBy: "TOTAL", includeFinalities: false,
+  });
+  const allowedUgs = new Set(totals.filters.matchedUgs.map((item) => item.ug));
+  const ncRows = projection.operational.ncMovements.filter((row) =>
+    allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi)
+  );
+  const grouped = new Map<string, {
+    ug: string; nc: string; purpose: string;
+    pis: Set<string>; nds: Set<string>;
+    provisionReceivedCents: number; provisionGrantedCents: number;
+    provisionUpdatedCents: number; reportedAvailableCreditCents: number;
+    sourceLines: number;
+  }>();
+  for (const row of ncRows) {
+    const key = row.ug + "|" + row.nc;
+    const current = grouped.get(key) ?? {
+      ug: row.ug, nc: row.nc, purpose: row.purpose,
+      pis: new Set<string>(), nds: new Set<string>(),
+      provisionReceivedCents: 0, provisionGrantedCents: 0,
+      provisionUpdatedCents: 0, reportedAvailableCreditCents: 0,
+      sourceLines: 0,
+    };
+    if (row.pi && row.pi !== "—") current.pis.add(row.pi);
+    if (row.nd && row.nd !== "—") current.nds.add(row.nd);
+    current.provisionReceivedCents += row.provisionReceivedCents;
+    current.provisionGrantedCents += row.provisionGrantedCents;
+    current.provisionUpdatedCents += row.provisionUpdatedCents;
+    current.reportedAvailableCreditCents += row.availableCreditCents;
+    current.sourceLines++;
+    grouped.set(key, current);
+  }
+  const documents = [...grouped.values()].map(({ pis, nds, ...document }) => ({
+    ...document, pis: [...pis].sort(), nds: [...nds].sort(),
+  })).sort((a, b) => Math.abs(b.provisionUpdatedCents) - Math.abs(a.provisionUpdatedCents) || a.nc.localeCompare(b.nc));
+  const count = Math.min(Math.max(limit, 1), 50);
+  return {
+    source: totals.source,
+    filters: totals.filters,
+    totals: totals.totals,
+    totalDocuments: documents.length,
+    shownDocuments: Math.min(count, documents.length),
+    documents: documents.slice(0, count),
+    notes: [
+      "As NC individualizam a origem e as movimentações de provisão, não necessariamente uma parcela atribuível do saldo disponível.",
+      "Crédito disponível do filtro = provisão atualizada menos total empenhado. O saldo individual por NC não é calculado sem vínculo contábil explícito entre NC e NE.",
+      "O Item Informação 19 por NC pode estar registrado na fonte; é mostrado apenas como valor informado e não como rateio calculado.",
+    ],
+  };
+}
+
+export async function queryTgNcComposition(
+  actor: MclAiActor,
+  input: Pick<CreditAnalyticsInput, "ug" | "nd" | "pi"> & { limit?: number },
+): Promise<MclToolEnvelope<ReturnType<typeof projectTgNcComposition> | { records: never[] }>> {
+  if (!process.env.DATABASE_URL) return unavailable("DATABASE_URL não configurada. Não há dados demonstrativos.", { records: [] });
+  if (!actor.organizationId) return unavailable("Organização não identificada.", { records: [] });
+  const projection = await getLatestTgProjection(actor.organizationId);
+  if (!projection) return unavailable("Nenhuma projeção TG persistida para esta organização.", { records: [] });
+  const data = projectTgNcComposition(projection, input, input.limit);
+  return {
+    status: "AVAILABLE",
+    dataNature: "CALCULATED_FROM_PERSISTED",
+    asOf: projection.snapshot.importedAt,
+    citations: [{
+      title: projection.snapshot.fileName, source: "TESOURO_GERENCIAL",
+      dataNature: "PERSISTED_OPERATIONAL", asOf: projection.snapshot.importedAt,
+    }],
+    gaps: [
+      ...(input.ug && data.filters.matchedUgs.length === 0
+        ? ["A UG solicitada não consta da carga autorizada."] : []),
+      ...(data.totalDocuments === 0 ? ["Nenhuma NC individualizada foi identificada no filtro e contrato TG importado."] : []),
+      ...(data.totalDocuments > data.shownDocuments
+        ? [`Exibidas ${data.shownDocuments} de ${data.totalDocuments} NC. Refine o filtro para consultar as demais.`] : []),
+    ],
+    data,
+  };
+}
+
 export async function queryTgCreditAnalytics(
   actor: MclAiActor,
   input: CreditAnalyticsInput,
