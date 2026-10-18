@@ -54,7 +54,9 @@ export const AI_CAPABILITY_REGISTRY: readonly SemanticCapability[] = [
 export const aiSemanticPlanSchema = z.object({
   capability: z.enum(["credits-tg", "other"]),
   intent: z.enum(["value", "ratio", "breakdown", "ranking", "documents", "analysis", "source", "clarify"]),
-  entity: z.enum(["NC", "NE", "UG"]).nullable().optional(),
+  // Structured Outputs em modo strict exige TODAS as propriedades em required.
+  // Usar null quando não há entidade; .optional() gera schema incompatível com o Gateway.
+  entity: z.enum(["NC", "NE", "UG"]).nullable(),
   metric: z.enum([
     "AVAILABLE", "PROVISION", "COMMITTED", "LIQUIDATED", "TO_LIQUIDATE", "PAID",
     "RPNP_REGISTERED_TOTAL", "RPNP_TO_LIQUIDATE", "RPNP_PAID",
