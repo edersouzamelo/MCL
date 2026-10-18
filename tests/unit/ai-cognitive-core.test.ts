@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateText } from "ai";
 import { prisma } from "@/server/db";
-import { queryTgCreditAnalytics } from "@/modules/ai/silos";
+import { queryTgCreditAnalytics, queryTgNcComposition } from "@/modules/ai/silos";
 import { resolveMclModel } from "@/modules/ai/provider";
 import { runMclCognitiveCore } from "@/modules/ai/cognitive-core";
 import { AI_CAPABILITY_REGISTRY, aiSemanticPlanSchema, type AiSemanticPlan } from "@/modules/ai/semantic-registry";
@@ -11,7 +11,7 @@ vi.mock("ai", async () => {
   return { ...actual, generateText: vi.fn() };
 });
 vi.mock("@/modules/ai/provider", () => ({ resolveMclModel: vi.fn() }));
-vi.mock("@/modules/ai/silos", () => ({ queryTgCreditAnalytics: vi.fn() }));
+vi.mock("@/modules/ai/silos", () => ({ queryTgCreditAnalytics: vi.fn(), queryTgNcComposition: vi.fn() }));
 vi.mock("@/server/db", () => ({ prisma: { organization: { findUnique: vi.fn() } } }));
 
 const actor = { id: "user-ai-test", organizationId: "org-ai-test", roles: ["LOGISTICS_MANAGER" as const] };
@@ -49,6 +49,29 @@ const tg = {
   },
 };
 
+const ncRecords = {
+  status: "AVAILABLE",
+  dataNature: "CALCULATED_FROM_PERSISTED",
+  asOf: "2026-09-11T22:21:09.000Z",
+  citations: [{ title: "TG_SET_2026.xlsx", source: "TESOURO_GERENCIAL", asOf: "2026-09-11T22:21:09.000Z" }],
+  gaps: [],
+  data: {
+    source: { fileName: "TG_SET_2026.xlsx", importedAt: "2026-09-11T22:21:09.000Z" },
+    filters: { ug: "160136", nd: null, pi: null, search: null, matchedUgs: [{ ug: "160136", om: "Cmdo 9 Gpt Log" }] },
+    totals: { provisionUpdatedCents: 100000, committedCents: 45000, availableCreditCents: 55000,
+      reportedAvailableCreditCents: 55000, availableReconciliationCents: 0 },
+    totalDocuments: 2, shownDocuments: 2,
+    documents: [
+      { ug: "160136", nc: "2026NC000123", purpose: "Suprimento classe II",
+        pis: ["BIDS"], nds: ["339030"], provisionReceivedCents: 80000, provisionGrantedCents: 0,
+        provisionUpdatedCents: 80000, reportedAvailableCreditCents: 40000, sourceLines: 2 },
+      { ug: "160136", nc: "2026NC000124", purpose: "Apoio administrativo",
+        pis: ["BIDES"], nds: ["339039"], provisionReceivedCents: 20000, provisionGrantedCents: 0,
+        provisionUpdatedCents: 20000, reportedAvailableCreditCents: 15000, sourceLines: 1 },
+    ],
+  },
+};
+
 describe("Cognitive Core v1 / contratos semânticos", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -58,6 +81,7 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     } as never);
     vi.mocked(prisma.organization.findUnique).mockResolvedValue({ uasg: "160136" } as never);
     vi.mocked(queryTgCreditAnalytics).mockResolvedValue(tg as never);
+    vi.mocked(queryTgNcComposition).mockResolvedValue(ncRecords as never);
     plan();
   });
 
@@ -109,6 +133,46 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
       .rejects.toMatchObject({ name: "MclAiServiceError", code: "AI_SEMANTIC_PLAN_EMPTY", status: 503 });
     expect(generateText).toHaveBeenCalledTimes(2);
     expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Quais NC compõem esse saldo?", "documents"],
+    ["Mas digo: me mostre as NC que estão formando esse saldo disponível", "documents"],
+    ["sim!!! quero!!!", "documents"],
+    ["já falei que quero", "source"],
+  ] as const)("executa listagem das NC sem repetir origem da UG: %s", async (question, intent) => {
+    plan({ intent, entity: "NC", metric: intent === "source" ? null : "AVAILABLE",
+      scope: "context", denominator: null, search: "NC" });
+    const history = [
+      { role: "user" as const, content: "Qual é o nosso crédito disponível?" },
+      { role: "assistant" as const, content: "O crédito disponível para UG/UASG 160136 é R$ 550,00." },
+      { role: "user" as const, content: "Quais NC compõem esse saldo?" },
+      { role: "assistant" as const, content: "Você deseja a lista detalhada das Notas de Crédito da UG 160136?" },
+    ];
+    const response = await runMclCognitiveCore(input(question, history), actor, "req-nc");
+    expect(queryTgNcComposition).toHaveBeenCalledWith(actor, {
+      ug: "160136", nd: undefined, pi: undefined, limit: 25,
+    });
+    expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+    expect(response?.answer).toContain("2026NC000123");
+    expect(response?.answer).toContain("2026NC000124");
+    expect(response?.answer).toContain("R$ 550,00");
+    expect(response?.answer).toContain("não é possível afirmar o saldo exclusivo de cada NC");
+    expect(response?.answer).not.toContain("Está filtrado para essa UG, não para a soma das OMDS");
+    expect(response?.warnings).toContainEqual(expect.stringContaining("desatualizada"));
+    expect(response?.citations[0].source).toBe("TESOURO_GERENCIAL");
+  });
+
+  it("não inventa NC se o extrato não trouxer documentos identificados", async () => {
+    plan({ intent: "documents", entity: "NC", metric: "AVAILABLE", denominator: null });
+    vi.mocked(queryTgNcComposition).mockResolvedValue({
+      ...ncRecords,
+      data: { ...ncRecords.data, totalDocuments: 0, shownDocuments: 0, documents: [] },
+      gaps: ["Nenhuma NC individualizada identificada."],
+    } as never);
+    const response = await runMclCognitiveCore(input("Quais NC compõem o crédito disponível?"), actor, "req-empty-nc");
+    expect(response?.answer).toContain("Não há NC individualizadas");
+    expect(response?.answer).not.toContain("2026NC000123");
   });
 
   it("catálogo publica só capacidades efetivamente adaptadas; Radar não é falso disponível", () => {
