@@ -156,7 +156,7 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
     expect(response?.answer).toContain("2026NC000123");
     expect(response?.answer).toContain("2026NC000124");
-    expect(response?.answer).toContain("R$ 550,00");
+    expect(response?.answer).toMatch(/R\$\s+550,00/);
     expect(response?.answer).toContain("não é possível afirmar o saldo exclusivo de cada NC");
     expect(response?.answer).not.toContain("Está filtrado para essa UG, não para a soma das OMDS");
     expect(response?.warnings).toContainEqual(expect.stringContaining("desatualizada"));
