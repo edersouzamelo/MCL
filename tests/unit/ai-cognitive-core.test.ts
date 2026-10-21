@@ -23,6 +23,7 @@ const basePlan: AiSemanticPlan = {
   capability: "credits-tg", intent: "ratio", metric: "LIQUIDATED", denominator: "COMMITTED",
   scope: "own", unit: null, nd: null, pi: null, search: null, groupBy: "TOTAL", clarification: null,
   entity: null,
+  metrics: [],
 };
 
 function plan(overrides: Partial<AiSemanticPlan> = {}) {
@@ -82,6 +83,7 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     expect(generated.required).toEqual(expect.arrayContaining(properties));
     expect(generated.required).toHaveLength(properties.length);
     expect(properties).toContain("entity");
+    expect(properties).toContain("metrics");
     expect(generated.additionalProperties).toBe(false);
     // Sem entidade o planejador retorna null, não omite campo obrigatório.
     expect(aiSemanticPlanSchema.safeParse({ ...basePlan, entity: null }).success).toBe(true);
@@ -128,6 +130,46 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     const response = await runMclCognitiveCore(input("Esse saldo é de qual UASG?"), actor, "req-no-provenance");
     expect(response?.answer).toContain("Preciso identificar a UASG");
     expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("compara empenhado, liquidado e pago no mesmo snapshot sem pedir métrica", async () => {
+    plan({ intent: "compare", metric: null, metrics: ["COMMITTED", "LIQUIDATED", "PAID"],
+      denominator: null, scope: "context", groupBy: "TOTAL" });
+    const history = [
+      { role: "user" as const, content: "Quanto de crédito disponível da nossa UASG?" },
+      { role: "assistant" as const, content: "O crédito disponível para UG/UASG 160136 é R$ 80,00." },
+    ];
+    const result = await runMclCognitiveCore(
+      input("Compare valor empenhado, liquidado e pago.", history), actor, "req-compare",
+    );
+    expect(result?.answer).toContain("UG/UASG 160136");
+    expect(result?.answer).toMatch(/Empenhado: R\$\s+100,00/);
+    expect(result?.answer).toMatch(/Liquidado: R\$\s+40,00/);
+    expect(result?.answer).toMatch(/Pago: R\$\s+30,00/);
+    expect(result?.answer).toContain("Liquidado sobre empenhado: 40,00%");
+    expect(result?.answer).toContain("Pago sobre empenhado: 30,00%");
+    expect(result?.answer).toContain("TG_SET_2026.xlsx");
+    expect(result?.answer).not.toContain("Qual medida financeira deseja consultar");
+    expect(queryTgCreditAnalytics).toHaveBeenCalledTimes(1);
+    expect(generateText).toHaveBeenCalledTimes(1);
+  });
+
+  it("detalha crédito por UASG mesmo quando existe apenas uma unidade no filtro", async () => {
+    plan({ intent: "breakdown", metric: "AVAILABLE", metrics: [], denominator: null, scope: "own", groupBy: "UG" });
+    vi.mocked(queryTgCreditAnalytics).mockResolvedValue({
+      ...tg, data: { ...tg.data, metric: "AVAILABLE",
+        groups: [{ label: "160136: Cmdo 9 Gpt Log", availableCreditCents: 8000, metricValueCents: 8000 }],
+        totals: { ...tg.data.totals, metricValueCents: 8000 },
+      },
+    } as never);
+    const result = await runMclCognitiveCore(input("Detalhe o resultado por UASG."), actor, "req-breakdown");
+    expect(queryTgCreditAnalytics).toHaveBeenCalledWith(actor, expect.objectContaining({
+      ug: "160136", groupBy: "UG", metric: "AVAILABLE",
+    }));
+    expect(result?.answer).toContain("160136: Cmdo 9 Gpt Log");
+    expect(result?.answer).toContain("1 unidade");
+    expect(result?.answer).toMatch(/R\$\s+80,00/);
+    expect(result?.answer).not.toContain("Qual medida financeira deseja consultar");
   });
 
   it("retenta planejamento sem saída uma única vez, usando o modelo conversacional", async () => {
