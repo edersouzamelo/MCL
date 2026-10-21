@@ -53,7 +53,7 @@ export const AI_CAPABILITY_REGISTRY: readonly SemanticCapability[] = [
 
 export const aiSemanticPlanSchema = z.object({
   capability: z.enum(["credits-tg", "other"]),
-  intent: z.enum(["value", "ratio", "breakdown", "ranking", "documents", "analysis", "source", "clarify"]),
+  intent: z.enum(["value", "ratio", "compare", "breakdown", "ranking", "documents", "analysis", "source", "clarify"]),
   // Structured Outputs em modo strict exige TODAS as propriedades em required.
   // Usar null quando não há entidade; .optional() gera schema incompatível com o Gateway.
   entity: z.enum(["NC", "NE", "UG"]).nullable(),
@@ -61,6 +61,11 @@ export const aiSemanticPlanSchema = z.object({
     "AVAILABLE", "PROVISION", "COMMITTED", "LIQUIDATED", "TO_LIQUIDATE", "PAID",
     "RPNP_REGISTERED_TOTAL", "RPNP_TO_LIQUIDATE", "RPNP_PAID",
   ]).nullable(),
+  // Sempre obrigatório no JSON Schema estrito; [] quando a consulta não é
+  // comparativa. Permite ao LLM solicitar várias medidas no mesmo plano.
+  metrics: z.array(z.enum([
+    "AVAILABLE", "PROVISION", "COMMITTED", "LIQUIDATED", "TO_LIQUIDATE", "PAID",
+  ])).max(6),
   denominator: z.enum(["COMMITTED", "PROVISION"]).nullable(),
   scope: z.enum(["own", "all", "unit", "context"]),
   unit: z.string().trim().max(100).nullable(),
