@@ -183,3 +183,22 @@ function instalarGatilhoMclTg() {
   ScriptApp.newTrigger('enviarPlanilhaSiafiParaMCL').timeBased().everyHours(1).create();
   console.log('Gatilho horário de ingestão TG criado.');
 }
+
+/** Diagnóstico sem imprimir segredo nem conteúdo financeiro. */
+function diagnosticarRoboMclTg() {
+  var props = PropertiesService.getScriptProperties();
+  var triggers = ScriptApp.getProjectTriggers().filter(function (trigger) {
+    return trigger.getHandlerFunction() === 'enviarPlanilhaSiafiParaMCL';
+  });
+  var last = Number(props.getProperty(MCL_TG_LAST_SUCCESS_AT_) || 0);
+  var report = {
+    status: triggers.length ? 'TG_TRIGGER_PRESENTE' : 'TG_SEM_TRIGGER',
+    handler: 'enviarPlanilhaSiafiParaMCL',
+    triggerCount: triggers.length,
+    tokenConfigured: Boolean(props.getProperty('MCL_WEBHOOK_TOKEN')),
+    organizationCodeValid: /^\d{6}$/.test(String(props.getProperty('MCL_ORGANIZATION_CODE') || '').trim()),
+    lastConfirmedEmailAt: last ? new Date(last).toISOString() : null,
+  };
+  console.log(JSON.stringify(report));
+  return report;
+}
