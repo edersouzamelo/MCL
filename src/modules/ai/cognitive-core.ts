@@ -19,6 +19,9 @@ const instructions = [
   "Responda apenas o OBJETO ESTRUTURADO solicitado. Não invente dados ou valores; as ferramentas farão os cálculos.",
   "Escolha capability=credits-tg para dados de Crédito/Tesouro Gerencial e other para domínios não cadastrados.",
   "Uma pergunta de percentual é intent=ratio, metric=NUMERADOR e denominator=DENOMINADOR. Exemplo: liquidação do total empenhado significa LIQUIDATED/COMMITTED.",
+  "Quando o usuário pede COMPARAR duas ou mais medidas (empenhado, liquidado, pago etc.), use intent=compare e preencha metrics com TODAS as medidas solicitadas, na ordem pedida; metric pode ser null. Exemplo: comparar empenhado, liquidado e pago: metrics=[COMMITTED,LIQUIDATED,PAID]. Não peça qual medida consultar.",
+  "Para breakdown por UASG/UG, use intent=breakdown e groupBy=UG, preservando a medida mencionada ou discutida (exemplo crédito disponível => AVAILABLE). Mesmo uma única UG deve ser identificada; não peça nova medida se o histórico a especificar.",
+  "Para cada consulta que não seja comparação, retorne metrics=[] (campo obrigatório do JSON estrito).",
   "PERCENTUAL eu disse é uma correção da pergunta anterior, não uma nova pergunta sobre o valor empenhado.",
   "Preserve unidade, medidas e filtros no histórico, a menos que o usuário os altere. Nossa OM é scope=own; todas as OM é scope=all.",
   "Se mencionar outra UG/UASG, use scope=unit e informe unit. No acompanhamento da própria OM, continue scope=own.",
@@ -144,6 +147,67 @@ function formatRatio(data: CreditResultData, plan: AiSemanticPlan): string {
   ].join("\n");
 }
 
+const comparableMetrics = {
+  AVAILABLE: "Crédito disponível",
+  PROVISION: "Provisão atualizada",
+  COMMITTED: "Empenhado",
+  LIQUIDATED: "Liquidado",
+  TO_LIQUIDATE: "A liquidar",
+  PAID: "Pago",
+} as const;
+
+type ComparableMeasure = keyof typeof comparableMetrics;
+function comparisonValue(data: CreditResultData, measure: ComparableMeasure): number | undefined {
+  const field = metricField[measure];
+  const value = data.totals[field];
+  return Number.isFinite(value) ? value : undefined;
+}
+
+/** No model-generated arithmetic: one authorized TG snapshot, several typed measures. */
+function formatComparison(data: CreditResultData, measures: ComparableMeasure[]) {
+  if (measures.length < 2) return "É necessário selecionar pelo menos duas medidas para comparar.";
+  const unit = data.filters.matchedUgs.length === 1 ? data.filters.matchedUgs[0] : null;
+  const rows = measures.map((measure) => {
+    const value = comparisonValue(data, measure);
+    return comparableMetrics[measure] + ": " + (value === undefined ? "não disponível" : money(value));
+  });
+  if (measures.includes("COMMITTED")) {
+    const committed = comparisonValue(data, "COMMITTED");
+    if (committed !== undefined && committed > 0) {
+      for (const measure of (["LIQUIDATED", "PAID", "TO_LIQUIDATE"] as const)) {
+        if (measures.includes(measure)) {
+          const value = comparisonValue(data, measure);
+          if (value !== undefined) rows.push(
+            comparableMetrics[measure] + " sobre empenhado: " + percent(value, committed),
+          );
+        }
+      }
+    }
+  }
+  return [
+    unit ? "Comparação para UG/UASG " + unit.ug + " (" + unit.om + "):"
+      : "Comparação de medidas no conjunto de UG/UASG autorizado:",
+    ...rows,
+    "Fonte: " + data.source.fileName + ", importada em " + fmtDate(data.source.importedAt) + ".",
+  ].join("\n");
+}
+
+function formatCreditBreakdown(data: CreditResultData, metric: string) {
+  if (!data.groups.length) return "Nenhuma UG/UASG encontrada no agrupamento solicitado.";
+  const field = metricField[metric] || "metricValueCents";
+  const lines = data.groups.map((group) => {
+    const value = group[field];
+    return group.label + ": " + (typeof value === "number" && Number.isFinite(value) ? money(value) : "valor não disponível") + ".";
+  });
+  const total = data.totals[field];
+  return [
+    "Detalhamento de " + metricName(metric) + " por " + (data.groups.length === 1 ? "1 unidade" : data.groups.length + " unidades") + ":",
+    ...lines,
+    typeof total === "number" ? "Total no filtro: " + money(total) + "." : "",
+    "Fonte: " + data.source.fileName + ", importada em " + fmtDate(data.source.importedAt) + ".",
+  ].filter(Boolean).join("\n");
+}
+
 type NcCompositionData = Awaited<ReturnType<typeof queryTgNcComposition>>["data"];
 
 function formatNcComposition(
@@ -234,7 +298,10 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
   if (plan.intent === "analysis") return null;
   const ncDrilldown = plan.entity === "NC" && ["documents", "breakdown", "ranking", "source"].includes(plan.intent)
     || plan.intent === "documents" && (plan.entity === "NC" || plan.entity == null);
-  if (plan.intent === "clarify" || (!plan.metric && plan.intent !== "source" && !ncDrilldown)) {
+  // Intent=compare aceita mais de uma métrica; a impossibilidade de escolher
+  // apenas uma não é ambiguidade. Não tratar a sugestão do próprio MCL como erro.
+  const comparison = plan.intent === "compare" && plan.metrics.length >= 2;
+  if (plan.intent === "clarify" || (!plan.metric && !comparison && plan.intent !== "source" && !ncDrilldown)) {
     return cognitiveResponse(plan.clarification || "Qual medida financeira deseja consultar?", requestId, parsed);
   }
 
@@ -283,7 +350,7 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
   const filters: CreditAnalyticsInput = {
     ug: target.unit || undefined,
     nd: plan.nd || undefined, pi: plan.pi || undefined, search: plan.search || undefined,
-    metric: plan.metric ?? "AVAILABLE",
+    metric: plan.metric ?? (comparison ? plan.metrics[0] : "AVAILABLE"),
     groupBy: plan.intent === "source" ? "UG" : plan.intent === "ranking" ? "NE" : (plan.groupBy || "TOTAL"),
     sort: plan.intent === "ranking" ? "VALUE_DESC" : undefined,
     limit: plan.intent === "ranking" ? 8 : 15,
@@ -306,6 +373,16 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
   ];
   if (filters.ug && !data.filters.matchedUgs.length) {
     return cognitiveResponse("Nenhuma UG/UASG corresponde ao filtro solicitado. Isso não equivale a saldo zero.", requestId, parsed, envelope.citations, notes);
+  }
+  if (comparison) {
+    return cognitiveResponse(
+      formatComparison(data, plan.metrics), requestId, parsed, envelope.citations, notes,
+    );
+  }
+  if (plan.intent === "breakdown" && (plan.groupBy ?? "TOTAL") !== "TOTAL" && plan.metric) {
+    return cognitiveResponse(
+      formatCreditBreakdown(data, plan.metric), requestId, parsed, envelope.citations, notes,
+    );
   }
   if (plan.intent === "source") {
     const verified = target.unit
