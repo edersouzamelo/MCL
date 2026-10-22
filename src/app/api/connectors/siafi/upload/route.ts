@@ -118,7 +118,7 @@ export async function POST(request: Request) {
     const organization = await prisma.organization.findUnique({ where: isTg ? { uasg: organizationCode } : { code: organizationCode }, select: { id: true, code: true, active: true } });
     if (!organization || !organization.active) return NextResponse.json({ success: false, error: isTg ? "UASG não vinculada a uma organização ativa. Vincule a UASG no painel de Créditos." : "Organização não localizada." }, { status: 404 });
 
-    if (isTg && formData.has("chunkCount")) return receiveTgChunk(formData, file, organization.id);
+    if (isTg && formData.has("chunkCount")) return await receiveTgChunk(formData, file, organization.id);
 
     const extension = file.name.toLowerCase().split(".").pop();
     if (extension !== "xls" && extension !== "xlsx") {
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     const buffer = await file.arrayBuffer();
     if (isTg) {
       const received = String(formData.get("emailReceivedAt") ?? "");
-      return persistTgFile({ organizationId: organization.id, fileName: file.name, buffer, emailReceivedAt: received });
+      return await persistTgFile({ organizationId: organization.id, fileName: file.name, buffer, emailReceivedAt: received });
     }
     if (!kind) return NextResponse.json({ success: false, error: "Tipo de fonte ausente." }, { status: 400 });
     const parsed = kind === "CURRENT" ? parseSagWorkbook(buffer, file.name) : parseRpnWorkbook(buffer, file.name);

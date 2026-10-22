@@ -148,7 +148,7 @@ function parseV1(matrix: unknown[][], sheet: XLSX.WorkSheet, sheetName: string, 
 }
 
 export function parseTgWorkbook(buffer: ArrayBuffer, fileName: string): TgReport {
-  const workbook = XLSX.read(buffer, { type: "array" });
+  const workbook = XLSX.read(buffer, { type: "array", dense: true });
   const rows: TgRow[] = [];
   let schema: TgReport["schema"] | null = null;
   for (const sheetName of workbook.SheetNames) {

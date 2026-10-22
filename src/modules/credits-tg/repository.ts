@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import type { TgReport } from "./parser";
 import { projectTgOperational } from "./projection";
+import { encodeTgPayload, decodeTgPayload } from "./payload";
 
 // Separate source kind: queries for SAG CURRENT/RPNP cannot consume this payload.
 // Stable database discriminator. The payload itself declares V1 or V2.
@@ -13,7 +14,7 @@ export type TgSnapshotMetadata = Omit<TgSnapshot, "rows"> & { rowCount: number }
 export type TgDashboardProjection = { projectionVersion?: number; snapshot: TgSnapshotMetadata; operational: ReturnType<typeof projectTgOperational> };
 export async function persistTg(input: { organizationId: string; report: TgReport; buffer: ArrayBuffer; actor: string; method: "APPS_SCRIPT_TG" | "MANUAL_TG"; emailReceivedAt?: string | null }) {
   const checksum = createHash("sha256").update(Buffer.from(input.buffer)).digest("hex");
-  const payload = JSON.parse(JSON.stringify({ ...input.report, emailReceivedAt: input.emailReceivedAt ?? null })) as Prisma.InputJsonValue;
+  const payload = encodeTgPayload({ ...input.report, emailReceivedAt: input.emailReceivedAt ?? null }) as unknown as Prisma.InputJsonValue;
   const projection = JSON.parse(JSON.stringify({
     projectionVersion: TG_PROJECTION_VERSION,
     snapshot: { schema: input.report.schema, parserVersion: input.report.parserVersion, fileName: input.report.fileName,
@@ -23,6 +24,7 @@ export async function persistTg(input: { organizationId: string; report: TgRepor
     operational: projectTgOperational(input.report),
   })) as Prisma.InputJsonValue;
   return prisma.financialSourceImport.upsert({
+    select: { rowCount: true, checksum: true, importedAt: true },
     where: { organizationId_sourceKind_checksum: { organizationId: input.organizationId, sourceKind: TG_SOURCE_KIND, checksum } },
     // The checksum still identifies the immutable source file. Rebuild only the
     // parsed projection so a corrected parser can repair an existing import;
@@ -63,7 +65,7 @@ export async function saveTgProjection(organizationId: string, snapshot: TgSnaps
 export async function getLatestTg(organizationId: string): Promise<TgSnapshot | null> {
   const record = await prisma.financialSourceImport.findFirst({ where: { organizationId, sourceKind: TG_SOURCE_KIND }, orderBy: [{ importedAt: "desc" }, { id: "desc" }] });
   if (!record) return null;
-  const payload = record.payload as unknown as TgReport & { emailReceivedAt?: string };
+  const payload = decodeTgPayload(record.payload);
   if (!["TG_MASTER_V1", "TG_MASTER_V2"].includes(payload.schema) || !Array.isArray(payload.rows)) throw new Error("Carga TG persistida incompatível.");
   return { ...payload, checksum: record.checksum, importedAt: record.importedAt.toISOString(), emailReceivedAt: payload.emailReceivedAt ?? null, ingestionMethod: record.ingestionMethod };
 }
