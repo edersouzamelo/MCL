@@ -19,7 +19,7 @@ describe("escopo das ferramentas TG",()=>{
     expect(getLatestTg).toHaveBeenCalledWith("org-authorized");
   });
   it("não lê TG sem organização e declara indisponibilidade",async()=>{
-    const tools=createTgEvidenceTools({...actor,organizationId:null});
+    const tools=createTgEvidenceTools({...actor,organizationId:undefined});
     expect(await execute(tools.consultarPrazosNc,{status:"ALL"})).toMatchObject({status:"UNAVAILABLE",dataNature:"NONE"});
     expect(getLatestTg).not.toHaveBeenCalled();
   });

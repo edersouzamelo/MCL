@@ -100,7 +100,7 @@ describe("Conciliação com Item 19 sem número de NC", () => {
     const source = {...projection(), operational:projectTgOperational({rows})};
     const result = projectCreditAnalytics(source,{ug:"160136",metric:"AVAILABLE"});
     expect(result.totals).toMatchObject({availableCreditCents:3000,reportedAvailableCreditCents:3000,availableReconciliationCents:0});
-    expect(projectCreditAnalytics(source,{ug:"160136",groupBy:"ND"}).groups[0].reportedAvailableCreditCents).toBe(3000);
+    expect(projectCreditAnalytics(source,{ug:"160136",groupBy:"ND"}).groups[0]).toMatchObject({reportedAvailableCreditCents:3000});
     expect(projectTgNcComposition(source,{ug:"160136"}).totalDocuments).toBe(1);
   });
   it("pagina documentos e informa a próxima página", () => {
