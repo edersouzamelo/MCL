@@ -66,6 +66,13 @@ export function projectTgOperational(report: Pick<TgReport, "rows"> | null) {
       availableCreditCents: sum(items, TG_ITEM.available),
     }));
 
+  // Item 19 also carries negative movements without a NC. Keep its full
+  // accounting scope independently of the documentary NC projection.
+  const reportedCreditBalances = group(rows.filter(row => row.itemCode === TG_ITEM.available),
+    row => [row.ug, row.pi, row.nd].join("|"),
+    (items, first) => ({ ug: first.ug, pi: text(first.pi), nd: text(first.nd),
+      availableCreditCents: sum(items, TG_ITEM.available) }));
+
   const neCodes: Set<string> = new Set([TG_ITEM.committed, TG_ITEM.committedToLiquidate, TG_ITEM.liquidated, TG_ITEM.liquidatedToPay, TG_ITEM.paid]);
   const neExecution = group(rows.filter(row => row.ne && row.itemCode && neCodes.has(row.itemCode)),
     row => [row.ug, row.ne, row.pi, row.nd].join("|"),
@@ -105,7 +112,7 @@ export function projectTgOperational(report: Pick<TgReport, "rows"> | null) {
   const rpnpCancelledCents = sum(rows, TG_ITEM.rpnpCancelled);
   const rpnpToLiquidateCents = sum(rows, TG_ITEM.rpnpToLiquidate);
   return {
-    currentYear, piNdMovements, neMovements, ncMovements, neExecution, rpnpMovements,
+    currentYear, piNdMovements, neMovements, ncMovements, neExecution, rpnpMovements, reportedCreditBalances,
     ugOptions: [...new Map(rows.map(row => [row.ug, { ug: row.ug, om: row.om }])).values()].sort((a, b) => a.ug.localeCompare(b.ug)),
     ndOptions: [...new Set(rows.flatMap(row => row.nd ? [row.nd] : []))].sort(),
     ugCount: new Set(rows.map(row => row.ug)).size,
@@ -126,3 +133,4 @@ export function projectTgOperational(report: Pick<TgReport, "rows"> | null) {
     },
   };
 }
+

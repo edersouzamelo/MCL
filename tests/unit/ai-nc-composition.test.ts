@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { projectTgNcComposition } from "@/modules/ai/silos";
+import { projectCreditAnalytics, projectTgNcComposition } from "@/modules/ai/silos";
+import { projectTgOperational } from "@/modules/credits-tg/projection";
+import type { TgRow } from "@/modules/credits-tg/parser";
 import type { TgDashboardProjection } from "@/modules/credits-tg/repository";
 
 function nc(ug: string, nc: string, pi: string, nd: string, received: number, updated: number, reported: number) {
@@ -81,5 +83,31 @@ describe("Detalhamento TG de Notas de Crédito", () => {
     expect(answer.totalDocuments).toBe(2);
     expect(answer.shownDocuments).toBe(1);
     expect(answer.documents).toHaveLength(1);
+  });
+});
+
+
+
+describe("Conciliação com Item 19 sem número de NC", () => {
+  it("preserva lançamentos negativos fora das NC e não inventa documento", () => {
+    const base = { ug:"160136", om:"OM", pi:"PI", nd:"339030", year:"2026" };
+    const rows = [
+      {...base,itemCode:"91",nc:"2026NC000001",movementCents:10000},
+      {...base,itemCode:"19",nc:"2026NC000001",movementCents:10000},
+      {...base,itemCode:"19",nc:null,movementCents:-7000},
+      {...base,itemCode:"29",nc:null,ne:"2026NE000001",movementCents:7000},
+    ] as TgRow[];
+    const source = {...projection(), operational:projectTgOperational({rows})};
+    const result = projectCreditAnalytics(source,{ug:"160136",metric:"AVAILABLE"});
+    expect(result.totals).toMatchObject({availableCreditCents:3000,reportedAvailableCreditCents:3000,availableReconciliationCents:0});
+    expect(projectCreditAnalytics(source,{ug:"160136",groupBy:"ND"}).groups[0]).toMatchObject({reportedAvailableCreditCents:3000});
+    expect(projectTgNcComposition(source,{ug:"160136"}).totalDocuments).toBe(1);
+  });
+  it("pagina documentos e informa a próxima página", () => {
+    const result=projectTgNcComposition(projection(),{ug:"160136"},1,1);
+    expect(result.shownDocuments).toBe(1);
+    expect(result.nextOffset).toBeNull();
+    expect(result.totalDocuments).toBe(2);
+    expect(result.documents[0].nc).toBe("2026NC000002");
   });
 });

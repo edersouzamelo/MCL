@@ -132,7 +132,7 @@ describe("API Route - /api/ai/chat", () => {
     expect(body.error).toContain("Nenhuma resposta substituta");
   });
 
-  it("encaminha perguntas abertas sobre alertas para a interpretação cognitiva", async () => {
+  it("encaminha análise aberta ao agente com ferramentas sobre a fonte integral", async () => {
     authenticatedActor();
     const answer: RagResponse = {
       answer: "O valor empenhado não é alerta por si só; analise saldo a liquidar e prazos.",
@@ -140,14 +140,15 @@ describe("API Route - /api/ai/chat", () => {
       requestId: "req-ai-test", provider: "vercel-ai-gateway",
       model: "openai/gpt-5-mini", authMode: "oidc",
     };
-    vi.mocked(runFinancialInterpretation).mockResolvedValue(answer);
+    vi.mocked(runMclAssistant).mockResolvedValue(answer);
     const response = await POST(request({
       prompt: "Existe algum empenho não liquidado que deve gerar alerta?",
       history: [{ role: "user", content: "Qual o total empenhado?" }],
     }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(answer);
-    expect(runMclAssistant).not.toHaveBeenCalled();
+    expect(runMclAssistant).toHaveBeenCalled();
+    expect(runFinancialInterpretation).not.toHaveBeenCalled();
     expect(runCreditAnalyticsContingency).not.toHaveBeenCalled();
   });
 
@@ -210,3 +211,4 @@ describe("API Route - /api/ai/chat", () => {
     );
   });
 });
+

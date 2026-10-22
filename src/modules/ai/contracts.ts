@@ -16,7 +16,7 @@ export const chatHistoryMessageSchema = z.object({
 export const mclChatRequestSchema = z.object({
   prompt: z.string().trim().min(1).max(4_000),
   scope: z.enum(MCL_AI_SCOPES).default("Todos os Dados"),
-  history: z.array(chatHistoryMessageSchema).max(8).default([]),
+  history: z.array(chatHistoryMessageSchema).max(16).default([]),
 });
 
 export type MclChatRequest = z.infer<typeof mclChatRequestSchema>;
@@ -74,3 +74,4 @@ export class MclAiServiceError extends Error {
     this.name = "MclAiServiceError";
   }
 }
+

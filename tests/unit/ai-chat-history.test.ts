@@ -48,13 +48,14 @@ describe("Histórico do Assistente MCL após respostas financeiras extensas", ()
     ]);
   });
 
-  it("usa somente as oito mensagens anteriores mais recentes", () => {
-    const history = buildBoundedMclHistory(Array.from({length:14},(_,i)=>({
+  it("usa somente as dezesseis mensagens anteriores mais recentes", () => {
+    const history = buildBoundedMclHistory(Array.from({length:22},(_,i)=>({
       sender: i%2===0 ? "user" as const : "assistant" as const,
       text: "Mensagem " + i,
     })));
     expect(history).toHaveLength(AI_HISTORY_MAX_MESSAGES);
     expect(history[0].content).toBe("Mensagem 6");
-    expect(history.at(-1)?.content).toBe("Mensagem 13");
+    expect(history.at(-1)?.content).toBe("Mensagem 21");
   });
 });
+

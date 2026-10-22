@@ -771,13 +771,17 @@ export function projectCreditAnalytics(
     allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi) && matchesCreditSearch(row, input.search)
   );
 
+  const hasReportedBalances = Array.isArray(projection.operational.reportedCreditBalances);
+  const balanceRows = (projection.operational.reportedCreditBalances ?? []).filter(row =>
+    allowedUgs.has(row.ug) && matchesCreditNd(row.nd, input.nd) && matchesCreditPi(row.pi, input.pi));
   const summarize = (
     scopedNcs: typeof ncRows,
     scopedNes: typeof neRows,
+    scopedBalances: typeof balanceRows,
   ) => {
     const provisionUpdatedCents = creditSum(scopedNcs, (row) => row.provisionUpdatedCents);
     const committedCents = creditSum(scopedNes, (row) => row.committedCents);
-    const reportedAvailableCreditCents = creditSum(scopedNcs, (row) => row.availableCreditCents);
+    const reportedAvailableCreditCents = hasReportedBalances ? creditSum(scopedBalances, row => row.availableCreditCents) : creditSum(scopedNcs, row => row.availableCreditCents);
     const availableCreditCents = provisionUpdatedCents - committedCents;
     return {
       provisionUpdatedCents,
@@ -799,9 +803,9 @@ export function projectCreditAnalytics(
   if (groupBy === "UG") {
     matchingUgs.forEach((option) => registerGroup(option.ug, `${option.ug}: ${option.om}`));
   } else if (groupBy === "ND") {
-    [...ncRows, ...neRows].forEach((row) => registerGroup(row.nd, row.nd));
+    [...ncRows, ...neRows, ...balanceRows].forEach((row) => registerGroup(row.nd, row.nd));
   } else if (groupBy === "PI") {
-    [...ncRows, ...neRows].forEach((row) => registerGroup(row.pi, row.pi));
+    [...ncRows, ...neRows, ...balanceRows].forEach((row) => registerGroup(row.pi, row.pi));
   } else if (groupBy === "NE") {
     neRows.forEach((row) => registerGroup(row.id, `${row.ne}: ${row.description}`));
   } else {
@@ -811,7 +815,8 @@ export function projectCreditAnalytics(
   const groups = [...groupKeys.values()].map((group) => {
     const groupNcs = groupBy === "TOTAL" || groupBy === "NE" ? (groupBy === "TOTAL" ? ncRows : []) : ncRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
     const groupNes = groupBy === "TOTAL" ? neRows : groupBy === "NE" ? neRows.filter((row) => row.id === group.key) : neRows.filter((row) => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
-    const summary = summarize(groupNcs, groupNes);
+    const groupBalances = groupBy === "TOTAL" ? balanceRows : groupBy === "NE" ? [] : balanceRows.filter(row => row[groupBy === "UG" ? "ug" : groupBy === "ND" ? "nd" : "pi"] === group.key);
+    const summary = summarize(groupNcs, groupNes, groupBalances);
     const ne = groupBy === "NE" ? groupNes[0] : undefined;
     return {
       ...group,
@@ -872,8 +877,8 @@ export function projectCreditAnalytics(
     },
     metric,
     totals: {
-      ...summarize(ncRows, neRows),
-      metricValueCents: creditMetricValue(summarize(ncRows, neRows), metric),
+      ...summarize(ncRows, neRows, balanceRows),
+      metricValueCents: creditMetricValue(summarize(ncRows, neRows, balanceRows), metric),
     },
     groupBy,
     groups,
@@ -900,6 +905,7 @@ export function projectTgNcComposition(
   projection: TgDashboardProjection,
   input: Pick<CreditAnalyticsInput, "ug" | "nd" | "pi">,
   limit = 25,
+  offset = 0,
 ) {
   const totals = projectCreditAnalytics(projection, {
     ...input, metric: "AVAILABLE", groupBy: "TOTAL", includeFinalities: false,
@@ -946,8 +952,9 @@ export function projectTgNcComposition(
     filters: totals.filters,
     totals: accountingTotals,
     totalDocuments: documents.length,
-    shownDocuments: Math.min(count, documents.length),
-    documents: documents.slice(0, count),
+    shownDocuments: Math.max(0, Math.min(count, documents.length - offset)),
+    nextOffset: offset + count < documents.length ? offset + count : null,
+    documents: documents.slice(offset, offset + count),
     notes: [
       "As NC individualizam a origem e as movimentações de provisão, não necessariamente uma parcela atribuível do saldo disponível.",
       "Crédito disponível do filtro = provisão atualizada menos total empenhado. O saldo individual por NC não é calculado sem vínculo contábil explícito entre NC e NE.",
@@ -958,13 +965,13 @@ export function projectTgNcComposition(
 
 export async function queryTgNcComposition(
   actor: MclAiActor,
-  input: Pick<CreditAnalyticsInput, "ug" | "nd" | "pi"> & { limit?: number },
+  input: Pick<CreditAnalyticsInput, "ug" | "nd" | "pi"> & { limit?: number; offset?: number },
 ): Promise<MclToolEnvelope<ReturnType<typeof projectTgNcComposition> | { records: never[] }>> {
   if (!process.env.DATABASE_URL) return unavailable("DATABASE_URL não configurada. Não há dados demonstrativos.", { records: [] });
   if (!actor.organizationId) return unavailable("Organização não identificada.", { records: [] });
   const projection = await getLatestTgProjection(actor.organizationId);
   if (!projection) return unavailable("Nenhuma projeção TG persistida para esta organização.", { records: [] });
-  const data = projectTgNcComposition(projection, input, input.limit);
+  const data = projectTgNcComposition(projection, input, input.limit, input.offset);
   return {
     status: "AVAILABLE",
     dataNature: "CALCULATED_FROM_PERSISTED",
@@ -1096,3 +1103,4 @@ export async function queryOfficialCatmat(
     data: { records },
   };
 }
+

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { classifyMclAiError, runMclAssistant } from "@/modules/ai/agent";
 import { runCreditAnalyticsContingency } from "@/modules/ai/credit-analytics";
-import { runFinancialInterpretation } from "@/modules/ai/financial-interpretation";
 import { runMclCognitiveCore } from "@/modules/ai/cognitive-core";
 import { mclChatRequestSchema, type MclChatRequest } from "@/modules/ai/contracts";
 import { assertMclAiRateLimit } from "@/modules/ai/rate-limit";
@@ -83,19 +82,6 @@ export async function POST(request: Request) {
         durationMs: Date.now() - startedAt,
       }));
       return NextResponse.json(cognitive);
-    }
-
-    const interpretation = await runFinancialInterpretation(input, actor, requestId, request.signal);
-    if (interpretation) {
-      console.info(JSON.stringify({
-        level: "info",
-        message: "Assistente IA concluiu interpretação financeira baseada em evidências",
-        route: "/api/ai/chat",
-        requestId,
-        provider: interpretation.provider,
-        durationMs: Date.now() - startedAt,
-      }));
-      return NextResponse.json(interpretation);
     }
 
     console.info(JSON.stringify({
@@ -179,3 +165,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

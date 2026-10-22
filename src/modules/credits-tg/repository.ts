@@ -8,7 +8,7 @@ import { encodeTgPayload, decodeTgPayload } from "./payload";
 // Separate source kind: queries for SAG CURRENT/RPNP cannot consume this payload.
 // Stable database discriminator. The payload itself declares V1 or V2.
 export const TG_SOURCE_KIND = "TG_MASTER_V1";
-export const TG_PROJECTION_VERSION = 2;
+export const TG_PROJECTION_VERSION = 3;
 export type TgSnapshot = TgReport & { checksum: string; importedAt: string; emailReceivedAt: string | null; ingestionMethod: string };
 export type TgSnapshotMetadata = Omit<TgSnapshot, "rows"> & { rowCount: number };
 export type TgDashboardProjection = { projectionVersion?: number; snapshot: TgSnapshotMetadata; operational: ReturnType<typeof projectTgOperational> };
@@ -69,3 +69,4 @@ export async function getLatestTg(organizationId: string): Promise<TgSnapshot | 
   if (!["TG_MASTER_V1", "TG_MASTER_V2"].includes(payload.schema) || !Array.isArray(payload.rows)) throw new Error("Carga TG persistida incompatível.");
   return { ...payload, checksum: record.checksum, importedAt: record.importedAt.toISOString(), emailReceivedAt: payload.emailReceivedAt ?? null, ingestionMethod: record.ingestionMethod };
 }
+
