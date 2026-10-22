@@ -200,7 +200,7 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     ["Mas digo: me mostre as NC que estão formando esse saldo disponível", "documents"],
     ["sim!!! quero!!!", "documents"],
     ["já falei que quero", "source"],
-  ] as const)("executa listagem das NC sem repetir origem da UG: %s", async (question, intent) => {
+  ] as const)("delega documentos ao agente com acesso integral à fonte: %s", async (question, intent) => {
     plan({ intent, entity: "NC", metric: intent === "source" ? null : "AVAILABLE",
       scope: "context", denominator: null, search: "NC" });
     const history = [
@@ -210,17 +210,9 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
       { role: "assistant" as const, content: "Você deseja a lista detalhada das Notas de Crédito da UG 160136?" },
     ];
     const response = await runMclCognitiveCore(input(question, history), actor, "req-nc");
-    expect(queryTgNcComposition).toHaveBeenCalledWith(actor, {
-      ug: "160136", nd: undefined, pi: undefined, limit: 25,
-    });
+    expect(response).toBeNull();
+    expect(queryTgNcComposition).not.toHaveBeenCalled();
     expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
-    expect(response?.answer).toContain("2026NC000123");
-    expect(response?.answer).toContain("2026NC000124");
-    expect(response?.answer).toMatch(/R\$\s+550,00/);
-    expect(response?.answer).toContain("não é possível afirmar o saldo exclusivo de cada NC");
-    expect(response?.answer).not.toContain("Está filtrado para essa UG, não para a soma das OMDS");
-    expect(response?.warnings).toContainEqual(expect.stringContaining("desatualizada"));
-    expect(response?.citations[0].source).toBe("TESOURO_GERENCIAL");
   });
 
   it("não inventa NC se o extrato não trouxer documentos identificados", async () => {
@@ -231,8 +223,15 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
       gaps: ["Nenhuma NC individualizada identificada."],
     } as never);
     const response = await runMclCognitiveCore(input("Quais NC compõem o crédito disponível?"), actor, "req-empty-nc");
-    expect(response?.answer).toContain("Não há NC individualizadas");
-    expect(response?.answer).not.toContain("2026NC000123");
+    expect(response).toBeNull();
+    expect(queryTgNcComposition).not.toHaveBeenCalled();
+  });
+
+  it("preserva esclarecimento no fim de mensagem longa para o planejador", async () => {
+    plan({intent:"analysis",metric:null});
+    const content="Contexto. ".repeat(130)+"Critério confirmado: prazo de recolhimento da NC.";
+    await runMclCognitiveCore(input("isso mesmo",[{role:"user",content}]),actor,"req-context");
+    expect(JSON.stringify(vi.mocked(generateText).mock.calls[0][0])).toContain("Critério confirmado: prazo de recolhimento da NC.");
   });
 
   it("catálogo publica só capacidades efetivamente adaptadas; Radar não é falso disponível", () => {
@@ -317,10 +316,10 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
   });
 
-  it("responde necessidade de esclarecimento sem acessar dados indevidos", async () => {
+  it("delega esclarecimento ao agente que preserva o contexto", async () => {
     plan({ intent: "clarify", metric: null, clarification: "Qual medida deseja comparar?" });
     const response = await runMclCognitiveCore(input("qual é o percentual?"), actor, "req-ask");
-    expect(response?.answer).toBe("Qual medida deseja comparar?");
+    expect(response).toBeNull();
     expect(queryTgCreditAnalytics).not.toHaveBeenCalled();
   });
 
@@ -345,3 +344,4 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     expect(() => aiSemanticPlanSchema.parse({ ...basePlan, metric: "FAKE_VALUE" })).toThrow();
   });
 });
+

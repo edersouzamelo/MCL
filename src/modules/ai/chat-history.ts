@@ -17,7 +17,7 @@ export type BoundedChatMessage = {
 };
 
 export const AI_HISTORY_MESSAGE_LIMIT = 4_000;
-export const AI_HISTORY_MAX_MESSAGES = 8;
+export const AI_HISTORY_MAX_MESSAGES = 16;
 const KEEP_HEAD_CHARS = 2_600;
 const KEEP_TAIL_CHARS = 700;
 const OMISSION = "\n[Resposta extensa abreviada apenas no histórico. Para analisar os registros, consulte novamente a fonte estruturada; o texto omitido não está disponível neste contexto.]\n";
@@ -44,3 +44,4 @@ export function buildBoundedMclHistory(
       content: compactHistoryContent(message),
     }));
 }
+
