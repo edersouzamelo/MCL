@@ -275,6 +275,37 @@ describe("Cognitive Core v1 / contratos semânticos", () => {
     expect(String(invocation.instructions)).toContain("OBJETO ESTRUTURADO");
   });
 
+  it("não herda ND ou PI antigos quando a pergunta atual inicia busca por objeto em RPNP", async () => {
+    plan({
+      intent: "value",
+      metric: "RPNP_REGISTERED_TOTAL",
+      denominator: null,
+      scope: "unit",
+      unit: "9 BSUP",
+      nd: "339039",
+      pi: "PI-ANTIGO",
+      search: "COTURNO",
+      groupBy: "NE",
+    });
+    const history = [
+      { role: "user" as const, content: "quanto de créditos que o 9 B Sup inscreveu em restos a pagar?" },
+      { role: "assistant" as const, content: "O valor inscrito e reinscrito soma R$ 1.019.172,67." },
+      { role: "user" as const, content: "quantos desses RP são de serviço 339039?" },
+      { role: "assistant" as const, content: "Na ND 339039, o total soma R$ 626.234,65." },
+    ];
+
+    await runMclCognitiveCore(input("Existe empenho de COTURNO em RP?", history), actor, "req-rpnp-search");
+
+    expect(queryTgCreditAnalytics).toHaveBeenCalledWith(actor, expect.objectContaining({
+      ug: "9 BSUP",
+      metric: "RPNP_REGISTERED_TOTAL",
+      search: "coturno",
+      nd: undefined,
+      pi: undefined,
+      groupBy: "NE",
+    }));
+  });
+
   it.each([
     ["PAID", "COMMITTED", "30,00%"],
     ["TO_LIQUIDATE", "COMMITTED", "60,00%"],
