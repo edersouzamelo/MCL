@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { gateway, generateText, Output } from "ai";
 import { MclAiServiceError } from "@/modules/ai/contracts";
 import type { MclAiActor, MclChatRequest, RagResponse } from "@/modules/ai/contracts";
-import { type ResolvedCreditIntent, formatCreditAnalyticsAnswer } from "@/modules/ai/credit-analytics";
+import {
+  type ResolvedCreditIntent,
+  formatCreditAnalyticsAnswer,
+  resolveCreditAnalyticsIntent,
+} from "@/modules/ai/credit-analytics";
 import { resolveMclModel } from "@/modules/ai/provider";
 import { queryTgCreditAnalytics, type CreditAnalyticsInput } from "@/modules/ai/silos";
 import { prisma } from "@/server/db";
@@ -273,9 +277,17 @@ export async function runMclCognitiveCore(input: MclChatRequest, actor: MclAiAct
       requestId, parsed,
     );
   }
+  // O planejador pode preservar classificações do histórico mesmo quando a
+  // pergunta atual inicia uma nova busca por objeto. Revalidar a busca apenas
+  // contra a mensagem corrente impede que ND/PI antigos estreitem o resultado
+  // sem terem sido repetidos pelo usuário.
+  const currentIntent = resolveCreditAnalyticsIntent({ ...input, history: [] });
+  const startsObjectSearch = Boolean(plan.search && currentIntent.search);
   const filters: CreditAnalyticsInput = {
     ug: target.unit || undefined,
-    nd: plan.nd || undefined, pi: plan.pi || undefined, search: plan.search || undefined,
+    nd: startsObjectSearch ? currentIntent.nd : plan.nd || undefined,
+    pi: startsObjectSearch ? currentIntent.pi : plan.pi || undefined,
+    search: startsObjectSearch ? currentIntent.search : plan.search || undefined,
     metric: plan.metric ?? (comparison ? plan.metrics[0] : "AVAILABLE"),
     groupBy: plan.intent === "source" ? "UG" : plan.intent === "ranking" ? "NE" : (plan.groupBy || "TOTAL"),
     sort: plan.intent === "ranking" ? "VALUE_DESC" : undefined,
